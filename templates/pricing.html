@@ -1,0 +1,225 @@
+{% extends "base.html" %}
+{% block title %}Plans & Pricing{% endblock %}
+
+{% block content %}
+<div class="pricing-header px-3 py-3 pt-md-5 pb-md-4 mx-auto text-center">
+    <h1 class="display-4 fw-bold">Plans & Pricing</h1>
+    <p class="lead text-muted">Choose the perfect plan for your fleet. From basic tracking to enterprise-level
+        management.</p>
+</div>
+
+<!-- Feature Filter UI -->
+<div class="container mb-4">
+    <div class="row justify-content-center">
+        <div class="col-md-6 col-lg-4">
+            <div class="input-group shadow-sm">
+                <label class="input-group-text bg-white border-end-0" for="featureFilter"><i
+                        class="fas fa-filter text-primary"></i></label>
+                <select class="form-select border-start-0 ps-0" id="featureFilter">
+                    <option value="all" selected>Show All Plans</option>
+                    <option value="dashboard_map">Live Fleet Map</option>
+                    <option value="dashboard_charts">Analytics Charts</option>
+                    <option value="dashboard_alerts">Real-time Alerts</option>
+                    <option value="user_manager">User Management</option>
+                    <option value="notifications">Notification Rules</option>
+                </select>
+            </div>
+            <div class="form-text text-center mt-2">Filter plans based on the features you need.</div>
+        </div>
+    </div>
+</div>
+
+<div class="container py-5">
+    <div class="row row-cols-1 row-cols-md-4 mb-3 text-center g-4" id="plansContainer">
+        {% for plan_name, plan_data in modules_config.items() %}
+        <!-- Determine if this plan matches current filter via JS, but we add data attributes here -->
+        <div class="col plan-card-col" data-modules="{{ plan_data.enabled_modules|join(',') }}">
+            <div
+                class="card mb-4 rounded-3 shadow-sm pricing-card h-100 {% if plan_name == 'Premium' %}border-primary premium-border{% endif %}">
+                <div class="card-header py-3 {% if plan_name == 'Premium' %}text-bg-primary border-primary{% endif %}">
+                    <h4 class="my-0 fw-bold">{{ plan_name }}</h4>
+                </div>
+                <div class="card-body d-flex flex-column">
+                    <h1 class="card-title pricing-card-title">{{ plan_data.vehicle_limit }}<small
+                            class="text-muted fw-light"> Veh</small></h1>
+                    <ul class="list-unstyled mt-3 mb-4 flex-grow-1 text-start small ps-3">
+                        <li class="mb-2"><i class="fas fa-check text-success me-2"></i> {{ plan_data.user_limit }} User
+                            Limit</li>
+
+                        {# Custom Feature Rendering Loop #}
+                        {% for module in plan_data.enabled_modules %}
+                        {% set friendly_name = module %}
+                        {% if module == 'dashboard' %}{% set friendly_name = 'Dashboard Access' %}
+                        {% elif module == 'dashboard_stats' %}{% set friendly_name = 'Key Performance Stats' %}
+                        {% elif module == 'dashboard_map' %}{% set friendly_name = 'Live Fleet Map' %}
+                        {% elif module == 'dashboard_charts' %}{% set friendly_name = 'Connectivity Charts' %}
+                        {% elif module == 'dashboard_big_chart' %}{% set friendly_name = 'Utilization Graph' %}
+                        {% elif module == 'dashboard_alerts' %}{% set friendly_name = 'Live Alert Feed' %}
+                        {% elif module == 'reports' %}{% set friendly_name = 'Car Quantity Report' %}
+                        {% elif module == 'pre_reg_report' %}{% set friendly_name = 'Pre-Registration Report' %}
+                        {% elif module == 'vehicle_add' %}{% set friendly_name = 'Vehicle Registration' %}
+                        {% elif module == 'user_manager' %}{% set friendly_name = 'User Manager' %}
+                        {% elif module == 'notifications' %}{% set friendly_name = 'Notification Rules' %}
+                        {% elif module == 'servers' %}{% set friendly_name = 'Server Settings' %}
+                        {% endif %}
+
+                        <li class="mb-1"><i class="fas fa-check text-success me-2"></i> {{ friendly_name }}</li>
+                        {% endfor %}
+                    </ul>
+                    <button type="button"
+                        class="w-100 btn btn-lg {% if plan_name == 'Premium' %}btn-primary{% else %}btn-outline-primary{% endif %} mt-auto">Get
+                        Started</button>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Download Section -->
+    <div class="download-section mt-5 p-5 rounded-4 shadow-lg position-relative overflow-hidden">
+        <div class="download-bg-overlay"></div>
+        <div class="container position-relative" style="z-index: 2;">
+            <div class="row align-items-center g-5">
+                <div class="col-lg-6">
+                    <div class="download-content">
+                        <div class="mb-3">
+                            <span class="badge bg-white text-primary px-3 py-2 rounded-pill shadow-sm">
+                                <i class="fas fa-mobile-alt me-2"></i>Mobile App Available
+                            </span>
+                        </div>
+                        <h2 class="display-5 fw-bold text-white mb-3">
+                            Take Control On The Go
+                        </h2>
+                        <p class="lead text-white-50 mb-4">
+                            Download the IVMS mobile app and manage your fleet from anywhere.
+                            Real-time tracking, instant alerts, and comprehensive reports at your fingertips.
+                        </p>
+
+                        <div class="row g-3 mb-4">
+                            <div class="col-sm-6">
+                                <div class="feature-badge">
+                                    <i class="fas fa-map-marked-alt text-primary"></i>
+                                    <div>
+                                        <h6 class="mb-0">Real-time Tracking</h6>
+                                        <small class="text-muted">Live location updates</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <!-- ... -->
+                            <div class="col-sm-6">
+                                <div class="feature-badge">
+                                    <i class="fas fa-wifi text-primary"></i>
+                                    <div>
+                                        <h6 class="mb-0">Offline Support</h6>
+                                        <small class="text-muted">Works without internet</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-lg-6">
+                    <div class="download-card p-5 rounded-4 text-center">
+                        <div class="mb-4">
+                            <div class="app-icon mx-auto mb-3">
+                                <i class="fas fa-satellite-dish"></i>
+                            </div>
+                            <h4 class="fw-bold mb-2">IVMS Mobile</h4>
+                            <p class="text-muted mb-0">Version 1.0.0</p>
+                        </div>
+                        <a href="/download/apk"
+                            class="btn btn-primary btn-lg download-btn w-100 py-3 rounded-3 shadow-lg">
+                            <i class="fab fa-android me-2"></i>
+                            Download APK
+                            <i class="fas fa-download ms-2"></i>
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="mt-5 p-4 bg-white rounded-3 shadow-sm border-0">
+        <h3 class="fw-bold mb-4 text-center">Detailed Feature Comparison</h3>
+        <div class="table-responsive">
+            <table class="table text-center align-middle table-hover">
+                <thead>
+                    <tr>
+                        <th style="width: 34%;">Feature</th>
+                        {% for plan_name in modules_config.keys() %}
+                        <th style="width: 16.5%;">{{ plan_name }}</th>
+                        {% endfor %}
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <th scope="row" class="text-start">Vehicle Limit</th>
+                        {% for plan_name, plan_data in modules_config.items() %}
+                        <td>{{ plan_data.vehicle_limit }}</td>
+                        {% endfor %}
+                    </tr>
+                    <tr>
+                        <th scope="row" class="text-start">User Limit</th>
+                        {% for plan_name, plan_data in modules_config.items() %}
+                        <td>{{ plan_data.user_limit }}</td>
+                        {% endfor %}
+                    </tr>
+                    {# Detailed Rows #}
+                    {% for mod in all_modules %}
+                    {% set friendly_name = mod %}
+                    {% if mod == 'dashboard' %}{% set friendly_name = 'Dashboard Access' %}
+                    {% elif mod == 'dashboard_stats' %}{% set friendly_name = 'Key Performance Stats' %}
+                    {% elif mod == 'dashboard_map' %}{% set friendly_name = 'Live Fleet Map' %}
+                    {% elif mod == 'dashboard_charts' %}{% set friendly_name = 'Connectivity Charts' %}
+                    {% elif mod == 'dashboard_big_chart' %}{% set friendly_name = 'Utilization Graph' %}
+                    {% elif mod == 'dashboard_alerts' %}{% set friendly_name = 'Live Alert Feed' %}
+                    {% elif mod == 'reports' %}{% set friendly_name = 'Car Quantity Report' %}
+                    {% elif mod == 'pre_reg_report' %}{% set friendly_name = 'Pre-Registration Report' %}
+                    {% elif mod == 'vehicle_add' %}{% set friendly_name = 'Vehicle Registration' %}
+                    {% elif mod == 'user_manager' %}{% set friendly_name = 'User Manager' %}
+                    {% elif mod == 'notifications' %}{% set friendly_name = 'Notification Rules' %}
+                    {% elif mod == 'servers' %}{% set friendly_name = 'Server Settings' %}
+                    {% endif %}
+                    <tr>
+                        <th scope="row" class="text-start">{{ friendly_name }}</th>
+                        {% for plan_name, plan_data in modules_config.items() %}
+                        <td>
+                            {% if mod in plan_data.enabled_modules %}
+                            <i class="fas fa-check text-success"></i>
+                            {% else %}
+                            <i class="fas fa-minus text-muted opacity-25"></i>
+                            {% endif %}
+                        </td>
+                        {% endfor %}
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.getElementById('featureFilter').addEventListener('change', function () {
+        const selected = this.value;
+        const cols = document.querySelectorAll('.plan-card-col');
+
+        cols.forEach(col => {
+            const modules = col.getAttribute('data-modules').split(',');
+            if (selected === 'all') {
+                col.style.opacity = '1';
+                col.style.filter = 'none';
+            } else {
+                if (modules.includes(selected)) {
+                    col.style.opacity = '1';
+                    col.style.filter = 'none';
+                } else {
+                    col.style.opacity = '0.3';
+                    col.style.filter = 'grayscale(100%)';
+                }
+            }
+        });
+    });
+</script>
+{% endblock %}

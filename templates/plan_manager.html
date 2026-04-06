@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% block title %}Plan Management{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h3 class="mb-4">Plan Management</h3>
+
+        {% if success %}
+        <div class="alert alert-success">{{ success }}</div>
+        {% endif %}
+        {% if error %}
+        <div class="alert alert-danger">{{ error }}</div>
+        {% endif %}
+
+        <div class="row row-cols-1 row-cols-md-2 g-4">
+            {% for plan_name, plan_data in modules_config.items() %}
+            <div class="col">
+                <div class="card h-100 border-0 shadow-sm">
+                    <div
+                        class="card-header {% if plan_name == 'Premium' %}bg-primary text-white{% else %}bg-light{% endif %}">
+                        <h5 class="mb-0">{{ plan_name }} Plan</h5>
+                    </div>
+                    <div class="card-body">
+                        <form method="post">
+                            <input type="hidden" name="action" value="update">
+                            <input type="hidden" name="plan_name" value="{{ plan_name }}">
+
+                            <div class="row g-3 mb-4">
+                                <div class="col-md-6">
+                                    <div class="outlined-group">
+                                        <input type="number" name="vehicle_limit" class="form-control"
+                                            value="{{ plan_data.vehicle_limit }}" required>
+                                        <label>Vehicle Limit</label>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="outlined-group">
+                                        <input type="number" name="user_limit" class="form-control"
+                                            value="{{ plan_data.user_limit }}" required>
+                                        <label>User Limit</label>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <h6>Enabled Modules</h6>
+                            <div class="row row-cols-1 row-cols-sm-2 g-2 mb-4">
+                                {% for module in all_modules %}
+                                <div class="col">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" name="enabled_modules"
+                                            value="{{ module }}" id="check-{{ plan_name }}-{{ module }}" {% if module in
+                                            plan_data.enabled_modules %}checked{% endif %}>
+                                        <label class="form-check-label" for="check-{{ plan_name }}-{{ module }}">
+                                            {{ module | replace('_', ' ') | title }}
+                                        </label>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+
+                            <button type="submit" class="btn btn-primary w-100">Update {{ plan_name }} Plan</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endblock %}

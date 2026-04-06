@@ -1,0 +1,469 @@
+nohup: ignoring input
+/home/concept/ivms_project/venv/lib/python3.12/site-packages/gunicorn/util.py:25: UserWarning: pkg_resources is deprecated as an API. See https://setuptools.pypa.io/en/latest/pkg_resources.html. The pkg_resources package is slated for removal as early as 2025-11-30. Refrain from using this package or pin to Setuptools<81.
+  import pkg_resources
+[2026-01-16 10:16:58 +0000] [63088] [INFO] Starting gunicorn 20.1.0
+[2026-01-16 10:16:58 +0000] [63088] [INFO] Listening at: http://0.0.0.0:5000 (63088)
+[2026-01-16 10:16:58 +0000] [63088] [INFO] Using worker: sync
+[2026-01-16 10:16:58 +0000] [63095] [INFO] Booting worker with pid: 63095
+[2026-01-16 10:16:58 +0000] [63098] [INFO] Booting worker with pid: 63098
+[2026-01-16 10:16:58 +0000] [63099] [INFO] Booting worker with pid: 63099
+[2026-01-16 10:29:17 +0000] [63088] [INFO] Handling signal: hup
+[2026-01-16 10:29:17 +0000] [63088] [INFO] Hang up: Master
+[2026-01-16 10:29:17 +0000] [63088] [WARNING] Worker with pid 63098 was terminated due to signal 1
+[2026-01-16 10:29:17 +0000] [64664] [INFO] Booting worker with pid: 64664
+[2026-01-16 10:29:17 +0000] [63088] [WARNING] Worker with pid 63095 was terminated due to signal 1
+[2026-01-16 10:29:17 +0000] [63088] [WARNING] Worker with pid 63099 was terminated due to signal 1
+[2026-01-16 10:29:17 +0000] [64665] [INFO] Booting worker with pid: 64665
+[2026-01-16 10:29:17 +0000] [64666] [INFO] Booting worker with pid: 64666
+[2026-01-20 04:04:10 +0000] [63088] [CRITICAL] WORKER TIMEOUT (pid:64664)
+[2026-01-20 04:04:10 +0000] [64664] [INFO] Worker exiting (pid: 64664)
+[2026-01-20 04:04:11 +0000] [63088] [WARNING] Worker with pid 64664 was terminated due to signal 9
+[2026-01-20 04:04:11 +0000] [261974] [INFO] Booting worker with pid: 261974
+[2026-01-20 04:30:30 +0000] [63088] [CRITICAL] WORKER TIMEOUT (pid:64666)
+[2026-01-20 04:30:30 +0000] [64666] [INFO] Worker exiting (pid: 64666)
+[2026-01-20 04:30:31 +0000] [63088] [WARNING] Worker with pid 64666 was terminated due to signal 9
+[2026-01-20 04:30:31 +0000] [263298] [INFO] Booting worker with pid: 263298
+[2026-01-20 04:45:40 +0000] [63088] [CRITICAL] WORKER TIMEOUT (pid:261974)
+[2026-01-20 04:45:40 +0000] [261974] [INFO] Worker exiting (pid: 261974)
+[2026-01-20 04:45:41 +0000] [63088] [WARNING] Worker with pid 261974 was terminated due to signal 9
+[2026-01-20 04:45:41 +0000] [263674] [INFO] Booting worker with pid: 263674
+[2026-01-20 04:49:58,333] WARNING in external_report_service: External Report: Vehicle 864275071210218 has distance > 0 but engineHours = 0 on 2025-12-29
+[2026-01-20 04:50:24 +0000] [63088] [CRITICAL] WORKER TIMEOUT (pid:64665)
+[2026-01-20 04:50:24 +0000] [64665] [INFO] Worker exiting (pid: 64665)
+[2026-01-20 04:50:25 +0000] [63088] [WARNING] Worker with pid 64665 was terminated due to signal 9
+[2026-01-20 04:50:25 +0000] [263785] [INFO] Booting worker with pid: 263785
+[2026-01-20 04:51:58,364] WARNING in external_report_service: External Report: Vehicle 864275071210218 has distance > 0 but engineHours = 0 on 2025-12-29
+[2026-01-20 04:52:26 +0000] [63088] [CRITICAL] WORKER TIMEOUT (pid:263785)
+[2026-01-20 04:52:26 +0000] [263785] [INFO] Worker exiting (pid: 263785)
+[2026-01-20 04:52:26 +0000] [263835] [INFO] Booting worker with pid: 263835
+[2026-01-20 04:53:58 +0000] [63088] [CRITICAL] WORKER TIMEOUT (pid:263674)
+[2026-01-20 04:53:58 +0000] [263674] [INFO] Worker exiting (pid: 263674)
+[2026-01-20 04:53:58 +0000] [263869] [INFO] Booting worker with pid: 263869
+[2026-01-20 05:37:21 +0000] [63088] [CRITICAL] WORKER TIMEOUT (pid:263869)
+[2026-01-20 05:37:21 +0000] [263869] [INFO] Worker exiting (pid: 263869)
+[2026-01-20 05:37:22 +0000] [63088] [WARNING] Worker with pid 263869 was terminated due to signal 9
+[2026-01-20 05:37:22 +0000] [264924] [INFO] Booting worker with pid: 264924
+[2026-01-20 06:05:16,534] WARNING in external_report_service: External Report: Vehicle 864275071210218 has distance > 0 but engineHours = 0 on 2025-12-29
+[2026-01-20 06:05:43 +0000] [63088] [CRITICAL] WORKER TIMEOUT (pid:264924)
+[2026-01-20 06:05:43 +0000] [264924] [INFO] Worker exiting (pid: 264924)
+[2026-01-20 06:05:44 +0000] [63088] [WARNING] Worker with pid 264924 was terminated due to signal 9
+[2026-01-20 06:05:44 +0000] [265612] [INFO] Booting worker with pid: 265612
+[2026-01-20 06:06:50 +0000] [63088] [CRITICAL] WORKER TIMEOUT (pid:263298)
+[2026-01-20 06:06:50 +0000] [263298] [INFO] Worker exiting (pid: 263298)
+[2026-01-20 06:06:51 +0000] [63088] [WARNING] Worker with pid 263298 was terminated due to signal 9
+[2026-01-20 06:06:51 +0000] [265639] [INFO] Booting worker with pid: 265639
+[2026-01-22 07:49:24 +0000] [63088] [CRITICAL] WORKER TIMEOUT (pid:263835)
+[2026-01-22 07:49:24 +0000] [263835] [INFO] Worker exiting (pid: 263835)
+[2026-01-22 07:49:25,790] WARNING in external_report_service: External Report: Vehicle 864275071226750 has distance > 0 but engineHours = 0 on 2026-01-04
+[2026-01-22 07:49:25 +0000] [63088] [WARNING] Worker with pid 263835 was terminated due to signal 9
+[2026-01-22 07:49:25 +0000] [338077] [INFO] Booting worker with pid: 338077
+[2026-01-22 07:49:54 +0000] [63088] [CRITICAL] WORKER TIMEOUT (pid:265612)
+[2026-01-22 07:49:54 +0000] [265612] [INFO] Worker exiting (pid: 265612)
+[2026-01-22 07:49:56 +0000] [63088] [WARNING] Worker with pid 265612 was terminated due to signal 9
+[2026-01-22 07:49:56 +0000] [338091] [INFO] Booting worker with pid: 338091
+[2026-01-22 07:50:25 +0000] [63088] [CRITICAL] WORKER TIMEOUT (pid:265639)
+[2026-01-22 07:50:25 +0000] [265639] [INFO] Worker exiting (pid: 265639)
+[2026-01-22 07:50:25,169] WARNING in external_report_service: External Report: Vehicle 864275071210820 has distance > 0 but engineHours = 0 on 2026-01-10
+[2026-01-22 07:50:26 +0000] [63088] [WARNING] Worker with pid 265639 was terminated due to signal 9
+[2026-01-22 07:50:26 +0000] [338109] [INFO] Booting worker with pid: 338109
+[2026-01-22 07:50:55 +0000] [63088] [CRITICAL] WORKER TIMEOUT (pid:338091)
+[2026-01-22 07:50:55 +0000] [338091] [INFO] Worker exiting (pid: 338091)
+[2026-01-22 07:50:55 +0000] [338120] [INFO] Booting worker with pid: 338120
+[2026-01-22 07:51:25 +0000] [63088] [CRITICAL] WORKER TIMEOUT (pid:338077)
+[2026-01-22 07:51:25 +0000] [338077] [INFO] Worker exiting (pid: 338077)
+[2026-01-22 07:51:25 +0000] [338131] [INFO] Booting worker with pid: 338131
+[2026-01-22 07:51:55 +0000] [63088] [CRITICAL] WORKER TIMEOUT (pid:338109)
+[2026-01-22 07:51:55 +0000] [338109] [INFO] Worker exiting (pid: 338109)
+[2026-01-22 07:51:55 +0000] [338144] [INFO] Booting worker with pid: 338144
+[2026-01-22 07:52:25 +0000] [63088] [CRITICAL] WORKER TIMEOUT (pid:338120)
+[2026-01-22 07:52:25 +0000] [338120] [INFO] Worker exiting (pid: 338120)
+[2026-01-22 07:52:25 +0000] [338155] [INFO] Booting worker with pid: 338155
+[2026-01-22 08:12:06 +0000] [63088] [CRITICAL] WORKER TIMEOUT (pid:338131)
+[2026-01-22 08:12:06 +0000] [338131] [INFO] Worker exiting (pid: 338131)
+[2026-01-22 08:12:06 +0000] [338618] [INFO] Booting worker with pid: 338618
+[2026-01-22 08:12:37,857] WARNING in external_report_service: External Report: Vehicle 864275071210820 has distance > 0 but engineHours = 0 on 2026-01-10
+[2026-01-22 08:14:57 +0000] [63088] [CRITICAL] WORKER TIMEOUT (pid:338618)
+[2026-01-22 08:14:57 +0000] [338618] [INFO] Worker exiting (pid: 338618)
+[2026-01-22 08:14:57 +0000] [338961] [INFO] Booting worker with pid: 338961
+[2026-01-22 08:14:58,799] WARNING in external_report_service: External Report: Vehicle 864275071226750 has distance > 0 but engineHours = 0 on 2026-01-04
+[2026-01-22 08:16:14 +0000] [63088] [CRITICAL] WORKER TIMEOUT (pid:338155)
+[2026-01-22 08:16:14 +0000] [338155] [INFO] Worker exiting (pid: 338155)
+[2026-01-22 08:16:15 +0000] [339212] [INFO] Booting worker with pid: 339212
+[2026-01-22 08:16:45 +0000] [63088] [CRITICAL] WORKER TIMEOUT (pid:338144)
+[2026-01-22 08:16:45 +0000] [338144] [INFO] Worker exiting (pid: 338144)
+[2026-01-22 08:16:46 +0000] [63088] [WARNING] Worker with pid 338144 was terminated due to signal 9
+[2026-01-22 08:16:46 +0000] [339225] [INFO] Booting worker with pid: 339225
+[2026-01-22 08:17:49 +0000] [63088] [CRITICAL] WORKER TIMEOUT (pid:339212)
+[2026-01-22 08:17:49 +0000] [339212] [INFO] Worker exiting (pid: 339212)
+[2026-01-22 08:17:49 +0000] [339251] [INFO] Booting worker with pid: 339251
+[2026-01-23 04:56:05 +0000] [63088] [INFO] Handling signal: hup
+[2026-01-23 04:56:05 +0000] [63088] [INFO] Hang up: Master
+[2026-01-23 04:56:05 +0000] [63088] [WARNING] Worker with pid 338961 was terminated due to signal 1
+[2026-01-23 04:56:05 +0000] [374086] [INFO] Booting worker with pid: 374086
+[2026-01-23 04:56:05 +0000] [63088] [WARNING] Worker with pid 339225 was terminated due to signal 1
+--- Logging error ---
+[2026-01-23 04:56:05 +0000] [374087] [INFO] Booting worker with pid: 374087
+Traceback (most recent call last):
+  File "/usr/lib/python3.12/logging/__init__.py", line 1163, in emit
+    stream.write(msg + self.terminator)
+RuntimeError: reentrant call inside <_io.BufferedWriter name='<stderr>'>
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/usr/lib/python3.12/logging/__init__.py", line 1163, in emit
+    stream.write(msg + self.terminator)
+  File "/home/concept/ivms_project/venv/lib/python3.12/site-packages/gunicorn/arbiter.py", line 242, in handle_chld
+    self.reap_workers()
+  File "/home/concept/ivms_project/venv/lib/python3.12/site-packages/gunicorn/arbiter.py", line 530, in reap_workers
+    self.log.warning(
+  File "/home/concept/ivms_project/venv/lib/python3.12/site-packages/gunicorn/glogging.py", line 261, in warning
+    self.error_log.warning(msg, *args, **kwargs)
+  File "/usr/lib/python3.12/logging/__init__.py", line 1551, in warning
+    self._log(WARNING, msg, args, **kwargs)
+  File "/usr/lib/python3.12/logging/__init__.py", line 1684, in _log
+    self.handle(record)
+  File "/usr/lib/python3.12/logging/__init__.py", line 1700, in handle
+    self.callHandlers(record)
+  File "/usr/lib/python3.12/logging/__init__.py", line 1762, in callHandlers
+    hdlr.handle(record)
+  File "/usr/lib/python3.12/logging/__init__.py", line 1028, in handle
+    self.emit(record)
+  File "/usr/lib/python3.12/logging/__init__.py", line 1168, in emit
+    self.handleError(record)
+  File "/usr/lib/python3.12/logging/__init__.py", line 1081, in handleError
+    sys.stderr.write('--- Logging error ---\n')
+RuntimeError: reentrant call inside <_io.BufferedWriter name='<stderr>'>
+Call stack:
+  File "/home/concept/ivms_project/venv/bin/gunicorn", line 8, in <module>
+    sys.exit(run())
+  File "/home/concept/ivms_project/venv/lib/python3.12/site-packages/gunicorn/app/wsgiapp.py", line 67, in run
+    WSGIApplication("%(prog)s [OPTIONS] [APP_MODULE]").run()
+  File "/home/concept/ivms_project/venv/lib/python3.12/site-packages/gunicorn/app/base.py", line 231, in run
+    super().run()
+  File "/home/concept/ivms_project/venv/lib/python3.12/site-packages/gunicorn/app/base.py", line 72, in run
+    Arbiter(self).run()
+  File "/home/concept/ivms_project/venv/lib/python3.12/site-packages/gunicorn/arbiter.py", line 224, in run
+    handler()
+  File "/home/concept/ivms_project/venv/lib/python3.12/site-packages/gunicorn/arbiter.py", line 253, in handle_hup
+    self.reload()
+  File "/home/concept/ivms_project/venv/lib/python3.12/site-packages/gunicorn/arbiter.py", line 481, in reload
+    self.spawn_worker()
+  File "/home/concept/ivms_project/venv/lib/python3.12/site-packages/gunicorn/arbiter.py", line 573, in spawn_worker
+    pid = os.fork()
+  File "/usr/lib/python3.12/logging/__init__.py", line 243, in _releaseLock
+    def _releaseLock():
+  File "/home/concept/ivms_project/venv/lib/python3.12/site-packages/gunicorn/arbiter.py", line 242, in handle_chld
+    self.reap_workers()
+  File "/home/concept/ivms_project/venv/lib/python3.12/site-packages/gunicorn/arbiter.py", line 530, in reap_workers
+    self.log.warning(
+  File "/home/concept/ivms_project/venv/lib/python3.12/site-packages/gunicorn/glogging.py", line 261, in warning
+    self.error_log.warning(msg, *args, **kwargs)
+Message: 'Worker with pid %s was terminated due to signal %s'
+Arguments: (339225, 1)
+[2026-01-23 04:56:05 +0000] [374088] [INFO] Booting worker with pid: 374088
+WARNING:root:Exception raised while handling cache file '/home/concept/.cache/flask_cache/2029240f6d1128be89ddc32729463129'
+Traceback (most recent call last):
+  File "/home/concept/ivms_project/venv/lib/python3.12/site-packages/cachelib/file.py", line 221, in get
+    with self._safe_stream_open(filename, "rb") as f:
+  File "/usr/lib/python3.12/contextlib.py", line 137, in __enter__
+    return next(self.gen)
+           ^^^^^^^^^^^^^^
+  File "/home/concept/ivms_project/venv/lib/python3.12/site-packages/cachelib/file.py", line 342, in _safe_stream_open
+    fs = self._run_safely(open, path, mode)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/concept/ivms_project/venv/lib/python3.12/site-packages/cachelib/file.py", line 336, in _run_safely
+    output = fn(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^
+PermissionError: [Errno 13] Permission denied: '/home/concept/.cache/flask_cache/2029240f6d1128be89ddc32729463129'
+WARNING:root:Exception raised while handling cache file '/home/concept/.cache/flask_cache/2029240f6d1128be89ddc32729463129'
+Traceback (most recent call last):
+  File "/home/concept/ivms_project/venv/lib/python3.12/site-packages/cachelib/file.py", line 221, in get
+    with self._safe_stream_open(filename, "rb") as f:
+  File "/usr/lib/python3.12/contextlib.py", line 137, in __enter__
+    return next(self.gen)
+           ^^^^^^^^^^^^^^
+  File "/home/concept/ivms_project/venv/lib/python3.12/site-packages/cachelib/file.py", line 342, in _safe_stream_open
+    fs = self._run_safely(open, path, mode)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/concept/ivms_project/venv/lib/python3.12/site-packages/cachelib/file.py", line 336, in _run_safely
+    output = fn(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^
+PermissionError: [Errno 13] Permission denied: '/home/concept/.cache/flask_cache/2029240f6d1128be89ddc32729463129'
+WARNING:root:Exception raised while handling cache file '/home/concept/.cache/flask_cache/2029240f6d1128be89ddc32729463129'
+Traceback (most recent call last):
+  File "/home/concept/ivms_project/venv/lib/python3.12/site-packages/cachelib/file.py", line 221, in get
+    with self._safe_stream_open(filename, "rb") as f:
+  File "/usr/lib/python3.12/contextlib.py", line 137, in __enter__
+    return next(self.gen)
+           ^^^^^^^^^^^^^^
+  File "/home/concept/ivms_project/venv/lib/python3.12/site-packages/cachelib/file.py", line 342, in _safe_stream_open
+    fs = self._run_safely(open, path, mode)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/concept/ivms_project/venv/lib/python3.12/site-packages/cachelib/file.py", line 336, in _run_safely
+    output = fn(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^
+PermissionError: [Errno 13] Permission denied: '/home/concept/.cache/flask_cache/2029240f6d1128be89ddc32729463129'
+WARNING:root:Exception raised while handling cache file '/home/concept/.cache/flask_cache/2029240f6d1128be89ddc32729463129'
+Traceback (most recent call last):
+  File "/home/concept/ivms_project/venv/lib/python3.12/site-packages/cachelib/file.py", line 221, in get
+    with self._safe_stream_open(filename, "rb") as f:
+  File "/usr/lib/python3.12/contextlib.py", line 137, in __enter__
+    return next(self.gen)
+           ^^^^^^^^^^^^^^
+  File "/home/concept/ivms_project/venv/lib/python3.12/site-packages/cachelib/file.py", line 342, in _safe_stream_open
+    fs = self._run_safely(open, path, mode)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/concept/ivms_project/venv/lib/python3.12/site-packages/cachelib/file.py", line 336, in _run_safely
+    output = fn(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^
+PermissionError: [Errno 13] Permission denied: '/home/concept/.cache/flask_cache/2029240f6d1128be89ddc32729463129'
+WARNING:root:Exception raised while handling cache file '/home/concept/.cache/flask_cache/2029240f6d1128be89ddc32729463129'
+Traceback (most recent call last):
+  File "/home/concept/ivms_project/venv/lib/python3.12/site-packages/cachelib/file.py", line 221, in get
+    with self._safe_stream_open(filename, "rb") as f:
+  File "/usr/lib/python3.12/contextlib.py", line 137, in __enter__
+    return next(self.gen)
+           ^^^^^^^^^^^^^^
+  File "/home/concept/ivms_project/venv/lib/python3.12/site-packages/cachelib/file.py", line 342, in _safe_stream_open
+    fs = self._run_safely(open, path, mode)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/concept/ivms_project/venv/lib/python3.12/site-packages/cachelib/file.py", line 336, in _run_safely
+    output = fn(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^
+PermissionError: [Errno 13] Permission denied: '/home/concept/.cache/flask_cache/2029240f6d1128be89ddc32729463129'
+[2026-01-31 10:51:26,531] ERROR in report_service: Bulk report fetch error: HTTPConnectionPool(host='172.16.1.26', port=8082): Read timed out. (read timeout=25)
+ERROR:app:Bulk report fetch error: HTTPConnectionPool(host='172.16.1.26', port=8082): Read timed out. (read timeout=25)
+[2026-02-03 09:22:53 +0000] [63088] [CRITICAL] WORKER TIMEOUT (pid:374086)
+[2026-02-03 09:22:53 +0000] [374086] [INFO] Worker exiting (pid: 374086)
+[2026-02-03 09:22:54 +0000] [63088] [WARNING] Worker with pid 374086 was terminated due to signal 9
+[2026-02-03 09:22:54 +0000] [766391] [INFO] Booting worker with pid: 766391
+[2026-02-03 09:33:10 +0000] [63088] [CRITICAL] WORKER TIMEOUT (pid:374087)
+[2026-02-03 09:33:10 +0000] [374087] [INFO] Worker exiting (pid: 374087)
+[2026-02-03 09:33:11 +0000] [63088] [WARNING] Worker with pid 374087 was terminated due to signal 9
+[2026-02-03 09:33:11 +0000] [766646] [INFO] Booting worker with pid: 766646
+[2026-02-03 09:34:57 +0000] [63088] [CRITICAL] WORKER TIMEOUT (pid:766391)
+[2026-02-03 09:34:57 +0000] [766391] [INFO] Worker exiting (pid: 766391)
+[2026-02-03 09:34:58 +0000] [63088] [WARNING] Worker with pid 766391 was terminated due to signal 9
+[2026-02-03 09:34:58 +0000] [766696] [INFO] Booting worker with pid: 766696
+[2026-02-03 09:38:27 +0000] [63088] [CRITICAL] WORKER TIMEOUT (pid:766696)
+[2026-02-03 09:38:27 +0000] [766696] [INFO] Worker exiting (pid: 766696)
+[2026-02-03 09:38:27 +0000] [766781] [INFO] Booting worker with pid: 766781
+[2026-02-03 09:41:28 +0000] [63088] [CRITICAL] WORKER TIMEOUT (pid:766781)
+[2026-02-03 09:41:28 +0000] [766781] [INFO] Worker exiting (pid: 766781)
+[2026-02-03 09:41:29 +0000] [766865] [INFO] Booting worker with pid: 766865
+[2026-02-03 19:00:59,975] WARNING in external_report_service: External Report: Vehicle 864275071210218 has distance > 0 but engineHours = 0 on 2026-02-02
+[2026-02-04 03:30:05,722] WARNING in external_report_service: External Report: Vehicle 864275071210218 has distance > 0 but engineHours = 0 on 2026-02-03
+[2026-02-04 19:00:58,515] WARNING in external_report_service: External Report: Vehicle 864275071210218 has distance > 0 but engineHours = 0 on 2026-02-03
+WARNING:root:Exception raised while handling cache file '/home/concept/.cache/flask_cache/2029240f6d1128be89ddc32729463129'
+Traceback (most recent call last):
+  File "/home/concept/ivms_project/venv/lib/python3.12/site-packages/cachelib/file.py", line 221, in get
+    with self._safe_stream_open(filename, "rb") as f:
+  File "/usr/lib/python3.12/contextlib.py", line 137, in __enter__
+    return next(self.gen)
+           ^^^^^^^^^^^^^^
+  File "/home/concept/ivms_project/venv/lib/python3.12/site-packages/cachelib/file.py", line 342, in _safe_stream_open
+    fs = self._run_safely(open, path, mode)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/concept/ivms_project/venv/lib/python3.12/site-packages/cachelib/file.py", line 336, in _run_safely
+    output = fn(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^
+PermissionError: [Errno 13] Permission denied: '/home/concept/.cache/flask_cache/2029240f6d1128be89ddc32729463129'
+WARNING:root:Exception raised while handling cache file '/home/concept/.cache/flask_cache/2029240f6d1128be89ddc32729463129'
+Traceback (most recent call last):
+  File "/home/concept/ivms_project/venv/lib/python3.12/site-packages/cachelib/file.py", line 221, in get
+    with self._safe_stream_open(filename, "rb") as f:
+  File "/usr/lib/python3.12/contextlib.py", line 137, in __enter__
+    return next(self.gen)
+           ^^^^^^^^^^^^^^
+  File "/home/concept/ivms_project/venv/lib/python3.12/site-packages/cachelib/file.py", line 342, in _safe_stream_open
+    fs = self._run_safely(open, path, mode)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/concept/ivms_project/venv/lib/python3.12/site-packages/cachelib/file.py", line 336, in _run_safely
+    output = fn(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^
+PermissionError: [Errno 13] Permission denied: '/home/concept/.cache/flask_cache/2029240f6d1128be89ddc32729463129'
+WARNING:root:Exception raised while handling cache file '/home/concept/.cache/flask_cache/2029240f6d1128be89ddc32729463129'
+Traceback (most recent call last):
+  File "/home/concept/ivms_project/venv/lib/python3.12/site-packages/cachelib/file.py", line 221, in get
+    with self._safe_stream_open(filename, "rb") as f:
+  File "/usr/lib/python3.12/contextlib.py", line 137, in __enter__
+    return next(self.gen)
+           ^^^^^^^^^^^^^^
+  File "/home/concept/ivms_project/venv/lib/python3.12/site-packages/cachelib/file.py", line 342, in _safe_stream_open
+    fs = self._run_safely(open, path, mode)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/concept/ivms_project/venv/lib/python3.12/site-packages/cachelib/file.py", line 336, in _run_safely
+    output = fn(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^
+PermissionError: [Errno 13] Permission denied: '/home/concept/.cache/flask_cache/2029240f6d1128be89ddc32729463129'
+WARNING:root:Exception raised while handling cache file '/home/concept/.cache/flask_cache/2029240f6d1128be89ddc32729463129'
+Traceback (most recent call last):
+  File "/home/concept/ivms_project/venv/lib/python3.12/site-packages/cachelib/file.py", line 221, in get
+    with self._safe_stream_open(filename, "rb") as f:
+  File "/usr/lib/python3.12/contextlib.py", line 137, in __enter__
+    return next(self.gen)
+           ^^^^^^^^^^^^^^
+  File "/home/concept/ivms_project/venv/lib/python3.12/site-packages/cachelib/file.py", line 342, in _safe_stream_open
+    fs = self._run_safely(open, path, mode)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/concept/ivms_project/venv/lib/python3.12/site-packages/cachelib/file.py", line 336, in _run_safely
+    output = fn(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^
+PermissionError: [Errno 13] Permission denied: '/home/concept/.cache/flask_cache/2029240f6d1128be89ddc32729463129'
+WARNING:root:Exception raised while handling cache file '/home/concept/.cache/flask_cache/2029240f6d1128be89ddc32729463129'
+Traceback (most recent call last):
+  File "/home/concept/ivms_project/venv/lib/python3.12/site-packages/cachelib/file.py", line 221, in get
+    with self._safe_stream_open(filename, "rb") as f:
+  File "/usr/lib/python3.12/contextlib.py", line 137, in __enter__
+    return next(self.gen)
+           ^^^^^^^^^^^^^^
+  File "/home/concept/ivms_project/venv/lib/python3.12/site-packages/cachelib/file.py", line 342, in _safe_stream_open
+    fs = self._run_safely(open, path, mode)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/concept/ivms_project/venv/lib/python3.12/site-packages/cachelib/file.py", line 336, in _run_safely
+    output = fn(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^
+PermissionError: [Errno 13] Permission denied: '/home/concept/.cache/flask_cache/2029240f6d1128be89ddc32729463129'
+WARNING:root:Exception raised while handling cache file '/home/concept/.cache/flask_cache/2029240f6d1128be89ddc32729463129'
+Traceback (most recent call last):
+  File "/home/concept/ivms_project/venv/lib/python3.12/site-packages/cachelib/file.py", line 221, in get
+    with self._safe_stream_open(filename, "rb") as f:
+  File "/usr/lib/python3.12/contextlib.py", line 137, in __enter__
+    return next(self.gen)
+           ^^^^^^^^^^^^^^
+  File "/home/concept/ivms_project/venv/lib/python3.12/site-packages/cachelib/file.py", line 342, in _safe_stream_open
+    fs = self._run_safely(open, path, mode)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/concept/ivms_project/venv/lib/python3.12/site-packages/cachelib/file.py", line 336, in _run_safely
+    output = fn(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^
+PermissionError: [Errno 13] Permission denied: '/home/concept/.cache/flask_cache/2029240f6d1128be89ddc32729463129'
+WARNING:root:Exception raised while handling cache file '/home/concept/.cache/flask_cache/2029240f6d1128be89ddc32729463129'
+Traceback (most recent call last):
+  File "/home/concept/ivms_project/venv/lib/python3.12/site-packages/cachelib/file.py", line 221, in get
+    with self._safe_stream_open(filename, "rb") as f:
+  File "/usr/lib/python3.12/contextlib.py", line 137, in __enter__
+    return next(self.gen)
+           ^^^^^^^^^^^^^^
+  File "/home/concept/ivms_project/venv/lib/python3.12/site-packages/cachelib/file.py", line 342, in _safe_stream_open
+    fs = self._run_safely(open, path, mode)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/concept/ivms_project/venv/lib/python3.12/site-packages/cachelib/file.py", line 336, in _run_safely
+    output = fn(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^
+PermissionError: [Errno 13] Permission denied: '/home/concept/.cache/flask_cache/2029240f6d1128be89ddc32729463129'
+WARNING:root:Exception raised while handling cache file '/home/concept/.cache/flask_cache/2029240f6d1128be89ddc32729463129'
+Traceback (most recent call last):
+  File "/home/concept/ivms_project/venv/lib/python3.12/site-packages/cachelib/file.py", line 221, in get
+    with self._safe_stream_open(filename, "rb") as f:
+  File "/usr/lib/python3.12/contextlib.py", line 137, in __enter__
+    return next(self.gen)
+           ^^^^^^^^^^^^^^
+  File "/home/concept/ivms_project/venv/lib/python3.12/site-packages/cachelib/file.py", line 342, in _safe_stream_open
+    fs = self._run_safely(open, path, mode)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/concept/ivms_project/venv/lib/python3.12/site-packages/cachelib/file.py", line 336, in _run_safely
+    output = fn(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^
+PermissionError: [Errno 13] Permission denied: '/home/concept/.cache/flask_cache/2029240f6d1128be89ddc32729463129'
+WARNING:root:Exception raised while handling cache file '/home/concept/.cache/flask_cache/2029240f6d1128be89ddc32729463129'
+Traceback (most recent call last):
+  File "/home/concept/ivms_project/venv/lib/python3.12/site-packages/cachelib/file.py", line 221, in get
+    with self._safe_stream_open(filename, "rb") as f:
+  File "/usr/lib/python3.12/contextlib.py", line 137, in __enter__
+    return next(self.gen)
+           ^^^^^^^^^^^^^^
+  File "/home/concept/ivms_project/venv/lib/python3.12/site-packages/cachelib/file.py", line 342, in _safe_stream_open
+    fs = self._run_safely(open, path, mode)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/concept/ivms_project/venv/lib/python3.12/site-packages/cachelib/file.py", line 336, in _run_safely
+    output = fn(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^
+PermissionError: [Errno 13] Permission denied: '/home/concept/.cache/flask_cache/2029240f6d1128be89ddc32729463129'
+WARNING:root:Exception raised while handling cache file '/home/concept/.cache/flask_cache/2029240f6d1128be89ddc32729463129'
+Traceback (most recent call last):
+  File "/home/concept/ivms_project/venv/lib/python3.12/site-packages/cachelib/file.py", line 221, in get
+    with self._safe_stream_open(filename, "rb") as f:
+  File "/usr/lib/python3.12/contextlib.py", line 137, in __enter__
+    return next(self.gen)
+           ^^^^^^^^^^^^^^
+  File "/home/concept/ivms_project/venv/lib/python3.12/site-packages/cachelib/file.py", line 342, in _safe_stream_open
+    fs = self._run_safely(open, path, mode)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/concept/ivms_project/venv/lib/python3.12/site-packages/cachelib/file.py", line 336, in _run_safely
+    output = fn(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^
+PermissionError: [Errno 13] Permission denied: '/home/concept/.cache/flask_cache/2029240f6d1128be89ddc32729463129'
+[2026-02-12 05:09:48,047] WARNING in external_report_service: External Report: Vehicle 864275071330164 has distance > 0 but engineHours = 0 on 2026-02-11
+[2026-02-12 19:01:28,319] WARNING in external_report_service: External Report: Vehicle 864275071330164 has distance > 0 but engineHours = 0 on 2026-02-11
+WARNING:root:Exception raised while handling cache file '/home/concept/.cache/flask_cache/2029240f6d1128be89ddc32729463129'
+Traceback (most recent call last):
+  File "/home/concept/ivms_project/venv/lib/python3.12/site-packages/cachelib/file.py", line 221, in get
+    with self._safe_stream_open(filename, "rb") as f:
+  File "/usr/lib/python3.12/contextlib.py", line 137, in __enter__
+    return next(self.gen)
+           ^^^^^^^^^^^^^^
+  File "/home/concept/ivms_project/venv/lib/python3.12/site-packages/cachelib/file.py", line 342, in _safe_stream_open
+    fs = self._run_safely(open, path, mode)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/concept/ivms_project/venv/lib/python3.12/site-packages/cachelib/file.py", line 336, in _run_safely
+    output = fn(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^
+PermissionError: [Errno 13] Permission denied: '/home/concept/.cache/flask_cache/2029240f6d1128be89ddc32729463129'
+WARNING:root:Exception raised while handling cache file '/home/concept/.cache/flask_cache/2029240f6d1128be89ddc32729463129'
+Traceback (most recent call last):
+  File "/home/concept/ivms_project/venv/lib/python3.12/site-packages/cachelib/file.py", line 221, in get
+    with self._safe_stream_open(filename, "rb") as f:
+  File "/usr/lib/python3.12/contextlib.py", line 137, in __enter__
+    return next(self.gen)
+           ^^^^^^^^^^^^^^
+  File "/home/concept/ivms_project/venv/lib/python3.12/site-packages/cachelib/file.py", line 342, in _safe_stream_open
+    fs = self._run_safely(open, path, mode)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/concept/ivms_project/venv/lib/python3.12/site-packages/cachelib/file.py", line 336, in _run_safely
+    output = fn(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^
+PermissionError: [Errno 13] Permission denied: '/home/concept/.cache/flask_cache/2029240f6d1128be89ddc32729463129'
+WARNING:root:Exception raised while handling cache file '/home/concept/.cache/flask_cache/2029240f6d1128be89ddc32729463129'
+Traceback (most recent call last):
+  File "/home/concept/ivms_project/venv/lib/python3.12/site-packages/cachelib/file.py", line 221, in get
+    with self._safe_stream_open(filename, "rb") as f:
+  File "/usr/lib/python3.12/contextlib.py", line 137, in __enter__
+    return next(self.gen)
+           ^^^^^^^^^^^^^^
+  File "/home/concept/ivms_project/venv/lib/python3.12/site-packages/cachelib/file.py", line 342, in _safe_stream_open
+    fs = self._run_safely(open, path, mode)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/concept/ivms_project/venv/lib/python3.12/site-packages/cachelib/file.py", line 336, in _run_safely
+    output = fn(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^
+PermissionError: [Errno 13] Permission denied: '/home/concept/.cache/flask_cache/2029240f6d1128be89ddc32729463129'
+WARNING:root:Exception raised while handling cache file '/home/concept/.cache/flask_cache/2029240f6d1128be89ddc32729463129'
+Traceback (most recent call last):
+  File "/home/concept/ivms_project/venv/lib/python3.12/site-packages/cachelib/file.py", line 221, in get
+    with self._safe_stream_open(filename, "rb") as f:
+  File "/usr/lib/python3.12/contextlib.py", line 137, in __enter__
+    return next(self.gen)
+           ^^^^^^^^^^^^^^
+  File "/home/concept/ivms_project/venv/lib/python3.12/site-packages/cachelib/file.py", line 342, in _safe_stream_open
+    fs = self._run_safely(open, path, mode)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/concept/ivms_project/venv/lib/python3.12/site-packages/cachelib/file.py", line 336, in _run_safely
+    output = fn(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^
+PermissionError: [Errno 13] Permission denied: '/home/concept/.cache/flask_cache/2029240f6d1128be89ddc32729463129'
+WARNING:root:Exception raised while handling cache file '/home/concept/.cache/flask_cache/2029240f6d1128be89ddc32729463129'
+Traceback (most recent call last):
+  File "/home/concept/ivms_project/venv/lib/python3.12/site-packages/cachelib/file.py", line 221, in get
+    with self._safe_stream_open(filename, "rb") as f:
+  File "/usr/lib/python3.12/contextlib.py", line 137, in __enter__
+    return next(self.gen)
+           ^^^^^^^^^^^^^^
+  File "/home/concept/ivms_project/venv/lib/python3.12/site-packages/cachelib/file.py", line 342, in _safe_stream_open
+    fs = self._run_safely(open, path, mode)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/concept/ivms_project/venv/lib/python3.12/site-packages/cachelib/file.py", line 336, in _run_safely
+    output = fn(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^
+PermissionError: [Errno 13] Permission denied: '/home/concept/.cache/flask_cache/2029240f6d1128be89ddc32729463129'

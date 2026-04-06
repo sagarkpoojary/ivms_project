@@ -1,0 +1,243 @@
+{
+  "system_config": {
+    "pricing_plans": {
+      "plans": {
+        "Premium": {
+          "enabled_modules": [
+            "dashboard",
+            "reports",
+            "pre_reg_report",
+            "vehicle_add",
+            "user_manager",
+            "notifications",
+            "servers",
+            "dashboard_stats",
+            "dashboard_charts",
+            "dashboard_map",
+            "dashboard_big_chart",
+            "dashboard_alerts",
+            "reports_trips",
+            "reports_stops",
+            "reports_combined",
+            "pricing"
+          ],
+          "vehicle_limit": 1000,
+          "user_limit": 1000
+        },
+        "Normal": {
+          "enabled_modules": [
+            "dashboard",
+            "reports",
+            "pre_reg_report",
+            "vehicle_add",
+            "user_manager",
+            "notifications",
+            "dashboard_stats",
+            "dashboard_charts",
+            "dashboard_map",
+            "dashboard_big_chart",
+            "dashboard_alerts",
+            "reports_trips",
+            "reports_stops",
+            "reports_combined"
+          ],
+          "vehicle_limit": 1,
+          "user_limit": 0
+        },
+        "Gold": {
+          "enabled_modules": [
+            "dashboard",
+            "dashboard_stats",
+            "dashboard_charts",
+            "dashboard_map",
+            "dashboard_big_chart",
+            "dashboard_alerts",
+            "reports",
+            "pre_reg_report",
+            "vehicle_add",
+            "user_manager"
+          ],
+          "vehicle_limit": 50,
+          "user_limit": 20
+        },
+        "Silver": {
+          "enabled_modules": [
+            "dashboard",
+            "reports",
+            "pre_reg_report",
+            "vehicle_add",
+            "dashboard_stats",
+            "dashboard_charts",
+            "dashboard_map",
+            "reports_trips"
+          ],
+          "vehicle_limit": 5,
+          "user_limit": 5
+        }
+      }
+    },
+    "stats": {
+      "total_users": 3,
+      "last_updated": "2026-01-15 10:04:44.568802+04:00",
+      "total_vehicles": 10
+    },
+    "traccar_settings": {
+      "stop_threshold": 5,
+      "servers": [
+        "172.16.1.26:8082"
+      ],
+      "admin_email": "alireza@conceptgrps.com",
+      "admin_pass": "1234",
+      "active_ip": "172.16.1.26:8082"
+    }
+  },
+  "users": {
+    "alireza@conceptgrps.com": {
+      "email": "alireza@conceptgrps.com",
+      "parent_email": "saga@gmail.com",
+      "name": "Alireza Main Admin",
+      "user_limit": 10000,
+      "vehicle_limit": 10000,
+      "account_module": "Premium",
+      "company_name": "Concept Groups",
+      "password_hash": "scrypt:32768:8:1$r9agBUSDABLvwOjw$50c81596ab1f5aff253818a91383eead871db796fa264efd5091ddaf667e0e36e0691469991d48b2e00678a6a97d13e524e19b880312b53adf48c41f84ffaa3f",
+      "role": "main_admin"
+    },
+    "dinesh@conceptgrps.com": {
+      "email": "dinesh@conceptgrps.com",
+      "parent_email": "alireza@conceptgrps.com",
+      "created_by": "alireza@conceptgrps.com",
+      "created_at": "2026-01-01 04:45:19.178554",
+      "name": "Dinesh",
+      "user_limit": 3,
+      "account_module": "Normal",
+      "vehicle_limit": 10,
+      "company_name": "Concept Technologies",
+      "password_hash": "scrypt:32768:8:1$gRtLD3SeBYquOCwc$f958934cd944898cc6edf303c54494c32b6042c0ed6c4e814dd3597b3693a25383b4c938e10fbaff04b39b0dec811f6484e1e8b13771f02d6bb465187f056b69",
+      "role": "admin"
+    },
+    "saga@gmail.com": {
+      "email": "saga@gmail.com",
+      "parent_email": "system",
+      "name": "Super Admin",
+      "user_limit": 100000,
+      "vehicle_limit": 100000,
+      "account_module": "Premium",
+      "company_name": "System",
+      "password_hash": "scrypt:32768:8:1$4s4cnWs2RGzr9PNQ$7439e9c4d7ac2d867a77b1dba4dfc3888d194c49c77369a5fc1b8ad05a08f73b333b884fb0b425df276dab81bb7fe00329572377414cda79afde5efc4f5b2cb1",
+      "role": "super_admin"
+    }
+  },
+  "vehicles": {
+    "3425655544": {
+      "parent_email": "dinesh@conceptgrps.com",
+      "unique_id": "3425655544",
+      "created_at": "2026-01-15 06:04:42.839815",
+      "name": "dfhv",
+      "status": "active",
+      "approval_date": "2026-01-15 06:05:29.785452",
+      "device_model": "Freematics ONE+ Model B",
+      "company_name": "Concept Technologies",
+      "driver_name": "sagar"
+    },
+    "864275071199007": {
+      "unique_id": "864275071199007",
+      "parent_email": "dinesh@conceptgrps.com",
+      "created_at": "2026-01-01 04:49:23.914180",
+      "name": "Mayda 3-51080",
+      "status": "active",
+      "approval_date": "2026-01-01 04:50:28.605519",
+      "company_name": "Concept Technologies",
+      "device_model": "",
+      "driver_name": "864275071199007"
+    },
+    "864275071204724": {
+      "unique_id": "864275071204724",
+      "parent_email": "dinesh@conceptgrps.com",
+      "created_at": "2026-01-01 04:47:46.059562",
+      "name": "79467 - Praneeth",
+      "status": "active",
+      "approval_date": "2026-01-01 04:50:33.919903",
+      "device_model": "",
+      "company_name": "Concept Technologies",
+      "driver_name": "Praneeth"
+    },
+    "864275071209095": {
+      "unique_id": "864275071209095",
+      "parent_email": "dinesh@conceptgrps.com",
+      "created_at": "2026-01-01 04:46:55.160453",
+      "name": "79467 - Mohammad",
+      "status": "active",
+      "approval_date": "2026-01-01 04:50:37.917710",
+      "company_name": "Concept Technologies",
+      "device_model": "",
+      "driver_name": "Mohammad"
+    },
+    "864275071210218": {
+      "unique_id": "864275071210218",
+      "parent_email": "dinesh@conceptgrps.com",
+      "created_at": "2026-01-01 04:48:07.259167",
+      "name": "58360",
+      "status": "active",
+      "approval_date": "2026-01-01 04:50:41.536647",
+      "device_model": "",
+      "company_name": "Concept Technologies",
+      "driver_name": "Changan"
+    },
+    "864275071210820": {
+      "unique_id": "864275071210820",
+      "parent_email": "dinesh@conceptgrps.com",
+      "created_at": "2026-01-01 04:49:34.287744",
+      "name": "Camery- 5523",
+      "status": "active",
+      "approval_date": "2026-01-01 04:50:44.000896",
+      "company_name": "Concept Technologies",
+      "device_model": "",
+      "driver_name": "864275071210820"
+    },
+    "864275071217296": {
+      "unique_id": "864275071217296",
+      "parent_email": "dinesh@conceptgrps.com",
+      "created_at": "2026-01-01 04:49:40.810454",
+      "name": "864275071217296",
+      "status": "active",
+      "approval_date": "2026-01-01 04:50:46.470767",
+      "device_model": "",
+      "company_name": "Concept Technologies",
+      "driver_name": "864275071217296"
+    },
+    "864275071226750": {
+      "unique_id": "864275071226750",
+      "parent_email": "dinesh@conceptgrps.com",
+      "created_at": "2026-01-01 04:49:52.628235",
+      "name": "2631 Ali Ist",
+      "status": "active",
+      "approval_date": "2026-01-01 04:50:48.673515",
+      "company_name": "Concept Technologies",
+      "device_model": "",
+      "driver_name": "864275071226750"
+    },
+    "864275071330164": {
+      "parent_email": "dinesh@conceptgrps.com",
+      "unique_id": "864275071330164",
+      "name": "Mazda 96985",
+      "created_at": "2026-01-01 04:48:32.837397",
+      "status": "active",
+      "approval_date": "2026-01-01 04:50:50.806845",
+      "device_model": "",
+      "company_name": "Concept Technologies",
+      "driver_name": "Mazda"
+    },
+    "864275071330206": {
+      "parent_email": "dinesh@conceptgrps.com",
+      "unique_id": "864275071330206",
+      "created_at": "2026-01-01 04:49:59.633364",
+      "name": "test- office",
+      "status": "active",
+      "approval_date": "2026-01-01 04:51:05.319496",
+      "company_name": "Concept Technologies",
+      "device_model": "",
+      "driver_name": "864275071330206"
+    }
+  }
+}

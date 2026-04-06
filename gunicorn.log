@@ -1,0 +1,24 @@
+nohup: ignoring input
+/home/concept/ivms_project/venv/lib/python3.12/site-packages/gunicorn/util.py:25: UserWarning: pkg_resources is deprecated as an API. See https://setuptools.pypa.io/en/latest/pkg_resources.html. The pkg_resources package is slated for removal as early as 2025-11-30. Refrain from using this package or pin to Setuptools<81.
+  import pkg_resources
+[2026-01-06 12:22:18 +0000] [38057] [INFO] Starting gunicorn 20.1.0
+[2026-01-06 12:22:18 +0000] [38057] [INFO] Listening at: http://0.0.0.0:5000 (38057)
+[2026-01-06 12:22:18 +0000] [38057] [INFO] Using worker: sync
+[2026-01-06 12:22:18 +0000] [38058] [INFO] Booting worker with pid: 38058
+[2026-01-06 12:22:19 +0000] [38059] [INFO] Booting worker with pid: 38059
+[2026-01-06 12:22:19 +0000] [38060] [INFO] Booting worker with pid: 38060
+[2026-01-06 12:25:41 +0000] [38057] [INFO] Handling signal: hup
+[2026-01-06 12:25:41 +0000] [38057] [INFO] Hang up: Master
+[2026-01-06 12:25:41 +0000] [38583] [INFO] Booting worker with pid: 38583
+[2026-01-06 12:25:41 +0000] [38584] [INFO] Booting worker with pid: 38584
+[2026-01-06 12:25:41 +0000] [38585] [INFO] Booting worker with pid: 38585
+[2026-01-06 12:25:41 +0000] [38057] [WARNING] Worker with pid 38058 was terminated due to signal 1
+[2026-01-06 12:25:41 +0000] [38057] [WARNING] Worker with pid 38059 was terminated due to signal 1
+[2026-01-06 12:25:41 +0000] [38057] [WARNING] Worker with pid 38060 was terminated due to signal 1
+[2026-01-07 05:30:34,728] ERROR in report_service: Failed to fetch combined data for 864275071204724: HTTPConnectionPool(host='172.16.1.26', port=8082): Read timed out. (read timeout=15)
+[2026-01-07 05:30:35,663] ERROR in report_service: Failed to fetch combined data for 864275071204724: HTTPConnectionPool(host='172.16.1.26', port=8082): Read timed out. (read timeout=15)
+[2026-01-07 06:38:21 +0000] [38057] [INFO] Handling signal: term
+[2026-01-07 06:38:21 +0000] [38585] [INFO] Worker exiting (pid: 38585)
+[2026-01-07 06:38:21 +0000] [38583] [INFO] Worker exiting (pid: 38583)
+[2026-01-07 06:38:21 +0000] [38584] [INFO] Worker exiting (pid: 38584)
+[2026-01-07 06:38:24 +0000] [38057] [INFO] Shutting down: Master

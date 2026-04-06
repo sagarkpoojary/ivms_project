@@ -1,0 +1,239 @@
+{% extends "base.html" %}
+{% block content %}
+
+<h3>Register Vehicle</h3>
+
+<div class="card p-3 mb-3" style="max-width:700px;">
+  {% if error %}
+  <div class="alert alert-danger">{{ error }}</div>
+  {% endif %}
+  {% if success %}
+  <div class="alert alert-success">{{ success }}</div>
+  {% endif %}
+
+  {% if usage and role != 'super_admin' %}
+  <!-- Vehicle Usage Stats -->
+  <div class="mb-4">
+    <div class="d-flex justify-content-between align-items-center mb-1">
+      <small class="text-muted fw-bold uppercase">Vehicle Limit Usage</small>
+      <small class="fw-bold">{{ usage.vehicles_registered }} / {{ usage.vehicle_limit }}</small>
+    </div>
+    <div class="progress" style="height: 6px;">
+      {% set vehicle_pct = (usage.vehicles_registered / usage.vehicle_limit * 100) if usage.vehicle_limit > 0 else 0 %}
+      <div class="progress-bar bg-{{ 'danger' if vehicle_pct >= 100 else 'success' }}" role="progressbar"
+        style="width: {{ vehicle_pct }}%" aria-valuenow="{{ usage.vehicles_registered }}" aria-valuemin="0"
+        aria-valuemax="{{ usage.vehicle_limit }}"></div>
+    </div>
+    {% if usage.vehicles_registered >= usage.vehicle_limit %}
+    <div class="text-danger x-small mt-1 fw-bold">
+      <i class="fas fa-exclamation-triangle me-1"></i> Limit reached. You must delete existing vehicles to add new ones.
+    </div>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  {% if role in ['admin', 'main_admin', 'super_admin'] %}
+
+  {% if role == 'admin' %}
+  <div class="alert alert-info py-2 small mb-3">
+    <i class="fas fa-info-circle me-1"></i> Submissions are saved as <b>Drafts</b> and require Main Admin approval
+    before appearing in your fleet.
+  </div>
+  {% endif %}
+
+  <form method="post" action="/vehicle/add">
+
+    <div class="mb-3">
+      <label class="form-label">Name</label>
+      <input name="name" class="form-control" placeholder="Friendly name (your label)">
+    </div>
+
+    <div class="mb-3">
+      <label class="form-label">Unique ID</label>
+      <input name="unique_id" class="form-control" placeholder="Device uniqueId (from tracker)">
+    </div>
+
+
+    <!-- Driver Name Field -->
+    <div class="mb-3">
+      <label class="form-label">Driver Name</label>
+      <input name="driver_name" class="form-control" placeholder="Driver's Name">
+    </div>
+
+    <!-- Device Model with live suggestions -->
+    <div class="mb-3 position-relative">
+      <label class="form-label">Device Model</label>
+      <input name="device_model" type="text" id="deviceModelInput" class="form-control"
+        placeholder="Type device model..." autocomplete="off">
+
+      <!-- Suggestion dropdown -->
+      <div id="modelSuggestions" class="list-group position-absolute w-100"
+        style="z-index:999; max-height:150px; overflow-y:auto; display:none;">
+      </div>
+    </div>
+
+    <button class="btn btn-primary" {% if usage and usage.vehicles_registered>= usage.vehicle_limit and role !=
+      'super_admin' %}disabled{% endif %}>
+      Add Vehicle
+    </button>
+  </form>
+  {% else %}
+  <div class="alert alert-info">Vehicle registration is restricted to Company Administrators.</div>
+  {% endif %}
+</div>
+
+<div class="card p-3">
+  <h5>Registered Vehicles</h5>
+  <div class="table-responsive">
+    <table class="table">
+      {% if role == 'main_admin' %}
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Company Name</th>
+          <th class="text-center">Total Vehicles</th>
+          <th class="text-center">Active</th>
+          <th class="text-center">Pending</th>
+          <th class="text-center">Declined</th>
+          <th class="text-end">Status Summary</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for c in company_summary %}
+        <tr>
+          <td>{{ loop.index }}</td>
+          <td><span class="fw-bold">{{ c.name }}</span></td>
+          <td class="text-center"><span class="badge bg-primary">{{ c.total }}</span></td>
+          <td class="text-center"><span class="text-success">{{ c.active }}</span></td>
+          <td class="text-center"><span class="text-warning">{{ c.draft }}</span></td>
+          <td class="text-center"><span class="text-danger">{{ c.declined }}</span></td>
+          <td class="text-end">
+            {% if c.active == c.total %}
+            <span class="badge bg-success">All Active</span>
+            {% elif c.draft > 0 %}
+            <span class="badge bg-warning text-dark">{{ c.draft }} Pending</span>
+            {% else %}
+            <span class="badge bg-secondary">Mixed</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="7" class="text-center text-muted py-4">
+            <i class="fas fa-building fa-2x mb-2 d-block"></i>
+            No companies with registered vehicles found.
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+      {% else %}
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Name</th>
+          <th>Device Model</th>
+          <th>Unique ID</th>
+          <th>Driver Name</th>
+          <th>Status</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for v in vehicles %}
+        <tr>
+          <td>{{ loop.index }}</td>
+          <td>{{ v.name }}</td>
+          <td>{{ v.device_model }}</td>
+          <td>{{ v.unique_id }}</td>
+          <td>{{ v.driver_name or '-' }}</td>
+          <td>
+            {% if v.status == 'active' %}
+            <span class="badge bg-success">Approved / Active</span>
+            {% elif v.status == 'draft' %}
+            <span class="badge bg-warning text-dark">Pending Approval</span>
+            {% elif v.status == 'declined' %}
+            <span class="badge bg-danger" title="{{ v.rejection_reason or 'No reason provided' }}">Declined</span>
+            {% if v.rejection_reason %}
+            <div class="x-small text-danger mt-1" style="font-size: 0.75rem;">Reason: {{ v.rejection_reason }}</div>
+            {% endif %}
+            {% else %}
+            <span class="badge bg-secondary">{{ v.status }}</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if v.status == 'active' %}
+            <button class="btn btn-sm btn-info text-white me-1"
+              onclick="openEditModal('{{ v.unique_id|escape }}', '{{ (v.name or "")|escape }}', '{{ (v.device_model or "")|escape }}', '{{ (v.driver_name or "")|escape }}')">
+              Edit
+            </button>
+            {% endif %}
+            <a href="/vehicle/delete/{{ v.unique_id }}" class="btn btn-sm btn-danger"
+              onclick="return confirm('Are you sure?')">Delete</a>
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="7" class="text-center">No vehicles registered.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+      {% endif %}
+    </table>
+  </div>
+</div>
+
+<!-- Edit Modal -->
+<div class="modal fade" id="editVehicleModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Edit Vehicle</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form id="editVehicleForm" method="post">
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label">Unique ID (Read-only)</label>
+            <input type="text" id="edit_unique_id" class="form-control" disabled readonly>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Name</label>
+            <input name="name" id="edit_name" class="form-control" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Device Model</label>
+            <input name="device_model" id="edit_device_model" class="form-control">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Driver Name</label>
+            <input name="driver_name" id="edit_driver_name" class="form-control">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary">Save Changes</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Load the JS file for live suggestions -->
+<script src="/static/js/register.js"></script>
+
+<script>
+  function openEditModal(uid, name, model, driver) {
+    document.getElementById('edit_unique_id').value = uid;
+    document.getElementById('edit_name').value = name;
+    document.getElementById('edit_device_model').value = (model == 'None' || !model) ? '' : model;
+    document.getElementById('edit_driver_name').value = (driver == 'None' || !driver) ? '' : driver;
+
+    // Set form action
+    document.getElementById('editVehicleForm').action = "/vehicle/update/" + uid;
+
+    var myModal = new bootstrap.Modal(document.getElementById('editVehicleModal'));
+    myModal.show();
+  }
+</script>
+
+{% endblock %}

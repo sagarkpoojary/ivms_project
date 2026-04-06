@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>{{ title or 'IVMS' }}</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <link rel="stylesheet" href="/static/css/style.css">
+
+  <!-- PWA Manifest -->
+  <link rel="manifest" href="/static/manifest.json">
+  <meta name="theme-color" content="#0d63f8">
+
+  <!-- iOS PWA Support -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="IVMS">
+  <link rel="apple-touch-icon" href="/static/icons/icon-192.png">
+</head>
+
+<body data-role="{{ role }}">
+  <div class="wrapper">
+  <div class="sidebar" id="mainSidebar">
+      <div class="sidebar-header">
+        <h4><i class="fas fa-satellite-dish"></i> <span class="sidebar-brand-text">IVMS</span></h4>
+        <button class="sidebar-toggle-btn" id="sidebarToggleBtn" title="Collapse sidebar">
+          <i class="fas fa-chevron-left" id="sidebarToggleIcon"></i>
+        </button>
+      </div>
+      <div class="mt-4">
+
+        {% if role == 'super_admin' or 'dashboard' in enabled_modules %}
+        <a href="/dashboard" title="Dashboard"><i class="fas fa-tachometer-alt"></i> <span>Dashboard</span></a>
+        {% endif %}
+
+        {% if role == 'super_admin' or (role == 'main_admin' and 'pricing' in enabled_modules) %}
+        <a href="/pricing" title="Plans & Pricing"><i class="fas fa-tags"></i> <span>Plans & Pricing</span></a>
+        {% endif %}
+
+        {% if role == 'super_admin' or 'reports' in enabled_modules %}
+        <div class="dropdown-menu-item">
+          <a href="/reports" title="Car Quantity">
+            <i class="fas fa-car"></i> <span>Car Quantity</span>
+          </a>
+        </div>
+        {% endif %}
+
+        {% if role == 'super_admin' or 'pre_reg_report' in enabled_modules %}
+        <div class="dropdown-menu-item">
+          <a href="#" title="Reports" class="dropdown-toggle d-flex justify-content-between align-items-center"
+            data-bs-toggle="collapse" data-bs-target="#reportsSubmenu" aria-expanded="false">
+            <i class="fas fa-chart-bar"></i> <span>Reports</span>
+            <i class="fas fa-chevron-down dropdown-arrow"></i>
+          </a>
+          <div class="collapse" id="reportsSubmenu">
+            <div class="submenu">
+              <a href="/pre_reg_report?report_type=Summary&v=101"><i class="fas fa-file-alt"></i> Summary Report</a>
+              <a href="/pre_reg_report?report_type=Trips&v=101"><i class="fas fa-route"></i> Trips Report</a>
+              <a href="/pre_reg_report?report_type=Stops&v=101"><i class="fas fa-stop-circle"></i> Stops Report</a>
+              <a href="/pre_reg_report?report_type=Combined&v=101"><i class="fas fa-layer-group"></i> Combined
+                Report</a>
+            </div>
+          </div>
+        </div>
+        {% endif %}
+
+        {% if role == 'super_admin' or (role in ['main_admin', 'admin'] and 'vehicle_add' in enabled_modules) %}
+        {% if role in ['super_admin', 'main_admin'] %}
+        <a href="/manage-drafts" title="Manage Drafts" class="position-relative d-flex justify-content-between align-items-center">
+          <i class="fas fa-file-invoice"></i> <span>Manage Drafts</span>
+          {% if pending_drafts_count > 0 %}
+          <span class="badge rounded-pill bg-danger" style="font-size: 0.7rem;">{{ pending_drafts_count }}</span>
+          {% endif %}
+        </a>
+        {% endif %}
+        <a href="/vehicle/add" title="Register Vehicle"><i class="fas fa-plus-circle"></i> <span>Register Vehicle</span></a>
+        {% endif %}
+
+        {% if role == 'super_admin' or (role in ['main_admin', 'admin'] and 'user_manager' in enabled_modules) %}
+        <a href="/user-manager" title="User Manager"><i class="fas fa-users-cog"></i> <span>User Manager</span></a>
+        {% endif %}
+
+        {% if role == 'super_admin' or (role == 'main_admin' and 'servers' in enabled_modules) %}
+        <a href="/server-settings" title="Servers"><i class="fas fa-server"></i> <span>Servers</span></a>
+        {% endif %}
+
+        {% if role in ['super_admin', 'main_admin'] %}
+        <div class="dropdown-menu-item">
+          <a href="#" title="System Config" class="dropdown-toggle d-flex justify-content-between align-items-center"
+            data-bs-toggle="collapse" data-bs-target="#configSubmenu" aria-expanded="false">
+            <i class="fas fa-tools"></i> <span>System Config</span>
+            <i class="fas fa-chevron-down dropdown-arrow"></i>
+          </a>
+          <div class="collapse" id="configSubmenu">
+            <div class="submenu">
+              <a href="/plan-manager"><i class="fas fa-tasks"></i> Plan Manager</a>
+              <a href="/dashboard-config"><i class="fas fa-cogs"></i> Dashboard Config</a>
+            </div>
+          </div>
+        </div>
+        {% endif %}
+
+        {% if role == 'super_admin' or 'notifications' in enabled_modules %}
+        <a href="/notifications" title="Notifications" class="position-relative">
+          <i class="fas fa-bell"></i> <span>Notifications (Inbox)</span>
+          <span id="alertBadge" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger"
+            style="display:none; left: 85% !important; top: 15px !important;">!</span>
+        </a>
+        {% endif %}
+      </div>
+      <div class="mt-auto">
+        <a href="/logout" title="Logout" style="color: #ef4444;"><i class="fas fa-sign-out-alt"></i> <span>Logout</span></a>
+      </div>
+    </div>
+
+
+  <main class="main-content" id="mainContent">
+
+      <div class="d-flex justify-content-between align-items-center mb-4">
+        <div></div>
+        <div class="d-flex align-items-center bg-white p-2 px-3 rounded shadow-sm">
+          <i class="fas fa-user-circle fa-lg text-muted me-2"></i>
+          <div>
+            <div class="fw-medium small text-muted lh-1 mb-1">{{ company_name or 'No Company' }}</div>
+            <div class="fw-bold lh-1">Hello, {{ user or 'User' }}</div>
+          </div>
+        </div>
+      </div>
+      {% block content %}{% endblock %}
+    </main>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+  {% block scripts %}{% endblock %}
+
+  <!-- Sidebar Toggle Logic -->
+  <script>
+    (function () {
+      const sidebar = document.getElementById('mainSidebar');
+      const content = document.getElementById('mainContent');
+      const toggleBtn = document.getElementById('sidebarToggleBtn');
+      const toggleIcon = document.getElementById('sidebarToggleIcon');
+
+      function collapse() {
+        sidebar.classList.add('sidebar-collapsed');
+        content.classList.add('sidebar-collapsed-content');
+        toggleIcon.classList.replace('fa-chevron-left', 'fa-chevron-right');
+        localStorage.setItem('sidebarCollapsed', '1');
+      }
+
+      function expand() {
+        sidebar.classList.remove('sidebar-collapsed');
+        content.classList.remove('sidebar-collapsed-content');
+        toggleIcon.classList.replace('fa-chevron-right', 'fa-chevron-left');
+        localStorage.setItem('sidebarCollapsed', '0');
+      }
+
+      toggleBtn.addEventListener('click', () => {
+        sidebar.classList.contains('sidebar-collapsed') ? expand() : collapse();
+      });
+
+      // Restore state on load
+      if (localStorage.getItem('sidebarCollapsed') === '1') {
+        collapse();
+      }
+    })();
+  </script>
+
+  <!-- PWA Service Worker Registration -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/static/sw.js')
+          .then(reg => console.log('Service Worker registered:', reg))
+          .catch(err => console.log('Service Worker registration failed:', err));
+      });
+    }
+  </script>
+</body>
+
+</html>

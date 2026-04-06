@@ -1,0 +1,472 @@
+{% extends "base.html" %}
+{% block title %}User Manager{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h3 class="mb-4">User Manager</h3>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+        {% for category, message in messages %}
+        <div class="alert alert-{{ 'danger' if category == 'error' else category }}">{{ message }}</div>
+        {% endfor %}
+        {% endif %}
+        {% endwith %}
+
+        {% if error %}
+        <div class="alert alert-danger">{{ error }}</div>
+        {% endif %}
+
+        {% if role != 'super_admin' and usage %}
+        <!-- Usage Overview -->
+        <div class="row mb-4" id="usageContainer">
+            <div class="col-md-6">
+                <div class="card p-3 custom-shadow border-0">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <h6 class="mb-0 text-muted small uppercase fw-bold">User Limit Usage</h6>
+                        <span class="badge bg-{{ 'danger' if usage.users_created >= usage.user_limit else 'primary' }}">
+                            {{ usage.users_created }} / {{ usage.user_limit }}
+                        </span>
+                    </div>
+                    <div class="progress" style="height: 8px;">
+                        {% set user_pct = (usage.users_created / usage.user_limit * 100) if usage.user_limit > 0 else 0
+                        %}
+                        <div class="progress-bar bg-{{ 'danger' if user_pct >= 90 else 'primary' }}" role="progressbar"
+                            style="width: {{ user_pct }}%" aria-valuenow="{{ usage.users_created }}" aria-valuemin="0"
+                            aria-valuemax="{{ usage.user_limit }}"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card p-3 custom-shadow border-0">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <h6 class="mb-0 text-muted small uppercase fw-bold">Vehicle Limit Usage</h6>
+                        <span
+                            class="badge bg-{{ 'danger' if usage.vehicles_registered >= usage.vehicle_limit else 'success' }}">
+                            {{ usage.vehicles_registered }} / {{ usage.vehicle_limit }}
+                        </span>
+                    </div>
+                    <div class="progress" style="height: 8px;">
+                        {% set vehicle_pct = (usage.vehicles_registered / usage.vehicle_limit * 100) if
+                        usage.vehicle_limit > 0 else 0 %}
+                        <div class="progress-bar bg-{{ 'danger' if vehicle_pct >= 90 else 'success' }}"
+                            role="progressbar" style="width: {{ vehicle_pct }}%"
+                            aria-valuenow="{{ usage.vehicles_registered }}" aria-valuemin="0"
+                            aria-valuemax="{{ usage.vehicle_limit }}"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Add User -->
+        <div class="card p-4 custom-shadow mb-4 border-0">
+            <h5 class="mb-3">
+                {% if role == 'super_admin' %}
+                Create Main Admin
+                {% elif role == 'main_admin' %}
+                Create Company Admin
+                {% elif role == 'admin' %}
+                Create User
+                {% endif %}
+            </h5>
+            <form method="post" class="row g-3" id="userCreationForm">
+                <input type="hidden" name="action" value="add">
+
+                <div class="col-md-3">
+                    <div class="outlined-group">
+                        <input name="email" class="form-control" placeholder="Email (Username)" required>
+                        <label>Email / Username</label>
+                    </div>
+                </div>
+
+                <div class="col-md-3">
+                    <div class="outlined-group">
+                        <input type="password" name="password" class="form-control" placeholder="Password" required>
+                        <label>Password</label>
+                    </div>
+                </div>
+
+                <div class="col-md-3">
+                    <div class="outlined-group">
+                        <input name="name" class="form-control" placeholder="Full Name">
+                        <label>Full Name</label>
+                    </div>
+                </div>
+
+                {% if role in ['super_admin', 'main_admin'] %}
+                <div class="col-md-3">
+                    <div class="outlined-group">
+                        <input name="company_name" class="form-control" placeholder="Assign Company Name" required>
+                        <label>Company Name</label>
+                    </div>
+                </div>
+                {% endif %}
+
+                {# Role selection removed for Company Admin as they can only create Users #}
+
+                <div class="col-md-2">
+                    <div class="outlined-group">
+                        <input type="number" name="vehicle_limit" class="form-control" placeholder="Max Vehicles"
+                            min="0" value="1">
+                        <label>Vehicle Limit</label>
+                    </div>
+                </div>
+
+                {% if role in ['super_admin', 'main_admin'] %}
+                <div class="col-md-2">
+                    <div class="outlined-group">
+                        <input type="number" name="user_limit" class="form-control" placeholder="Max Users" min="0"
+                            value="0">
+                        <label>User Limit</label>
+                    </div>
+                </div>
+                {% else %}
+                <input type="hidden" name="user_limit" value="0">
+                {% endif %}
+
+                <div class="col-md-2">
+                    <button type="submit" class="btn btn-primary w-100 h-100">
+                        {% if role == 'super_admin' %} Create Main Admin {% elif role == 'main_admin' %} Create Company
+                        Admin {% else %} Create User {% endif %}
+                    </button>
+                </div>
+                {% if role in ['super_admin', 'main_admin', 'admin'] %}
+                {# Roles are fixed based on creator role #}
+                <input type="hidden" name="role"
+                    value="{{ 'main_admin' if role == 'super_admin' else ('admin' if role == 'main_admin' else 'user') }}">
+                {% endif %}
+            </form>
+        </div>
+
+        <!-- User List -->
+        <div class="card p-4 custom-shadow border-0">
+            <h5 class="mb-3">
+                {% if role == 'super_admin' %} Main Admin Accounts (System View) {% elif role == 'main_admin' %}
+                Comprehensive User Management {% else %} User & Admin Accounts {% endif %}
+            </h5>
+            <div class="table-responsive" id="userTableContainer">
+                <table class="table table-hover align-middle">
+                    <thead class="bg-light">
+                        <tr>
+                            <th>Name</th>
+                            <th>Email / ID</th>
+                            <th>Role</th>
+                            {% if role != 'super_admin' %}
+                            <th>Company</th>
+                            {% endif %}
+                            {% if role == 'main_admin' %}
+                            <th>Created By</th>
+                            {% endif %}
+                            <th class="text-center">Vehicles</th>
+                            <th class="text-center">Users</th>
+                            <th class="text-end">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% macro render_user_row(u, is_sub=False) %}
+                        <tr class="{{ 'bg-light bg-opacity-50 ps-4' if is_sub else '' }}">
+                            <td class="{{ 'ps-5' if is_sub else '' }}">
+                                {% if is_sub %} <i class="fas fa-level-up-alt fa-rotate-90 text-muted me-2"></i> {%
+                                endif %}
+                                {% if role != 'super_admin' %}
+                                <form method="post" class="d-inline">
+                                    <input type="hidden" name="action" value="update_profile">
+                                    <input type="hidden" name="email" value="{{ u.email }}">
+                                    <input type="text" name="name" value="{{ u.name or '' }}"
+                                        class="form-control form-control-sm border-0 bg-transparent fw-bold"
+                                        style="min-width: 150px;" onchange="this.form.submit()">
+                                </form>
+                                {% else %}
+                                <span class="fw-bold">{{ u.name or u.email }}</span>
+                                {% endif %}
+                            </td>
+                            <td class="small text-muted">{{ u.email }}</td>
+                            <td>
+                                {% if u.role == 'super_admin' %}
+                                <span class="badge bg-dark">Super Admin</span>
+                                {% elif u.role == 'main_admin' %}
+                                <span class="badge bg-danger">Main Admin</span>
+                                {% elif u.role == 'admin' %}
+                                <span class="badge bg-primary">Company Admin</span>
+                                {% else %}
+                                <span class="badge bg-info">User</span>
+                                {% endif %}
+                            </td>
+                            {% if role != 'super_admin' %}
+                            <td>
+                                {% if role == 'main_admin' and u.parent_email == session.get('email') %}
+                                <form method="post" class="d-inline">
+                                    <input type="hidden" name="action" value="update_profile">
+                                    <input type="hidden" name="email" value="{{ u.email }}">
+                                    <input type="text" name="company_name" value="{{ u.company_name or '' }}"
+                                        class="form-control form-control-sm border-0 bg-transparent"
+                                        style="min-width: 150px;" onchange="this.form.submit()">
+                                </form>
+                                {% else %}
+                                <span class="text-muted">{{ u.company_name or 'Auto-Inherited' }}</span>
+                                {% endif %}
+                            </td>
+                            {% endif %}
+                            {% if role == 'main_admin' %}
+                            <td>
+                                {% if u.created_by == session.get('email') %}
+                                <span class="badge bg-light text-dark border">You</span>
+                                {% else %}
+                                <span class="small text-muted">{{ u.created_by or u.parent_email }}</span>
+                                {% endif %}
+                            </td>
+                            {% endif %}
+                            <td class="text-center">
+                                <form method="post" class="d-inline">
+                                    <input type="hidden" name="action" value="update_profile">
+                                    <input type="hidden" name="email" value="{{ u.email }}">
+                                    <input type="number" name="vehicle_limit" value="{{ u.vehicle_limit or 0 }}"
+                                        class="form-control form-control-sm border-0 bg-transparent text-center mx-auto no-spinner"
+                                        style="width: 80px;" onchange="this.form.submit()">
+                                </form>
+                            </td>
+                            <td class="text-center">
+                                <form method="post" class="d-inline">
+                                    <input type="hidden" name="action" value="update_profile">
+                                    <input type="hidden" name="email" value="{{ u.email }}">
+                                    <input type="number" name="user_limit" value="{{ u.user_limit or 0 }}"
+                                        class="form-control form-control-sm border-0 bg-transparent text-center mx-auto no-spinner"
+                                        style="width: 80px;" onchange="this.form.submit()">
+                                </form>
+                            </td>
+                            <td class="text-end">
+                                {% if role != 'user' %}
+                                <form method="post" class="d-inline">
+                                    <input type="hidden" name="action" value="delete">
+                                    <input type="hidden" name="email" value="{{ u.email }}">
+                                    <button type="submit" class="btn btn-outline-danger btn-sm border-0"
+                                        onclick="return confirm('Strictly Delete this account?')">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </form>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endmacro %}
+
+                        {% if role == 'main_admin' and grouped_users %}
+                        {% for group in grouped_users %}
+                        {# The Title / Header for the Company Admin #}
+                        {% if not group.admin.is_virtual %}
+                        <tr class="table-primary bg-opacity-10 border-top-2">
+                            <td colspan="8" class="py-3 px-4">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <i class="fas fa-shield-alt text-primary me-2"></i>
+                                        <span class="h6 mb-0 fw-bold">{{ group.admin.company_name }} Management</span>
+                                    </div>
+                                    <div class="small">
+                                        <span class="badge bg-white text-primary border me-2">Section:
+                                            Sub-categories</span>
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                        {{ render_user_row(group.admin, is_sub=False) }}
+                        {% else %}
+                        <tr class="table-secondary bg-opacity-25">
+                            <td colspan="8" class="py-2 px-4">
+                                <i class="fas fa-folder-open me-2"></i>
+                                <span class="fw-bold">{{ group.admin.name }}</span>
+                            </td>
+                        </tr>
+                        {% endif %}
+
+                        {# Sub-categories (Users added by that Admin) #}
+                        {% for sub in group.children %}
+                        {{ render_user_row(sub, is_sub=True) }}
+                        {% endfor %}
+
+                        {% if not group.children and not group.admin.is_virtual %}
+                        <tr class="bg-light opacity-50">
+                            <td colspan="8" class="text-center py-2 small italic text-muted ps-5">No sub-users added by
+                                this company admin yet.</td>
+                        </tr>
+                        {% endif %}
+                        {% endfor %}
+                        {% else %}
+                        {% for u in users %}
+                        {{ render_user_row(u) }}
+                        {% endfor %}
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const userForm = document.getElementById('userCreationForm');
+        const tableContainer = document.getElementById('userTableContainer');
+        const usageContainer = document.getElementById('usageContainer');
+
+        function showLoading(show) {
+            const btn = userForm.querySelector('button[type="submit"]');
+            if (show) {
+                btn.disabled = true;
+                btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Processing...';
+            } else {
+                btn.disabled = false;
+                btn.innerHTML = userForm.dataset.originalText || 'Create';
+            }
+        }
+
+        if (userForm) {
+            userForm.dataset.originalText = userForm.querySelector('button[type="submit"]').innerText;
+
+            userForm.addEventListener('submit', async function (e) {
+                e.preventDefault();
+                showLoading(true);
+
+                const formData = new FormData(this);
+                try {
+                    const response = await fetch(window.location.href, {
+                        method: 'POST',
+                        body: formData,
+                        headers: {
+                            'X-Requested-With': 'XMLHttpRequest'
+                        }
+                    });
+
+                    const result = await response.json();
+
+                    if (result.success) {
+                        userForm.reset();
+                        await refreshUI();
+                        // Alert success
+                        showToast('Success', result.message, 'success');
+                    } else {
+                        showToast('Error', result.error || 'Failed to create user', 'danger');
+                    }
+                } catch (error) {
+                    console.error('Error:', error);
+                    showToast('Error', 'A system error occurred', 'danger');
+                } finally {
+                    showLoading(false);
+                }
+            });
+        }
+
+        async function refreshUI() {
+            if (tableContainer) tableContainer.style.opacity = '0.5';
+            if (usageContainer) usageContainer.style.opacity = '0.5';
+
+            try {
+                const response = await fetch(window.location.href);
+                const html = await response.text();
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(html, 'text/html');
+
+                // Swap table content
+                const newTable = doc.getElementById('userTableContainer');
+                if (newTable && tableContainer) {
+                    tableContainer.innerHTML = newTable.innerHTML;
+                }
+
+                // Swap usage content
+                const newUsage = doc.getElementById('usageContainer');
+                if (newUsage && usageContainer) {
+                    usageContainer.innerHTML = newUsage.innerHTML;
+                }
+
+                // Re-attach event listeners for inline forms if any
+                attachInlineFormListeners();
+
+            } catch (error) {
+                console.error('UI Refresh Error:', error);
+            } finally {
+                if (tableContainer) tableContainer.style.opacity = '1';
+                if (usageContainer) usageContainer.style.opacity = '1';
+            }
+        }
+
+        function attachInlineFormListeners() {
+            // Handle inline updates (names, limits)
+            document.querySelectorAll('#userTableContainer form').forEach(form => {
+                form.addEventListener('submit', async function (e) {
+                    e.preventDefault();
+                    const formData = new FormData(this);
+                    try {
+                        const response = await fetch(window.location.href, {
+                            method: 'POST',
+                            body: formData,
+                            headers: { 'X-Requested-With': 'XMLHttpRequest' }
+                        });
+                        const result = await response.json();
+                        if (result.success) {
+                            // For updates, we might only want to refresh the specific row or usage
+                            // Full refresh is safer for now
+                            await refreshUI();
+                        }
+                    } catch (err) { console.error(err); }
+                });
+
+                // Re-bind the onchange submit
+                const inputs = form.querySelectorAll('input, select');
+                inputs.forEach(input => {
+                    input.onchange = null; // Clear existing
+                    input.addEventListener('change', () => {
+                        form.requestSubmit();
+                    });
+                });
+            });
+
+            // Handle delete buttons
+            document.querySelectorAll('#userTableContainer button[type="submit"]').forEach(btn => {
+                const form = btn.closest('form');
+                if (form && form.querySelector('input[name="action"][value="delete"]')) {
+                    form.addEventListener('submit', async function (e) {
+                        e.preventDefault();
+                        if (!confirm('Strictly Delete this account?')) return;
+
+                        const formData = new FormData(this);
+                        try {
+                            const response = await fetch(window.location.href, {
+                                method: 'POST',
+                                body: formData,
+                                headers: { 'X-Requested-With': 'XMLHttpRequest' }
+                            });
+                            const result = await response.json();
+                            if (result.success) {
+                                await refreshUI();
+                                showToast('Deleted', 'User removed successfully', 'warning');
+                            }
+                        } catch (err) { console.error(err); }
+                    });
+                }
+            });
+        }
+
+        function showToast(title, message, type) {
+            // If there's a toast container in base.html, use it. 
+            // Otherwise use a simple alert for fallback.
+            const toastEl = document.createElement('div');
+            toastEl.className = `alert alert-${type} alert-dismissible fade show position-fixed top-0 end-0 m-3 z-index-huge`;
+            toastEl.style.zIndex = '9999';
+            toastEl.innerHTML = `
+            <strong>${title}:</strong> ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        `;
+            document.body.appendChild(toastEl);
+            setTimeout(() => {
+                toastEl.classList.remove('show');
+                setTimeout(() => toastEl.remove(), 500);
+            }, 3000);
+        }
+
+        // Initial attachment
+        attachInlineFormListeners();
+    });
+</script>
+{% endblock %}

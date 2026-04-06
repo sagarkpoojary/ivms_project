@@ -1,0 +1,1760 @@
+{% extends "base.html" %}
+
+{% block content %}
+<style>
+    .row-no-movement {
+        background-color: rgba(220, 53, 69, 0.08) !important;
+    }
+
+    .row-low-usage {
+        background-color: rgba(255, 193, 7, 0.08) !important;
+    }
+
+    .row-possible-overspeed {
+        background-color: rgba(253, 126, 20, 0.08) !important;
+    }
+
+    .row-normal {
+        background-color: rgba(40, 167, 69, 0.04) !important;
+    }
+
+    .status-badge {
+        font-size: 0.75rem;
+        padding: 0.4em 0.8em;
+        border-radius: 50rem;
+        font-weight: 600;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+    }
+
+    .text-orange {
+        color: #fd7e14 !important;
+    }
+
+    .bg-orange {
+        background-color: #fd7e14 !important;
+    }
+
+    .bg-soft-orange {
+        background-color: rgba(253, 126, 20, 0.15) !important;
+        color: #fd7e14 !important;
+    }
+
+    .cursor-pointer {
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .cursor-pointer:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1) !important;
+    }
+
+    .summary-card-active {
+        box-shadow: 0 0 0 2px #0d6efd !important;
+    }
+
+    .insight-text {
+        font-size: 0.7rem;
+        color: #6c757d;
+        display: block;
+        margin-top: 2px;
+    }
+
+    .stat-card {
+        border-radius: 12px;
+        transition: all 0.3s ease;
+    }
+
+    /* Enterprise Table Styles */
+    .enterprise-table thead th {
+        vertical-align: middle;
+        text-transform: uppercase;
+        font-size: 0.75rem;
+        letter-spacing: 0.05em;
+        font-weight: 700;
+        background-color: #f8f9fa;
+        border-top: none;
+        white-space: nowrap;
+    }
+
+    .enterprise-table tbody td {
+        vertical-align: middle !important;
+        height: 64px;
+        /* Fixed row height for consistency */
+        overflow: hidden;
+        padding-top: 8px !important;
+        padding-bottom: 8px !important;
+    }
+
+    .td-datetime {
+        width: 140px;
+        min-width: 140px;
+        line-height: 1.2 !important;
+    }
+
+    .td-datetime .date {
+        display: block;
+        font-weight: 600;
+        color: #212529;
+    }
+
+    .td-datetime .time {
+        display: block;
+        font-size: 0.8rem;
+        color: #6c757d;
+    }
+
+    .td-duration {
+        width: 100px;
+        min-width: 100px;
+        text-align: center !important;
+    }
+
+    .td-numeric {
+        text-align: center !important;
+        white-space: nowrap;
+    }
+
+    .td-address {
+        max-width: 250px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        color: #6c757d;
+    }
+
+    .td-status {
+        width: 130px;
+        text-align: center !important;
+    }
+
+    .td-location {
+        width: 150px;
+        min-width: 150px;
+        text-align: center !important;
+    }
+
+    .btn-map-fixed {
+        width: 120px;
+        height: 32px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.75rem;
+        padding: 0;
+        margin: 0 auto;
+    }
+</style>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<div class="col-12">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2 class="mb-0">{{ selected_report_type }} Report</h2>
+    </div>
+
+    {% if error %}
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        <i class="fas fa-exclamation-triangle me-2"></i> {{ error }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+    {% endif %}
+
+    {% if traccar_admin_warning %}
+    <div class="alert alert-warning alert-dismissible fade show mb-4 border-0 shadow-sm" role="alert">
+        <div class="d-flex">
+            <i class="fas fa-user-shield fa-2x me-3 text-warning"></i>
+            <div>
+                <h6 class="alert-heading fw-bold">Limited Traccar Permissions</h6>
+                <p class="mb-0 small">You are logged in as a <strong>Super Admin</strong> in IVMS, but your account is
+                    not an <strong>Administrator</strong> in the Traccar backend. You might not see all vehicles or data
+                    until they are explicitly linked to your account in Traccar or your profile is promoted.</p>
+            </div>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+    {% endif %}
+
+    <div class="card p-4 custom-shadow mb-4 border-0">
+        <form method="get" class="row g-2 align-items-center">
+            <div class="col-lg-2 col-md-6 col-12">
+                <div class="outlined-group">
+                    <select id="unique_id" name="unique_id" class="form-select form-select-sm">
+                        <option value="">All Registered</option>
+                        {% for v in vehicles %}
+                        <option value="{{ v.unique_id }}" {% if selected_uid|string==v.unique_id|string %}selected{%
+                            endif %}>
+                            {% if role == 'main_admin' %}
+                            Asset #{{ loop.index }} ({{ v.company_name or 'N/A' }})
+                            {% else %}
+                            {{ v.name }}
+                            {% endif %}
+                        </option>
+                        {% endfor %}
+                    </select>
+                    <label for="unique_id">Devices</label>
+                </div>
+            </div>
+
+            <div class="col-lg-2 col-md-6 col-12">
+                <div class="outlined-group">
+                    <select id="groups" name="groups" class="form-select form-select-sm" onchange="this.form.submit()">
+                        <option value="">Groups</option>
+                        {% for g in groups %}
+                        <option value="{{ g.id }}" {% if selected_group|string==g.id|string %}selected{% endif %}>{{
+                            g.name }}</option>
+                        {% endfor %}
+                    </select>
+                    <label for="groups">Groups</label>
+                </div>
+            </div>
+
+            {% if role in ['super_admin', 'main_admin'] %}
+            <div class="col-lg-2 col-md-6 col-12">
+                <div class="outlined-group">
+                    {% set unique_companies = [] %}
+                    {% for v in vehicles %}
+                    {% if v.company_name and v.company_name not in unique_companies %}
+                    {% set _ = unique_companies.append(v.company_name) %}
+                    {% endif %}
+                    {% endfor %}
+                    <select id="company_filter" name="company_filter" class="form-select form-select-sm"
+                        onchange="this.form.submit()">
+                        <option value="">All Companies</option>
+                        {% for comp in unique_companies | sort %}
+                        <option value="{{ comp }}" {% if request.args.get('company_filter')==comp %}selected{% endif %}>
+                            {{ comp }}</option>
+                        {% endfor %}
+                    </select>
+                    <label for="company_filter">Company</label>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Report Type is now fixed based on sidebar selection -->
+            <input type="hidden" name="report_type" id="report_type" value="{{ selected_report_type }}">
+
+            <div class="col-lg-2 col-md-6 col-12">
+                <div class="outlined-group">
+                    <select id="period" name="period" class="form-select form-select-sm" onchange="this.form.submit()">
+                        <option {% if selected_period=='Today' %}selected{% endif %}>Today</option>
+                        <option {% if selected_period=='Yesterday' %}selected{% endif %}>Yesterday</option>
+                        <option {% if selected_period=='This Week' %}selected{% endif %}>This Week</option>
+                        <option {% if selected_period=='This Month' %}selected{% endif %}>This Month</option>
+                        <option {% if selected_period=='Custom' %}selected{% endif %}>Custom</option>
+                    </select>
+                    <label for="period">Period</label>
+                </div>
+            </div>
+
+            {% if selected_uid and selected_report_type != 'Stops' %}
+            <div class="col-lg-2 col-md-6 col-12">
+                <div class="outlined-group">
+                    <select id="stop_threshold" name="stop_threshold" class="form-select form-select-sm"
+                        onchange="this.form.submit()">
+                        <option value="5" {% if selected_threshold=='5' %}selected{% endif %}>5 Minutes</option>
+                        <option value="10" {% if selected_threshold=='10' %}selected{% endif %}>10 Minutes</option>
+                        <option value="15" {% if selected_threshold=='15' %}selected{% endif %}>15 Minutes</option>
+                        <option value="30" {% if selected_threshold=='30' %}selected{% endif %}>30 Minutes</option>
+                        <option value="60" {% if selected_threshold=='60' %}selected{% endif %}>60 Minutes</option>
+                    </select>
+                    <label for="stop_threshold">Stop Threshold</label>
+                </div>
+            </div>
+            {% endif %}
+
+            {% if selected_report_type in ['Trips', 'Stops'] %}
+            <div class="col-lg-2 col-md-6 col-12">
+                <div class="outlined-group">
+                    <div class="custom-multi-select" id="columnSelectWrapper">
+                        <div class="multi-select-trigger" id="multiSelectTrigger">
+                            {% if selected_columns %}
+                            {{ selected_columns | length }} selected
+                            {% else %}
+                            Select Columns
+                            {% endif %}
+                        </div>
+                        <div class="multi-select-dropdown">
+                            {% if selected_report_type == 'Trips' %}
+                            {% set all_cols = [
+                            ('startTime', 'Start Time'),
+                            ('startOdometer', 'Odometer Start'),
+                            ('startAddress', 'Start Address'),
+                            ('endTime', 'End Time'),
+                            ('endOdometer', 'Odometer End'),
+                            ('endAddress', 'End Address'),
+                            ('distance', 'Distance'),
+                            ('averageSpeed', 'Average Speed'),
+                            ('maxSpeed', 'Maximum Speed'),
+                            ('duration', 'Duration'),
+                            ('spentFuel', 'Spent Fuel'),
+                            ('driverName', 'Driver')
+                            ] %}
+                            {% elif selected_report_type == 'Stops' %}
+                            {% set all_cols = [
+                            ('startTime', 'Start Time'),
+                            ('endTime', 'End Time'),
+                            ('duration', 'Duration'),
+                            ('startOdometer', 'Odometer'),
+                            ('address', 'Address'),
+                            ('engineHours', 'Engine Hours'),
+                            ('spentFuel', 'Spent Fuel')
+                            ] %}
+                            {% endif %}
+                            {% for key, label in all_cols %}
+                            <div class="multi-select-item">
+                                <input type="checkbox" name="col_{{ key }}" id="col_{{ key }}" value="1" {% if key in
+                                    selected_columns %}checked{% endif %}>
+                                <label for="col_{{ key }}">{{ label }}</label>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    <label for="columns">Columns</label>
+                </div>
+            </div>
+            {% endif %}
+
+            <div class="col-lg-2 col-md-12 col-12">
+                <div class="btn-group-show">
+                    <button type="submit" class="btn btn-show-outlined">APPLY</button>
+                    <button type="button" class="btn btn-show-dropdown dropdown-toggle dropdown-toggle-split"
+                        data-bs-toggle="dropdown" aria-expanded="false">
+                        <span class="visually-hidden">Toggle Dropdown</span>
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end">
+                        <li><a class="dropdown-item" href="javascript:void(0)" onclick="downloadCSV()">Export to CSV</a>
+                        </li>
+                        <li><a class="dropdown-item" href="javascript:void(0)" onclick="downloadCSV('excel')">Export to
+                                Excel</a>
+                        </li>
+                        <li><a class="dropdown-item" href="javascript:void(0)" onclick="window.print()">Export to
+                                PDF</a>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+
+            {% if selected_period == 'Custom' %}
+            <div class="col-12 mt-2">
+                <div class="row g-2">
+                    <div class="col-lg-3 col-md-6 col-6">
+                        <div class="outlined-group">
+                            <input type="datetime-local" class="form-control form-control-sm" id="from" name="from"
+                                value="{{ from_date }}">
+                            <label for="from">From</label>
+                        </div>
+                    </div>
+                    <div class="col-lg-3 col-md-6 col-6">
+                        <div class="outlined-group">
+                            <input type="datetime-local" class="form-control form-control-sm" id="to" name="to"
+                                value="{{ to_date }}">
+                            <label for="to">To</label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            {% if selected_uid and role in ['main_admin', 'admin'] %}
+            <div class="col-12 mt-2">
+                <button type="button" class="btn btn-success btn-sm shadow-sm" id="btnDownloadReport"
+                    onclick="fetchAndDownloadReport('{{ selected_uid }}', '{{ selected_period }}')">
+                    <i class="fas fa-download me-2"></i>Download Detailed Data
+                </button>
+            </div>
+            {% endif %}
+        </form>
+    </div>
+</div>
+
+{% if (not selected_uid and selected_report_type != 'Stops') or selected_report_type == 'Summary' %}
+{% if selected_report_type == 'Summary' or not selected_uid %}
+<div class="row g-3 mb-4 mt-2">
+    <div class="col-lg-3 col-md-6">
+        <div class="card p-3 border-0 shadow-sm text-center stat-card cursor-pointer" onclick="filterSummaryTable('')">
+            <div class="d-flex align-items-center justify-content-center gap-3">
+                <div class="rounded-circle bg-soft-primary p-2">
+                    <i class="fas fa-car text-primary"></i>
+                </div>
+                <div class="text-start">
+                    <h6 class="text-muted mb-0 small uppercase fw-bold">Total Vehicles</h6>
+                    <h3 class="mb-0 fw-bold">{{ total_vehicles_count }}</h3>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-3 col-md-6">
+        <div class="card p-3 border-0 shadow-sm text-center stat-card cursor-pointer border-start border-4 border-warning"
+            onclick="filterSummaryTable('status-lowusage')">
+            <div class="d-flex align-items-center justify-content-center gap-3">
+                <div class="rounded-circle bg-soft-warning p-2">
+                    <i class="fas fa-tachometer-alt text-warning"></i>
+                </div>
+                <div class="text-start">
+                    <h6 class="text-muted mb-0 small uppercase fw-bold">Low Usage</h6>
+                    <h3 class="mb-0 fw-bold text-warning">{{ low_usage_count }}</h3>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-3 col-md-6">
+        <div class="card p-3 border-0 shadow-sm text-center stat-card cursor-pointer border-start border-4 border-danger"
+            onclick="filterSummaryTable('status-nomovement')">
+            <div class="d-flex align-items-center justify-content-center gap-3">
+                <div class="rounded-circle bg-soft-danger p-2">
+                    <i class="fas fa-exclamation-triangle text-danger"></i>
+                </div>
+                <div class="text-start">
+                    <h6 class="text-muted mb-0 small uppercase fw-bold">No Movement</h6>
+                    <h3 class="mb-0 fw-bold text-danger">{{ no_movement_count }}</h3>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-3 col-md-6">
+        <div class="card p-3 border-0 shadow-sm text-center stat-card cursor-pointer border-start border-4 border-orange"
+            onclick="filterSummaryTable('status-overspeed')">
+            <div class="d-flex align-items-center justify-content-center gap-3">
+                <div class="rounded-circle bg-soft-orange p-2">
+                    <i class="fas fa-bolt text-orange"></i>
+                </div>
+                <div class="text-start">
+                    <h6 class="text-muted mb-0 small uppercase fw-bold">Overspeed</h6>
+                    <h3 class="mb-0 fw-bold text-orange">{{ overspeed_count }}</h3>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+<div class="card p-4 custom-shadow border-0 mt-4">
+    <h5 class="card-title text-dark mb-3">
+        {% if selected_report_type == 'Summary' %}
+        Summary Report
+        {% elif selected_report_type == 'Combined' %}
+        Combined Report Summary
+        {% else %}
+        {{ selected_report_type }} Overview
+        {% endif %}
+    </h5>
+    <div class="table-responsive">
+        {% if selected_report_type in ['Trips', 'Stops'] %}
+        <!-- Table WITH Map Column (Trips/Stops only) -->
+        <table class="table mb-0 align-middle table-hover" id="summaryTable">
+            <thead class="bg-light">
+                <tr>
+                    <th class="py-3 ps-4" style="width: 50px;">Map</th>
+                    <th class="py-3">Vehicle</th>
+                    <th class="py-3">Status / Insight</th>
+                    <th class="py-3">Unique ID</th>
+                    <th class="py-3">Total Distance</th>
+                    <th class="py-3">Max Speed</th>
+                    <th class="py-3">Avg Speed</th>
+                    <th class="py-3">Total Idling Time</th>
+                    <th class="py-3 pe-4">Total Parked Time</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in report_data %}
+                <tr
+                    class="{% if row.status == 'No Movement' %}row-no-movement{% elif row.status == 'Low Usage' %}row-low-usage{% elif row.status == 'Possible Overspeed' %}row-possible-overspeed{% else %}row-normal{% endif %}">
+                    <td class="ps-4 text-center">
+                        {% if row.total_distance > 0 %}
+                        <button class="btn btn-sm btn-link text-primary p-0"
+                            onclick="fetchAndShowRoute('{{ row.unique_id }}', '{{ row.name | replace("'", "\\'") }}')"
+                            title="View Trip Route" style="font-size: 1.2rem;">
+                            <i class="fas fa-route"></i>
+                        </button>
+                        {% else %}
+                        <button class="btn btn-sm btn-link text-muted p-0" disabled title="No movement"
+                            style="font-size: 1.2rem; cursor: not-allowed; opacity: 0.5;">
+                            <i class="fas fa-route"></i>
+                        </button>
+                        {% endif %}
+                    </td>
+                    <td class="fw-medium">
+                        {% if role == 'main_admin' %}Asset #{{ loop.index }}{% else %}{{ row.name }}{% endif %}
+                        {% if not row.internal_id %}
+                        <i class="fas fa-exclamation-circle text-warning ms-1" title="Not linked to Traccar"></i>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <span class="d-none">
+                            {% if row.status == 'No Movement' %}status-nomovement{% endif %}
+                            {% if row.status == 'Low Usage' %}status-lowusage{% endif %}
+                            {% if row.max_speed > (speed_limit|default(100)) %}status-overspeed{% endif %}
+                        </span>
+                        {% if row.status == 'No Movement' %}
+                        <span class="status-badge bg-soft-danger text-danger" title="{{ row.insight }}">
+                            <i class="fas fa-circle-minus"></i> {{ row.status }}
+                        </span>
+                        {% elif row.status == 'Low Usage' %}
+                        <span class="status-badge bg-soft-warning text-warning" title="{{ row.insight }}">
+                            <i class="fas fa-circle-pause"></i> {{ row.status }}
+                        </span>
+                        {% elif row.status == 'Possible Overspeed' %}
+                        <span class="status-badge bg-soft-orange text-orange" title="{{ row.insight }}">
+                            <i class="fas fa-circle-exclamation"></i> {{ row.status }}
+                        </span>
+                        {% else %}
+                        <span class="status-badge bg-soft-success text-success" title="{{ row.insight }}">
+                            <i class="fas fa-circle-check"></i> {{ row.status }}
+                        </span>
+                        {% endif %}
+                        <small class="insight-text">{{ row.insight }}</small>
+                    </td>
+                    <td>
+                        {% if role == 'main_admin' %}
+                        <span class="badge bg-outline-secondary text-dark border">{{ row.company_name or 'N/A' }}</span>
+                        {% else %}
+                        <span class="badge bg-light text-dark">{{ row.unique_id }}</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if row.total_distance > 0 %}
+                        <div class="fw-bold text-dark" style="font-size: 1rem;">{{ row.total_distance }} km</div>
+                        {% else %}
+                        <div class="fw-bold text-muted" style="font-size: 1rem;">0 km</div>
+                        <small class="text-muted d-block" style="font-size: 0.75rem;">No movement</small>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <span class="{% if row.max_speed > (speed_limit|default(100)) %}text-orange fw-bold{% endif %}">
+                            {{ row.max_speed }} km/h
+                        </span>
+                    </td>
+                    <td>{{ row.average_speed }} km/h</td>
+                    <td>
+                        {% set idle_sec = (row.idle_duration / 1000) | int %}
+                        <span {% if idle_sec> 3600 %}title="High idle time detected" class="text-warning"{% endif %}>
+                            {{ (idle_sec // 3600) }}h {{ ((idle_sec % 3600) // 60) }}m
+                        </span>
+                    </td>
+                    <td class="pe-4">
+                        {% set off_sec = (row.off_duration / 1000) | int %}
+                        {{ (off_sec // 3600) }}h {{ ((off_sec % 3600) // 60) }}m
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <!-- Table WITHOUT Map Column (Summary/Combined/General) -->
+        <table class="table mb-0 align-middle table-hover" id="summaryTable">
+            <thead class="bg-light">
+                <tr>
+                    <th class="py-3 ps-4">Vehicle</th>
+                    <th class="py-3">Status / Insight</th>
+                    <th class="py-3">Unique ID</th>
+                    <th class="py-3">Total Distance</th>
+                    <th class="py-3">Max Speed</th>
+                    <th class="py-3">Avg Speed</th>
+                    <th class="py-3">Total Idling Time</th>
+                    <th class="py-3 pe-4">Total Parked Time</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in report_data %}
+                <tr
+                    class="{% if row.status == 'No Movement' %}row-no-movement{% elif row.status == 'Low Usage' %}row-low-usage{% elif row.status == 'Possible Overspeed' %}row-possible-overspeed{% else %}row-normal{% endif %}">
+                    <td class="ps-4 fw-medium">
+                        {% if role == 'main_admin' %}Asset #{{ loop.index }}{% else %}{{ row.name }}{% endif %}
+                        {% if not row.internal_id %}
+                        <i class="fas fa-exclamation-circle text-warning ms-1" title="Not linked to Traccar"></i>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <span class="d-none">
+                            {% if row.status == 'No Movement' %}status-nomovement{% endif %}
+                            {% if row.status == 'Low Usage' %}status-lowusage{% endif %}
+                            {% if row.max_speed > (speed_limit|default(100)) %}status-overspeed{% endif %}
+                        </span>
+                        {% if row.status == 'No Movement' %}
+                        <span class="status-badge bg-soft-danger text-danger" title="{{ row.insight }}">
+                            <i class="fas fa-circle-minus"></i> {{ row.status }}
+                        </span>
+                        {% elif row.status == 'Low Usage' %}
+                        <span class="status-badge bg-soft-warning text-warning" title="{{ row.insight }}">
+                            <i class="fas fa-circle-pause"></i> {{ row.status }}
+                        </span>
+                        {% elif row.status == 'Possible Overspeed' %}
+                        <span class="status-badge bg-soft-orange text-orange" title="{{ row.insight }}">
+                            <i class="fas fa-circle-exclamation"></i> {{ row.status }}
+                        </span>
+                        {% else %}
+                        <span class="status-badge bg-soft-success text-success" title="{{ row.insight }}">
+                            <i class="fas fa-circle-check"></i> {{ row.status }}
+                        </span>
+                        {% endif %}
+                        <small class="insight-text">{{ row.insight }}</small>
+                    </td>
+                    <td>
+                        {% if role == 'main_admin' %}
+                        <span class="badge bg-outline-secondary text-dark border">{{ row.company_name or 'N/A' }}</span>
+                        {% else %}
+                        <span class="badge bg-light text-dark">{{ row.unique_id }}</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if row.total_distance > 0 %}
+                        <div class="fw-bold text-dark" style="font-size: 1rem;">{{ row.total_distance }} km</div>
+                        {% else %}
+                        <div class="fw-bold text-muted" style="font-size: 1rem;">0 km</div>
+                        <small class="text-muted d-block" style="font-size: 0.75rem;">No movement</small>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <span class="{% if row.max_speed > (speed_limit|default(100)) %}text-orange fw-bold{% endif %}">
+                            {{ row.max_speed }} km/h
+                        </span>
+                    </td>
+                    <td>{{ row.average_speed }} km/h</td>
+                    <td>
+                        {% set idle_sec = (row.idle_duration / 1000) | int %}
+                        <span {% if idle_sec> 3600 %}title="High idle time detected" class="text-warning"{% endif %}>
+                            {{ (idle_sec // 3600) }}h {{ ((idle_sec % 3600) // 60) }}m
+                        </span>
+                    </td>
+                    <td class="pe-4">
+                        {% set off_sec = (row.off_duration / 1000) | int %}
+                        {{ (off_sec // 3600) }}h {{ ((off_sec % 3600) // 60) }}m
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% endif %}
+        <div class="mt-4 text-center">
+            <p class="text-muted small">
+                {% if selected_uid %}
+                Report for: <strong>{{ selected_uid }}</strong>
+                {% else %}
+                Report for: <strong>All Registered Devices</strong>
+                {% endif %}
+                | Period: {{ selected_period }} ({{ from_date }} to {{ to_date }})
+            </p>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<div id="reportMapContainer" class="card p-3 mt-4 custom-shadow border-0" style="display:none;">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+        <h5 class="m-0"><i class="fas fa-map-marker-alt text-primary me-2"></i>Device Location: <span
+                id="reportMapDeviceName"></span></h5>
+        <button class="btn btn-sm btn-outline-secondary"
+            onclick="document.getElementById('reportMapContainer').style.display='none'">Close</button>
+    </div>
+    <div id="reportDetailMap" style="height:400px; border-radius:8px;"></div>
+</div>
+
+{% if selected_report_type == 'Trips' and trip_data %}
+<div class="card p-4 custom-shadow border-0 mt-4">
+    <h5 class="card-title text-dark mb-3">Trip Details</h5>
+    <div class="table-responsive">
+        <table class="table mb-0 align-middle table-hover">
+            <thead class="bg-light">
+                <tr>
+                    <th class="py-3 ps-4">{% if role == 'main_admin' %}Asset Sum{% else %}Device{% endif %}</th>
+                    {% set col_map = {
+                    'startTime': 'Start Time',
+                    'startOdometer': 'Odometer Start',
+                    'startAddress': 'Start Address',
+                    'endTime': 'End Time',
+                    'endOdometer': 'Odometer End',
+                    'endAddress': 'End Address',
+                    'distance': 'Distance',
+                    'averageSpeed': 'Average Speed',
+                    'maxSpeed': 'Maximum Speed',
+                    'duration': 'Duration',
+                    'spentFuel': 'Spent Fuel',
+                    'driverName': 'Driver'
+                    } %}
+
+                    {% if not selected_columns %}
+                    <!-- DEFAULT VIEW if no columns selected (Show all from desired list) -->
+                    <th class="py-3 td-datetime text-center">Start Time</th>
+                    <th class="py-3 td-numeric">Odometer Start</th>
+                    <th class="py-3 td-datetime text-center">End Time</th>
+                    <th class="py-3 td-numeric">Odometer End</th>
+                    <th class="py-3 td-numeric">Distance</th>
+                    {% if role != 'main_admin' %}
+                    <th class="py-3 pe-4">Driver</th>
+                    {% endif %}
+                    {% else %}
+                    {% for key in selected_columns %}
+                    {% if key in col_map %}
+                    {% if not (role == 'main_admin' and key == 'driverName') %}
+                    <th
+                        class="py-3 {% if key in ['startTime', 'endTime'] %}td-datetime text-center{% elif key in ['startOdometer', 'endOdometer', 'distance'] %}td-numeric{% endif %}">
+                        {{ col_map[key] }}</th>
+                    {% endif %}
+                    {% endif %}
+                    {% endfor %}
+                    {% endif %}
+                    <th class="py-3 td-location text-center">Location</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in trip_data %}
+                <tr>
+                    <td class="ps-4 fw-medium">{% if role == 'main_admin' %}Asset#{{ row.deviceId }}{% else %}{{
+                        row.deviceName }}{% endif %}</td>
+
+                    {% if not selected_columns %}
+                    <td class="td-datetime text-center">
+                        {% set start_parts = row.startTime.split(" ") %}
+                        <span class="date">{{ start_parts[0] }}</span>
+                        <span class="time">{{ start_parts[1] }}</span>
+                    </td>
+                    <td class="td-numeric">{{ row.startOdometer }}</td>
+                    <td class="td-datetime text-center">
+                        {% set end_parts = row.endTime.split(" ") %}
+                        <span class="date">{{ end_parts[0] }}</span>
+                        <span class="time">{{ end_parts[1] }}</span>
+                    </td>
+                    <td class="td-numeric">{{ row.endOdometer }}</td>
+                    <td class="td-numeric"><span class="badge bg-soft-primary text-primary">{{ row.distance }}</span>
+                    </td>
+                    {% if role != 'main_admin' %}
+                    <td class="pe-4">{{ row.driverName }}</td>
+                    {% endif %}
+                    {% else %}
+                    {% for key in selected_columns %}
+                    {% if key in col_map %}
+                    {% if not (role == 'main_admin' and key == 'driverName') %}
+                    <td
+                        class="{% if key in ['startTime', 'endTime'] %}td-datetime text-center{% elif key in ['startOdometer', 'endOdometer', 'distance'] %}td-numeric{% endif %}">
+                        {% if key == 'startTime' or key == 'endTime' %}
+                        {% set parts = row[key].split(" ") %}
+                        <span class="date">{{ parts[0] }}</span>
+                        <span class="time">{{ parts[1] }}</span>
+                        {% elif key == 'distance' %}
+                        <span class="badge bg-soft-primary text-primary">{{ row.distance }}</span>
+                        {% elif key == 'duration' %}
+                        {% set dur_sec = row.duration / 1000 %}
+                        {% set h = (dur_sec // 3600) | int %}
+                        {% set m = ((dur_sec % 3600) // 60) | int %}
+                        {{ h }}h {{ m }}m
+                        {% else %}
+                        {{ row[key] }}
+                        {% endif %}
+                    </td>
+                    {% endif %}
+                    {% endif %}
+                    {% endfor %}
+                    {% endif %}
+                    <td class="td-location text-center">
+                        {% if row.startLat and row.startLon %}
+                        <button class="btn btn-sm btn-outline-primary btn-map-fixed"
+                            onclick="fetchAndShowRoute('{{ selected_uid }}', '{{ row.deviceName | replace("'", "\\'") }}', '{{ row.rawStartTime }}', '{{ row.rawEndTime }}')">
+                            <i class="fas fa-map-marker-alt me-1"></i> Map
+                        </button>
+                        {% else %}
+                        <span class="text-muted small">No GPS</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% elif selected_report_type == 'Trips' and selected_uid %}
+<div class="card p-5 custom-shadow border-0 mt-4 text-center">
+    <div class="py-4">
+        <i class="fas fa-route fa-3x text-muted mb-3"></i>
+        <h5 class="text-muted">No trip data found for this period</h5>
+        <p class="small text-muted mb-0">Try selecting a different period or device.</p>
+    </div>
+</div>
+{% elif selected_report_type == 'Stops' and (stop_data_on or stop_data_off) %}
+<div class="card p-4 custom-shadow border-0 mt-4">
+    <h5 class="card-title text-dark mb-3">Stops with Engine OFF (Parked)</h5>
+    <div class="table-responsive">
+        <table class="table mb-0 align-middle table-hover enterprise-table">
+            <thead class="bg-light">
+                <tr>
+                    <th class="py-3 ps-4" style="width: 180px;">{% if role == 'main_admin' %}Asset Sum{% else %}Device{%
+                        endif %}</th>
+                    {% set stop_col_map = {
+                    'startTime': 'Arrival',
+                    'endTime': 'Departure',
+                    'duration': 'Duration',
+                    'distance': 'Distance',
+                    'startOdometer': 'Odometer',
+                    'endOdometer': 'Odometer',
+                    'engineHours': 'Eng Hours',
+                    'spentFuel': 'Spent Fuel',
+                    'address': 'Address'
+                    } %}
+
+                    {% if not selected_columns %}
+                    <th class="py-3 td-datetime text-center">Arrival</th>
+                    <th class="py-3 td-datetime text-center">Departure</th>
+                    <th class="py-3 td-duration">Duration</th>
+                    <th class="py-3">Address</th>
+                    <th class="py-3 td-status">Engine Status</th>
+                    <th class="py-3 td-numeric">Odometer</th>
+                    <th class="py-3 td-numeric">Eng Hours</th>
+                    <th class="py-3 td-numeric pe-4">Fuel</th>
+                    {% else %}
+                    {% for key in selected_columns %}
+                    {% if key in stop_col_map %}
+                    <th
+                        class="py-3 {% if key in ['startTime', 'endTime'] %}td-datetime text-center{% elif key == 'duration' %}td-duration{% elif key in ['odometer', 'engineHours', 'spentFuel'] %}td-numeric{% endif %}">
+                        {{ stop_col_map[key] }}</th>
+                    {% endif %}
+                    {% endfor %}
+                    {% endif %}
+                    <th class="py-3 td-location">Location</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in stop_data_off %}
+                <tr>
+                    <td class="ps-4 fw-medium">{% if role == 'main_admin' %}Asset#{{ row.deviceId }}{% else %}{{
+                        row.deviceName }}{% endif %}</td>
+
+                    {% if not selected_columns %}
+                    <td class="td-datetime text-center">
+                        {% set start_parts = row.startTime.split(" ") %}
+                        <span class="date">{{ start_parts[0] }}</span>
+                        <span class="time">{{ start_parts[1] }}</span>
+                    </td>
+                    <td class="td-datetime text-center">
+                        {% set end_parts = row.endTime.split(" ") %}
+                        <span class="date">{{ end_parts[0] }}</span>
+                        <span class="time">{{ end_parts[1] }}</span>
+                    </td>
+                    <td class="td-duration">
+                        {% set dur_sec = row.duration / 1000 %}
+                        {% set h = (dur_sec // 3600) | int %}
+                        {% set m = ((dur_sec % 3600) // 60) | int %}
+                        <span class="fw-bold">{{ h }}h {{ m }}m</span>
+                    </td>
+                    <td class="td-address">{{ row.address }}</td>
+                    <td class="td-status"><span class="badge bg-soft-secondary text-secondary">OFF</span></td>
+                    <td class="td-numeric fw-medium">{{ row.odometer }} km</td>
+                    <td class="td-numeric text-muted small">{{ row.engineHours }}</td>
+                    <td class="td-numeric pe-4">{{ row.spentFuel }}</td>
+                    {% else %}
+                    {% for key in selected_columns %}
+                    {% if key in stop_col_map %}
+                    <td
+                        class="{% if key in ['startTime', 'endTime'] %}td-datetime text-center{% elif key == 'duration' %}td-duration{% elif key in ['odometer', 'engineHours', 'spentFuel'] %}td-numeric{% elif key == 'address' %}td-address{% endif %}">
+                        {% if key == 'startTime' or key == 'endTime' %}
+                        {% set parts = row[key].split(" ") %}
+                        <span class="date">{{ parts[0] }}</span>
+                        <span class="time">{{ parts[1] }}</span>
+                        {% elif key == 'duration' %}
+                        {% set dur_sec = row.duration / 1000 %}
+                        {% set h = (dur_sec // 3600) | int %}
+                        {% set m = ((dur_sec % 3600) // 60) | int %}
+                        <span class="fw-bold">{{ h }}h {{ m }}m</span>
+                        {% elif key == 'distance' or key == 'startOdometer' or key == 'endOdometer' %}
+                        <span class="fw-medium">{{ row.odometer }} km</span>
+                        {% elif key == 'engineHours' or key == 'startEngineHours' or key == 'endEngineHours' %}
+                        <span class="text-muted small">{{ row.engineHours }}</span>
+                        {% else %}
+                        {{ row[key] }}
+                        {% endif %}
+                    </td>
+                    {% endif %}
+                    {% endfor %}
+                    {% endif %}
+                    <td class="td-location">
+                        {% if row.latitude and row.longitude %}
+                        <button class="btn btn-sm btn-outline-primary btn-map-fixed"
+                            onclick="viewOnePointOnMap({{ row.latitude }}, {{ row.longitude }}, '{{ row.deviceName | replace("'", "\\'") }}', '{{ row.address | replace("'", "\\'") }}')">
+                            <i class="fas fa-map-marker-alt me-1"></i> Map
+                        </button>
+                        {% else %}
+                        <span class="text-muted small">No GPS</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="11" class="text-center text-muted py-3">No parked stops found</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="card p-4 custom-shadow border-0 mt-4">
+    <h5 class="card-title text-dark mb-3">Stops with Engine ON (Idling)</h5>
+    <div class="table-responsive">
+        <table class="table mb-0 align-middle table-hover enterprise-table">
+            <thead class="bg-light">
+                <tr>
+                    <th class="py-3 ps-4" style="width: 180px;">{% if role == 'main_admin' %}Asset Sum{% else %}Device{%
+                        endif %}</th>
+                    {% set stop_col_map = {
+                    'startTime': 'Arrival',
+                    'endTime': 'Departure',
+                    'duration': 'Duration',
+                    'distance': 'Distance',
+                    'startOdometer': 'Odometer',
+                    'endOdometer': 'Odometer',
+                    'engineHours': 'Eng Hours',
+                    'spentFuel': 'Spent Fuel',
+                    'address': 'Address'
+                    } %}
+
+                    {% if not selected_columns %}
+                    <th class="py-3 td-datetime text-center">Arrival</th>
+                    <th class="py-3 td-datetime text-center">Departure</th>
+                    <th class="py-3 td-duration">Duration</th>
+                    <th class="py-3">Address</th>
+                    <th class="py-3 td-status">Engine Status</th>
+                    <th class="py-3 td-numeric">Odometer</th>
+                    <th class="py-3 td-numeric">Eng Hours</th>
+                    <th class="py-3 td-numeric pe-4">Fuel</th>
+                    {% else %}
+                    {% for key in selected_columns %}
+                    {% if key in stop_col_map %}
+                    <th
+                        class="py-3 {% if key in ['startTime', 'endTime'] %}td-datetime text-center{% elif key == 'duration' %}td-duration{% elif key in ['odometer', 'engineHours', 'spentFuel'] %}td-numeric{% endif %}">
+                        {{ stop_col_map[key] }}</th>
+                    {% endif %}
+                    {% endfor %}
+                    {% endif %}
+                    <th class="py-3 td-location text-center">Location</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in stop_data_on %}
+                <tr>
+                    <td class="ps-4 fw-medium">{% if role == 'main_admin' %}Asset#{{ row.deviceId }}{% else %}{{
+                        row.deviceName }}{% endif %}</td>
+
+                    {% if not selected_columns %}
+                    <td class="td-datetime text-center">
+                        {% set start_parts = row.startTime.split(" ") %}
+                        <span class="date">{{ start_parts[0] }}</span>
+                        <span class="time">{{ start_parts[1] }}</span>
+                    </td>
+                    <td class="td-datetime text-center">
+                        {% set end_parts = row.endTime.split(" ") %}
+                        <span class="date">{{ end_parts[0] }}</span>
+                        <span class="time">{{ end_parts[1] }}</span>
+                    </td>
+                    <td class="td-duration">
+                        {% set dur_sec = row.duration / 1000 %}
+                        {% set h = (dur_sec // 3600) | int %}
+                        {% set m = ((dur_sec % 3600) // 60) | int %}
+                        <span class="fw-bold">{{ h }}h {{ m }}m</span>
+                    </td>
+                    <td class="td-address">{{ row.address }}</td>
+                    <td class="td-status"><span class="badge bg-soft-warning text-warning">ON (Idle)</span></td>
+                    <td class="td-numeric fw-medium">{{ row.odometer }} km</td>
+                    <td class="td-numeric text-muted small">{{ row.engineHours }}</td>
+                    <td class="td-numeric pe-4">{{ row.spentFuel }}</td>
+                    {% else %}
+                    {% for key in selected_columns %}
+                    {% if key in stop_col_map %}
+                    <td
+                        class="{% if key in ['startTime', 'endTime'] %}td-datetime text-center{% elif key == 'duration' %}td-duration{% elif key in ['odometer', 'engineHours', 'spentFuel'] %}td-numeric{% elif key == 'address' %}td-address{% endif %}">
+                        {% if key == 'startTime' or key == 'endTime' %}
+                        {% set parts = row[key].split(" ") %}
+                        <span class="date">{{ parts[0] }}</span>
+                        <span class="time">{{ parts[1] }}</span>
+                        {% elif key == 'duration' %}
+                        {% set dur_sec = row.duration / 1000 %}
+                        {% set h = (dur_sec // 3600) | int %}
+                        {% set m = ((dur_sec % 3600) // 60) | int %}
+                        <span class="fw-bold">{{ h }}h {{ m }}m</span>
+                        {% elif key == 'distance' or key == 'startOdometer' or key == 'endOdometer' %}
+                        <span class="fw-medium">{{ row.odometer }} km</span>
+                        {% elif key == 'engineHours' or key == 'startEngineHours' or key == 'endEngineHours' %}
+                        <span class="text-muted small">{{ row.engineHours }}</span>
+                        {% else %}
+                        {{ row[key] }}
+                        {% endif %}
+                    </td>
+                    {% endif %}
+                    {% endfor %}
+                    {% endif %}
+                    <td class="td-location text-center">
+                        {% if row.latitude and row.longitude %}
+                        <button class="btn btn-sm btn-outline-primary btn-map-fixed"
+                            onclick="viewOnePointOnMap({{ row.latitude }}, {{ row.longitude }}, '{{ row.deviceName | replace("'", "\\'") }}', '{{ row.address | replace("'", "\\'") }}')">
+                            <i class="fas fa-map-marker-alt me-1"></i> Map
+                        </button>
+                        {% else %}
+                        <span class="text-muted small">No GPS</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="11" class="text-center text-muted py-3">No idling stops found</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% elif selected_report_type == 'Stops' and selected_uid %}
+<div class="card p-5 custom-shadow border-0 mt-4 text-center">
+    <div class="py-4">
+        <i class="fas fa-hand-paper fa-3x text-muted mb-3"></i>
+        <h5 class="text-muted">No stop data found for this period</h5>
+        <p class="small text-muted mb-0">Try a different period.</p>
+    </div>
+</div>
+{% elif selected_report_type == 'Combined' %}
+<div class="row">
+    <!-- Map Section -->
+    <div class="col-lg-8">
+        <div class="card p-4 custom-shadow border-0 h-100">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="card-title text-dark mb-0">
+                    <i class="fas fa-route text-primary me-2"></i>Route Overview
+                </h5>
+                <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" id="showRoute" checked>
+                    <label class="form-check-label small" for="showRoute">Show Route</label>
+                </div>
+            </div>
+            <div id="combinedMap" style="height: 500px; border-radius: 8px; width: 100%;"></div>
+
+            <!-- Map Legend -->
+            <div class="mt-3 d-flex flex-wrap gap-3">
+                <div class="d-flex align-items-center">
+                    <div class="legend-icon"
+                        style="background-color: #0d6efd; width: 16px; height: 16px; border-radius: 3px; margin-right: 6px;">
+                    </div>
+                    <span class="small">Route</span>
+                </div>
+                <div class="d-flex align-items-center">
+                    <i class="fas fa-play-circle text-success me-1"></i>
+                    <span class="small">Start</span>
+                </div>
+                <div class="d-flex align-items-center">
+                    <i class="fas fa-stop-circle text-danger me-1"></i>
+                    <span class="small">End</span>
+                </div>
+                <div class="d-flex align-items-center">
+                    <i class="fas fa-power-off text-warning me-1"></i>
+                    <span class="small">Ignition</span>
+                </div>
+                <div class="d-flex align-items-center">
+                    <i class="fas fa-exclamation-triangle text-danger me-1"></i>
+                    <span class="small">Speed Alert</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Events Summary -->
+    <div class="col-lg-4 mt-4 mt-lg-0">
+        <div class="card p-4 custom-shadow border-0 h-100">
+            <h5 class="card-title text-dark mb-3">
+                <i class="fas fa-list-ul text-primary me-2"></i>Events Summary
+            </h5>
+            <div class="list-group list-group-flush">
+                <div class="list-group-item d-flex justify-content-between align-items-center">
+                    <span><i class="fas fa-route text-primary me-2"></i>Total Distance</span>
+                    <span class="fw-medium" id="totalDistance">{{ summary_distance }} km</span>
+                </div>
+                <div class="list-group-item d-flex justify-content-between align-items-center">
+                    <span><i class="fas fa-clock text-info me-2"></i>Duration</span>
+                    <span class="fw-medium" id="totalDuration">
+                        {% set dur_sec = summary_duration / 1000 %}
+                        {% set h = (dur_sec // 3600) | int %}
+                        {% set m = ((dur_sec % 3600) // 60) | int %}
+                        {{ h }}h {{ m }}m
+                    </span>
+                </div>
+                <div class="list-group-item d-flex justify-content-between align-items-center">
+                    <span><i class="fas fa-tachometer-alt text-warning me-2"></i>Avg. Speed</span>
+                    <span class="fw-medium" id="avgSpeed">{{ summary_avg_speed }} km/h</span>
+                </div>
+                <div class="list-group-item d-flex justify-content-between align-items-center">
+                    <span><i class="fas fa-stopwatch text-danger me-2"></i>Idle Time</span>
+                    <span class="fw-medium" id="idleTime">
+                        {% set idle_sec = summary_idle_time / 1000 %}
+                        {% set h_idle = (idle_sec // 3600) | int %}
+                        {% set m_idle = ((idle_sec % 3600) // 60) | int %}
+                        {{ h_idle }}h {{ m_idle }}m
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Events Log -->
+<div class="card p-4 custom-shadow border-0 mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h5 class="card-title text-dark mb-0">
+            <i class="fas fa-history text-primary me-2"></i>Detailed Events Log
+        </h5>
+        <div class="btn-group" role="group">
+            <button type="button" class="btn btn-sm btn-outline-secondary active" data-filter="all">All</button>
+            <button type="button" class="btn btn-sm btn-outline-secondary" data-filter="ignition">Ignition</button>
+            <button type="button" class="btn btn-sm btn-outline-secondary" data-filter="stop">Stops</button>
+            <button type="button" class="btn btn-sm btn-outline-secondary" data-filter="speed">Speed</button>
+        </div>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table mb-0 align-middle table-hover" id="eventsTable">
+            <thead class="bg-light">
+                <tr>
+                    <th class="py-3 ps-4">Time</th>
+                    <th class="py-3">Event</th>
+                    <th class="py-3 pe-4">Location</th>
+                    <th class="py-3 pe-4">Details</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in combined_data %}
+                {% set event_time = row.fixTime | replace("T", " ") | truncate(19, True, "") %}
+                {% set row_alarm = (row.attributes.alarm or '') | lower %}
+                <tr class="event-row" data-type="{{ row.type | lower }}" data-alarm="{{ row_alarm }}">
+                    <td class="ps-4">
+                        {% if ' ' in event_time %}
+                        <div class="fw-medium">{{ event_time.split(' ')[1] }}</div>
+                        <div class="text-muted small">{{ event_time.split(' ')[0] }}</div>
+                        {% else %}
+                        <div class="fw-medium">{{ event_time }}</div>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if row.type == 'deviceOnline' %}
+                        <span class="badge bg-soft-success text-success">
+                            <i class="fas fa-wifi me-1"></i> Online
+                        </span>
+                        {% elif row.type == 'deviceOffline' %}
+                        <span class="badge bg-soft-secondary text-secondary">
+                            <i class="fas fa-power-off me-1"></i> Offline
+                        </span>
+                        {% elif row.type == 'deviceMoving' %}
+                        <span class="badge bg-soft-info text-info">
+                            <i class="fas fa-car me-1"></i> Moving
+                        </span>
+                        {% elif row.type == 'deviceStopped' or row.type == 'stop' %}
+                        <span class="badge bg-soft-warning text-warning">
+                            <i class="fas fa-pause-circle me-1"></i> Stopped / Parked
+                        </span>
+                        {% elif row.type == 'ignitionOn' %}
+                        <span class="badge bg-soft-success text-success">
+                            <i class="fas fa-power-off me-1"></i> Ignition ON
+                        </span>
+                        {% elif row.type == 'ignitionOff' %}
+                        <span class="badge bg-soft-dark text-dark">
+                            <i class="fas fa-power-off me-1"></i> Ignition OFF
+                        </span>
+                        {% elif row.type == 'alarm' %}
+                        <span class="badge bg-soft-danger text-danger">
+                            <i class="fas fa-exclamation-triangle me-1"></i>
+                            {{ row.attributes.alarm | default('Alarm') | capitalize }}
+                            {% if (row.attributes.alarm | lower) == 'speed' and row.attributes.speed %}
+                            ({{ row.attributes.speed }} km/h)
+                            {% endif %}
+                        </span>
+                        {% else %}
+                        <span class="badge bg-light text-dark">{{ row.type }}</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if row.position and row.position.address %}
+                        {{ row.position.address | truncate(30, True) }}
+                        {% else %}
+                        <span class="text-muted">No location data</span>
+                        {% endif %}
+                    </td>
+                    <td class="pe-4">
+                        {% if row.type == 'alarm' and row.attributes.speed %}
+                        Speed: {{ row.attributes.speed }} km/h
+                        {% elif row.attributes.duration_ms %}
+                        {% set dur_sec = row.attributes.duration_ms / 1000 %}
+                        {% set h = (dur_sec // 3600) | int %}
+                        {% set m = ((dur_sec % 3600) // 60) | int %}
+                        Duration: {{ h }}h {{ m }}m
+                        {% elif row.attributes.duration %}
+                        Duration: {{ row.attributes.duration }}
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        // Initialize the map
+        const mapDiv = document.getElementById('combinedMap');
+        if (!mapDiv) return;
+
+        const map = L.map('combinedMap', {
+            zoomControl: false
+        });
+
+        // Add OpenStreetMap tiles
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors'
+        }).addTo(map);
+
+        // Add zoom control with custom position
+        L.control.zoom({
+            position: 'topright'
+        }).addTo(map);
+
+        // Get route data from server
+        const routeData = {{ route_data | tojson | safe
+    }};
+    const events = {{ combined_data | tojson | safe }};
+
+    // Initialize variables for route and markers
+    let routeLayer = null;
+    const markers = [];
+    let bounds = [];
+
+    // Function to add a marker with custom icon
+    function addMarker(lat, lng, type, title, description = '') {
+        let iconHtml = '';
+        let className = 'marker-' + type;
+
+        switch (type) {
+            case 'start':
+                iconHtml = '<i class="fas fa-play-circle fa-2x text-success"></i>';
+                break;
+            case 'end':
+                iconHtml = '<i class="fas fa-stop-circle fa-2x text-danger"></i>';
+                break;
+            case 'ignitionOn':
+                iconHtml = '<i class="fas fa-power-off fa-2x text-success"></i>';
+                break;
+            case 'ignitionOff':
+                iconHtml = '<i class="fas fa-power-off fa-2x text-dark"></i>';
+                break;
+            case 'speed':
+                iconHtml = '<i class="fas fa-tachometer-alt fa-2x text-warning"></i>';
+                break;
+            case 'alert':
+                iconHtml = '<i class="fas fa-exclamation-triangle fa-2x text-danger"></i>';
+                break;
+            default:
+                iconHtml = '<i class="fas fa-map-marker-alt fa-2x text-primary"></i>';
+        }
+
+        const icon = L.divIcon({
+            html: iconHtml,
+            className: 'custom-marker',
+            iconSize: [30, 30],
+            iconAnchor: [15, 30],
+            popupAnchor: [0, -30]
+        });
+
+        const marker = L.marker([lat, lng], { icon: icon })
+            .addTo(map)
+            .bindPopup(`<strong>${title}</strong><br>${description}`);
+
+        markers.push(marker);
+        return marker;
+    }
+
+    // Process route data if available
+    if (routeData && routeData.length > 0) {
+        const latlngs = [];
+
+        // Convert route points to LatLng array and add to bounds
+        routeData.forEach(point => {
+            if (point.latitude && point.longitude) {
+                const latlng = [point.latitude, point.longitude];
+                latlngs.push(latlng);
+                bounds.push(latlng);
+            }
+        });
+
+        // Add route line
+        if (latlngs.length > 0) {
+            // Add route line with speed-based coloring
+            for (let i = 0; i < routeData.length - 1; i++) {
+                const p1 = routeData[i];
+                const p2 = routeData[i + 1];
+                const speed = (p1.speed || 0) * 1.852;
+
+                let color = '#28a745';
+                if (speed < 5) color = '#6c757d';
+                else if (speed > 80) color = '#dc3545'; // Red for Overspeed (>80)
+                else if (speed > 60) color = '#fd7e14'; // Orange
+                else if (speed > 40) color = '#ffc107'; // Yellow
+
+                L.polyline([[p1.latitude, p1.longitude], [p2.latitude, p2.longitude]], {
+                    color: color,
+                    weight: 5,
+                    opacity: 0.8,
+                    lineJoin: 'round'
+                }).addTo(map);
+            }
+
+            // Also keep a hidden polyline for bounds/visibility logic if needed
+            routeLayer = L.polyline(latlngs, { opacity: 0 }).addTo(map);
+
+            // Add start and end markers
+            if (latlngs.length > 1) {
+                addMarker(
+                    latlngs[0][0], latlngs[0][1],
+                    'start',
+                    'Start Point',
+                    'Journey started here'
+                );
+
+                addMarker(
+                    latlngs[latlngs.length - 1][0],
+                    latlngs[latlngs.length - 1][1],
+                    'end',
+                    'End Point',
+                    'Journey ended here'
+                );
+            }
+        }
+    }
+
+    // Process events
+    if (events && events.length > 0) {
+        events.forEach(event => {
+            if (event.position && event.position.latitude && event.position.longitude) {
+                const lat = event.position.latitude;
+                const lng = event.position.longitude;
+                const time = new Date(event.fixTime).toLocaleString();
+                let markerType = 'default';
+                let title = event.type;
+                let description = time;
+
+                // Add to bounds for auto-zoom
+                bounds.push([lat, lng]);
+
+                // Customize marker based on event type
+                switch (event.type) {
+                    case 'overspeed_virtual':
+                        return; // Skip markers for virtual overspeed, shown as red line instead
+                    case 'ignitionOn':
+                    case 'ignitionOff':
+                        markerType = event.type;
+                        title = event.type === 'ignitionOn' ? 'Ignition ON' : 'Ignition OFF';
+                        description = `${time}<br>${event.position.address || ''}`;
+                        break;
+                    case 'alarm':
+                        if (event.attributes && event.attributes.alarm === 'speed') {
+                            markerType = 'speed';
+                            title = 'Speed Alert';
+                            description = `Speed: ${event.attributes.speed || 'N/A'} km/h<br>${time}`;
+                        } else {
+                            markerType = 'alert';
+                            title = 'Alert';
+                            description = `${event.attributes.alarm || 'Alert'} at ${time}`;
+                        }
+                        break;
+                    case 'deviceStopped':
+                        markerType = 'stop';
+                        title = 'Vehicle Stopped';
+                        description = `Stopped at ${time}<br>${event.position.address || ''}`;
+                        if (event.attributes && event.attributes.duration) {
+                            description += `<br>Duration: ${event.attributes.duration}`;
+                        }
+                        break;
+                }
+
+                // Add marker for the event
+                addMarker(lat, lng, markerType, title, description);
+            }
+        });
+    }
+
+    // Fit map to show all points
+    if (bounds.length > 0) {
+        map.fitBounds(bounds, { padding: [50, 50] });
+    } else {
+        // Default view if no points
+        map.setView([20, 0], 2);
+    }
+
+    // Toggle route visibility
+    const showRouteCheckbox = document.getElementById('showRoute');
+    if (showRouteCheckbox && routeLayer) {
+        showRouteCheckbox.addEventListener('change', function () {
+            if (this.checked) {
+                map.addLayer(routeLayer);
+            } else {
+                map.removeLayer(routeLayer);
+            }
+        });
+    }
+
+    // Event filtering
+    const filterButtons = document.querySelectorAll('[data-filter]');
+    filterButtons.forEach(button => {
+        button.addEventListener('click', function () {
+            const filter = this.getAttribute('data-filter');
+
+            // Update active button
+            filterButtons.forEach(btn => btn.classList.remove('active'));
+            this.classList.add('active');
+
+            // Show/hide rows based on filter
+            document.querySelectorAll('.event-row').forEach(row => {
+                const rowType = row.getAttribute('data-type') || '';
+                const rowAlarm = row.getAttribute('data-alarm') || '';
+
+                if (filter === 'all' ||
+                    (filter === 'ignition' && (rowType.includes('ignition'))) ||
+                    (filter === 'stop' && (rowType.includes('stop') || rowType.includes('parked'))) ||
+                    (filter === 'speed' && (rowType.includes('speed') || rowAlarm.includes('speed')))) {
+                    row.style.display = '';
+                } else {
+                    row.style.display = 'none';
+                }
+            });
+        });
+    });
+    });
+</script>
+
+<style>
+    /* Custom marker styles */
+    .custom-marker {
+        background: none;
+        border: none;
+    }
+
+    .custom-marker i {
+        text-shadow: 0 0 3px rgba(0, 0, 0, 0.5);
+    }
+
+    /* Map controls */
+    .leaflet-control-zoom {
+        margin-top: 10px !important;
+        margin-right: 10px !important;
+    }
+
+    /* Event table styles */
+    .event-row {
+        transition: all 0.2s ease;
+    }
+
+    .event-row:hover {
+        background-color: rgba(13, 110, 253, 0.05) !important;
+    }
+
+    /* Responsive adjustments */
+    @media (max-width: 768px) {
+        #combinedMap {
+            height: 400px !important;
+        }
+    }
+</style>
+
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<link rel="stylesheet" href="https://cdn.datatables.net/1.13.7/css/dataTables.bootstrap5.min.css">
+<style>
+    .dataTables_wrapper .dataTables_paginate .paginate_button {
+        padding: 0.2rem 0.5rem;
+    }
+
+    .dataTables_filter input {
+        border-radius: 20px;
+        padding: 0.3rem 0.8rem;
+        border: 1px solid #dee2e6;
+    }
+</style>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.7/js/dataTables.bootstrap5.min.js"></script>
+<script src="/static/js/report_download.js"></script>
+<script>
+    function filterSummaryTable(status) {
+        if ($('#summaryTable').length) {
+            var table = $('#summaryTable').DataTable();
+            table.column(1).search(status).draw();
+
+            // Visual feedback for selected card
+            $('.stat-card').removeClass('summary-card-active shadow').addClass('shadow-sm');
+
+            if (status) {
+                // Find the card that matches this status
+                $('.stat-card').each(function () {
+                    if ($(this).attr('onclick').includes(status)) {
+                        $(this).addClass('summary-card-active shadow').removeClass('shadow-sm');
+                    }
+                });
+            }
+        }
+    }
+
+    $(document).ready(function () {
+        if ($('#summaryTable').length) {
+            $('#summaryTable').DataTable({
+                "pageLength": 10,
+                "ordering": true,
+                "info": true,
+                "paging": true,
+                "searching": true,
+                "order": [], // Keep server-side priority sorting
+                "language": {
+                    "emptyTable": "No data available"
+                }
+            });
+        }
+
+        if ($('#eventsTable').length) {
+            $('#eventsTable').DataTable({
+                "pageLength": 25,
+                "ordering": true,
+                "info": true,
+                "paging": true,
+                "searching": true,
+                "order": [[0, "desc"]], // Newest first
+                "language": {
+                    "emptyTable": "No events found"
+                }
+            });
+        }
+    });
+    document.addEventListener('DOMContentLoaded', function () {
+        const trigger = document.getElementById('multiSelectTrigger');
+        const wrapper = document.getElementById('columnSelectWrapper');
+
+        if (wrapper && trigger) {
+            const checkboxes = wrapper.querySelectorAll('input[type="checkbox"]');
+
+            trigger.addEventListener('click', function (e) {
+                e.stopPropagation();
+                wrapper.classList.toggle('active');
+            });
+
+            document.addEventListener('click', function (e) {
+                if (!wrapper.contains(e.target)) {
+                    wrapper.classList.remove('active');
+                }
+            });
+
+            checkboxes.forEach(cb => {
+                cb.addEventListener('change', function () {
+                    const selected = Array.from(checkboxes).filter(c => c.checked).length;
+                    trigger.textContent = selected + ' selected';
+                });
+            });
+        }
+    });
+
+    let reportMap = null;
+    let reportMarker = null;
+
+    function viewOnePointOnMap(lat, lng, title, details) {
+        if (!lat || !lng) {
+            alert('Location coordinates missing');
+            return;
+        }
+        var container = document.getElementById('reportMapContainer');
+        container.style.display = 'block';
+        document.getElementById('reportMapDeviceName').innerText = title;
+        container.scrollIntoView({ behavior: 'smooth' });
+
+        if (!reportMap) {
+            reportMap = L.map('reportDetailMap').setView([lat, lng], 15);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap contributors'
+            }).addTo(reportMap);
+        } else {
+            reportMap.setView([lat, lng], 15);
+            setTimeout(() => { reportMap.invalidateSize(); }, 200);
+        }
+
+        // Remove existing marker if any
+        if (reportMarker) {
+            reportMarker.remove();
+        }
+
+        reportMarker = L.marker([lat, lng]).addTo(reportMap)
+            .bindPopup(`<b>${title}</b><br>${details}`)
+            .openPopup();
+    }
+
+    async function showReportMap(name, uid) {
+        try {
+            const res = await fetch(`/api/devices?uid=${uid}`);
+            const data = await res.json();
+            if (!res.ok) {
+                throw new Error(data.error || `Server returned ${res.status}`);
+            }
+            const devices = data;
+            if (devices && devices.length > 0 && devices[0].position) {
+                const pos = devices[0].position;
+                const lat = pos.latitude;
+                const lng = pos.longitude;
+
+                const container = document.getElementById("reportMapContainer");
+                container.style.display = "block";
+                document.getElementById("reportMapDeviceName").innerText = name;
+                container.scrollIntoView({ behavior: 'smooth' });
+
+                if (!reportMap) {
+                    reportMap = L.map('reportDetailMap').setView([lat, lng], 15);
+                    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                        attribution: '© OpenStreetMap contributors'
+                    }).addTo(reportMap);
+                    reportMarker = L.marker([lat, lng]).addTo(reportMap);
+                } else {
+                    reportMap.setView([lat, lng], 15);
+                    reportMarker.setLatLng([lat, lng]);
+                    setTimeout(() => { reportMap.invalidateSize(); }, 200);
+                }
+                reportMarker.bindPopup(`<b>${name}</b><br>${pos.address || lat + ", " + lng}`).openPopup();
+            } else {
+                alert("No position data available for this device.");
+            }
+        } catch (err) {
+            console.error("Error fetching device position:", err);
+            alert("Failed to fetch device position: " + err.message);
+        }
+    }
+
+    async function fetchAndShowRoute(uid, name, customFrom, customTo) {
+        // Use the UTC-aligned strings from the backend if custom ones aren't provided
+        let fromStr = customFrom || "{{ traccar_from }}";
+        let toStr = customTo || "{{ traccar_to }}";
+
+        try {
+            const url = `/api/reports/route?unique_id=${uid}&from=${encodeURIComponent(fromStr)}&to=${encodeURIComponent(toStr)}`;
+            const res = await fetch(url, {
+                credentials: 'same-origin',
+                redirect: 'manual'  // Don't follow redirects automatically
+            });
+
+            // Check if we got redirected to login
+            if (res.type === 'opaqueredirect' || res.status === 302) {
+                throw new Error("Session expired. Please refresh the page and log in again.");
+            }
+
+            if (!res.ok) {
+                let errMsg = `Route API Error (Status: ${res.status})`;
+                try {
+                    const errJson = await res.json();
+                    if (errJson.error) errMsg += ": " + errJson.error;
+                    if (errJson.details) errMsg += "\nDetails: " + errJson.details;
+                    if (errJson.upstream_body) errMsg += "\nUpstream: " + errJson.upstream_body;
+                } catch (e) {
+                    // ignore json parse error
+                }
+                console.error("Route fetch error:", errMsg);
+                throw new Error(errMsg);
+            }
+
+            let routePoints;
+            try {
+                routePoints = await res.json();
+            } catch (jsonErr) {
+                console.error("JSON parse error:", jsonErr);
+                const text = await res.text();
+                console.error("Response text:", text);
+                throw new Error("Invalid JSON response from server. Got: " + text.substring(0, 300));
+            }
+
+            if (!routePoints || routePoints.length === 0) {
+                alert("No route data available for this selection.");
+                return;
+            }
+
+            // Show Container
+            const container = document.getElementById("reportMapContainer");
+            container.style.display = "block";
+            document.getElementById("reportMapDeviceName").innerText = name + " (Trip Route)";
+            container.scrollIntoView({ behavior: 'smooth' });
+
+            // Initialize Map
+            if (!reportMap) {
+                reportMap = L.map('reportDetailMap').setView([0, 0], 13);
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    attribution: '© OpenStreetMap contributors'
+                }).addTo(reportMap);
+            } else {
+                reportMap.invalidateSize();
+                // Clear existing layers
+                reportMap.eachLayer(layer => {
+                    if (layer instanceof L.Marker || layer instanceof L.Polyline) {
+                        reportMap.removeLayer(layer);
+                    }
+                });
+            }
+
+            // Draw Colored Polyline segments
+            for (let i = 0; i < routePoints.length - 1; i++) {
+                const p1 = routePoints[i];
+                const p2 = routePoints[i + 1];
+                const speed = (p1.speed || 0) * 1.852; // knots to km/h
+
+                let color = '#28a745'; // Green (Normal)
+                if (speed < 5) color = '#6c757d'; // Gray (Nearly stopped)
+                else if (speed > 80) color = '#dc3545'; // Red (Overspeed >80)
+                else if (speed > 60) color = '#fd7e14'; // Orange
+                else if (speed > 40) color = '#ffc107'; // Yellow // Yellow
+
+                L.polyline([[p1.latitude, p1.longitude], [p2.latitude, p2.longitude]], {
+                    color: color,
+                    weight: 5,
+                    opacity: 0.8
+                }).addTo(reportMap);
+            }
+
+            const latlngs = routePoints.map(p => [p.latitude, p.longitude]);
+            const polyline = L.polyline(latlngs, { opacity: 0 }); // Hidden polyline for bounds calculation
+            polyline.addTo(reportMap);
+
+            // Start Marker
+            const startPt = latlngs[0];
+            const startIcon = L.divIcon({
+                html: '<i class="fas fa-flag fa-2x text-success" style="text-shadow: 0 0 3px white;"></i>',
+                className: 'custom-marker',
+                iconSize: [30, 30],
+                iconAnchor: [5, 30]
+            });
+            L.marker(startPt, { icon: startIcon }).addTo(reportMap).bindPopup("<b>Start</b><br>" + routePoints[0].fixTime);
+
+            // End Marker
+            const endPt = latlngs[latlngs.length - 1];
+            const endIcon = L.divIcon({
+                html: '<i class="fas fa-flag-checkered fa-2x text-danger" style="text-shadow: 0 0 3px white;"></i>',
+                className: 'custom-marker',
+                iconSize: [30, 30],
+                iconAnchor: [5, 30]
+            });
+            L.marker(endPt, { icon: endIcon }).addTo(reportMap).bindPopup("<b>End</b><br>" + routePoints[routePoints.length - 1].fixTime);
+
+            // Fit bounds
+            reportMap.fitBounds(polyline.getBounds(), { padding: [50, 50] });
+
+        } catch (e) {
+            console.error(e);
+            alert("Error loading route: " + e.message);
+        }
+    }
+
+    function downloadCSV(subType) {
+        const uid = document.getElementById('unique_id').value;
+        const period = document.getElementById('period').value;
+        const type = document.getElementById('report_type').value;
+        const threshold = document.getElementById('stop_threshold').value;
+        const company = document.getElementById('company_filter') ? document.getElementById('company_filter').value : '';
+        const from = document.getElementById('from') ? document.getElementById('from').value : '';
+        const to = document.getElementById('to') ? document.getElementById('to').value : '';
+
+        let url = `/api/reports/export?report_type=${type}&unique_id=${uid}&period=${period}&stop_threshold=${threshold}&from=${from}&to=${to}&company_filter=${company}`;
+        window.location.href = url;
+    }
+</script>
+{% endblock %}

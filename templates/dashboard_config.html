@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block title %}Dashboard Configuration{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h3 class="mb-4">Dashboard Features Configuration</h3>
+        <p class="text-muted mb-4">Control which dashboard widgets and links are visible for each Plan. Changes take
+            effect on next login.</p>
+
+        {% if success %}
+        <div class="alert alert-success">{{ success }}</div>
+        {% endif %}
+        {% if error %}
+        <div class="alert alert-danger">{{ error }}</div>
+        {% endif %}
+
+        <div class="row row-cols-1 row-cols-md-2 g-4">
+            {% for plan_name, plan_data in modules_config.items() %}
+            <div class="col">
+                <div class="card h-100 border-0 shadow-sm">
+                    <div
+                        class="card-header {% if plan_name == 'Premium' %}bg-primary text-white{% else %}bg-light{% endif %}">
+                        <h5 class="mb-0">{{ plan_name }} Plan</h5>
+                    </div>
+                    <div class="card-body">
+                        <form method="post">
+                            <input type="hidden" name="action" value="update">
+                            <input type="hidden" name="plan_name" value="{{ plan_name }}">
+
+                            <h6>Visible Dashboard Elements</h6>
+                            <div class="alert alert-light border small text-muted">
+                                Uncheck items to hide them from the dashboard for users on this plan.
+                            </div>
+
+                            <div class="row row-cols-1 row-cols-sm-2 g-2 mb-4">
+                                {% for module in doc_modules %}
+                                <div class="col">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" name="enabled_modules"
+                                            value="{{ module }}" id="check-{{ plan_name }}-{{ module }}" {% if module in
+                                            plan_data.enabled_modules %}checked{% endif %}>
+                                        <label class="form-check-label" for="check-{{ plan_name }}-{{ module }}">
+                                            {% if module == 'dashboard' %}
+                                            <strong>Dashboard Access</strong> (Main)
+                                            {% elif module == 'pricing' %}
+                                            Plans & Pricing Link
+                                            {% else %}
+                                            {{ module | replace('dashboard_', '') | replace('_', ' ') | title }} Widget
+                                            {% endif %}
+                                        </label>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+
+                            <button type="submit" class="btn btn-primary w-100">Save {{ plan_name }} Settings</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endblock %}

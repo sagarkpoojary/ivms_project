@@ -1,0 +1,66 @@
+{% extends 'base.html' %}
+{% block title %}Single Vehicle Report{% endblock %}
+
+{% block page_title %}Single Vehicle Report{% endblock %}
+{% block page_subtitle %}View only a single vehicle via unique id{% endblock %}
+
+{% block content %}
+<div class="card p-3 mb-3" style="max-width:900px;">
+    <form id="singleForm" class="row g-2 align-items-center">
+        <div class="col-auto" style="flex:1;">
+            <input id="uid" class="form-control" placeholder="Enter uniqueId (IMEI etc)" value="{{ uid if uid else '' }}">
+        </div>
+        <div class="col-auto">
+            <button id="run" class="btn btn-primary" type="button">View</button>
+        </div>
+        <div class="col-12 mt-2">
+            <small class="text-muted">If left empty, no device will be shown. Use uniqueId from Traccar.</small>
+        </div>
+    </form>
+</div>
+
+<div id="resultArea"></div>
+
+<script>
+document.getElementById('run').addEventListener('click', async function(){
+    const uid = document.getElementById('uid').value.trim();
+    const resultArea = document.getElementById('resultArea');
+    if(!uid){ 
+        resultArea.innerHTML = '<div class="alert alert-warning">Enter unique id.</div>'; 
+        return; 
+    }
+    const url = '/api/devices?unique_id=' + encodeURIComponent(uid);
+    
+    resultArea.innerHTML = '<div class="alert alert-info">Fetching data...</div>';
+
+    try {
+        const res = await fetch(url, {credentials:'same-origin'});
+        
+        if(!res.ok){ 
+            const errorData = await res.json().catch(() => ({error: 'Unknown error'}));
+            resultArea.innerHTML = `<div class="alert alert-danger">Failed to fetch report. Status: ${res.status}. Details: ${errorData.message || res.statusText}</div>`; 
+            return; 
+        }
+        
+        const js = await res.json();
+        
+        if(!js || js.length===0){ 
+            resultArea.innerHTML = '<div class="alert alert-info">No device found with that unique ID.</div>'; 
+            return; 
+        }
+        
+        const d = js[0];
+        resultArea.innerHTML = `
+            <div class="card p-4">
+                <h5 class="text-primary">${d.name || 'Vehicle Report'}</h5>
+                <p class="mb-1"><strong>Unique ID:</strong> ${d.uniqueId || d.unique_id || '—'}</p>
+                <p class="mb-1"><strong>Status:</strong> <span class="badge bg-${d.status === 'online' ? 'success' : d.status === 'offline' ? 'danger' : 'secondary'}">${d.status || '—'}</span></p>
+                <p class="mb-1"><strong>Last update:</strong> ${d.lastUpdate || d.lastupdate || '—'}</p>
+            </div>
+        `;
+    } catch (e) {
+        resultArea.innerHTML = `<div class="alert alert-danger">A network or processing error occurred: ${e.message}</div>`;
+    }
+});
+</script>
+{% endblock %}

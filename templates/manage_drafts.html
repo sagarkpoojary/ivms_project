@@ -1,0 +1,157 @@
+{% extends "base.html" %}
+{% block title %}Manage Vehicle Drafts{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h3 class="mb-4"><i class="fas fa-file-invoice me-2"></i> Pending Vehicle Drafts</h3>
+
+        {% if request.args.get('success') %}
+        <div class="alert alert-success">{{ request.args.get('success') }}</div>
+        {% endif %}
+        {% if request.args.get('error') %}
+        <div class="alert alert-danger">{{ request.args.get('error') }}</div>
+        {% endif %}
+
+        <div class="card p-4 custom-shadow border-0">
+            <h5 class="mb-3 text-muted"><i class="fas fa-clock me-2"></i> Pending for Approval</h5>
+            {% if drafts %}
+            <div class="table-responsive">
+                <table class="table table-hover align-middle">
+                    <thead class="bg-light">
+                        <tr>
+                            {% if role == 'main_admin' %}
+                            <th>#</th>
+                            <th>Company</th>
+                            <th>Request Date</th>
+                            <th class="text-end">Actions</th>
+                            {% else %}
+                            <th>Vehicle Name</th>
+                            <th>Unique ID</th>
+                            <th>Driver</th>
+                            <th>Company</th>
+                            <th>Created At</th>
+                            <th class="text-end">Actions</th>
+                            {% endif %}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for v in drafts %}
+                        <tr>
+                            {% if role == 'main_admin' %}
+                            <td><span class="fw-bold">{{ loop.index }}</span></td>
+                            <td><span class="badge bg-secondary">{{ v.company_name }}</span></td>
+                            <td class="small text-muted">{{ (v.created_at or 'N/A')[:16] }}</td>
+                            {% else %}
+                            <td><span class="fw-bold text-primary">{{ v.name }}</span></td>
+                            <td><code>{{ v.unique_id }}</code></td>
+                            <td>{{ v.driver_name or 'N/A' }}</td>
+                            <td><span class="badge bg-secondary">{{ v.company_name }}</span></td>
+                            <td class="small text-muted">{{ (v.created_at or 'N/A')[:16] }}</td>
+                            {% endif %}
+                            <td class="text-end">
+                                <form action="{{ url_for('vehicles.approve_draft', unique_id=v.unique_id) }}"
+                                    method="POST" class="d-inline">
+                                    <button type="submit" class="btn btn-success btn-sm px-3 shadow-sm">
+                                        <i class="fas fa-check-circle me-1"></i> Approve
+                                    </button>
+                                </form>
+                                <button type="button" class="btn btn-danger btn-sm px-3 shadow-sm"
+                                    onclick="openDeclineModal('{{ v.unique_id }}', '{{ v.name if role != 'main_admin' else 'this vehicle' }}')">
+                                    <i class="fas fa-times-circle me-1"></i> Decline
+                                </button>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="text-center py-4">
+                <i class="fas fa-check-double fa-2x text-muted mb-2"></i>
+                <h5 class="text-muted">No pending drafts at the moment.</h5>
+            </div>
+            {% endif %}
+        </div>
+
+        {% if recent_approved %}
+        <div class="card p-4 custom-shadow border-0 mt-4 bg-light bg-opacity-50">
+            <h5 class="mb-3 text-success"><i class="fas fa-check-double me-2"></i> Recently Approved Stage</h5>
+            <div class="table-responsive">
+                <table class="table table-sm table-hover align-middle">
+                    <thead>
+                        <tr class="text-muted small">
+                            {% if role == 'main_admin' %}
+                            <th>#</th>
+                            <th>Company</th>
+                            <th>Status</th>
+                            <th>Date</th>
+                            {% else %}
+                            <th>Vehicle Name</th>
+                            <th>Unique ID</th>
+                            <th>Company</th>
+                            <th>Status</th>
+                            <th>Approved At</th>
+                            {% endif %}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for v in recent_approved %}
+                        <tr>
+                            {% if role == 'main_admin' %}
+                            <td><span class="fw-bold">{{ loop.index }}</span></td>
+                            <td><span class="badge bg-outline-secondary text-dark border">{{ v.company_name }}</span></td>
+                            <td><span class="badge bg-success">Approved</span></td>
+                            <td class="small text-muted">{{ (v.approval_date or 'Now')[:16] | replace("T", " ") }}</td>
+                            {% else %}
+                            <td><span class="fw-bold">{{ v.name }}</span></td>
+                            <td><small class="text-muted">{{ v.unique_id }}</small></td>
+                            <td><span class="badge bg-outline-secondary text-dark border">{{ v.company_name }}</span></td>
+                            <td><span class="badge bg-success">Approved</span></td>
+                            <td class="small text-muted">{{ (v.approval_date or 'Now')[:16] | replace("T", " ") }}</td>
+                            {% endif %}
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Decline Modal -->
+<div class="modal fade" id="declineModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Decline Vehicle Draft</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form id="declineForm" method="POST">
+                <div class="modal-body">
+                    <p>Specify the reason for declining <strong><span id="declineVehicleName"></span></strong>:</p>
+                    <div class="outlined-group">
+                        <textarea name="reason" class="form-control" rows="3" placeholder="Enter rejection reason..."
+                            required></textarea>
+                        <label>Rejection Reason</label>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-danger">Confirm Decline</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+    function openDeclineModal(uid, name) {
+        document.getElementById('declineVehicleName').textContent = name;
+        document.getElementById('declineForm').action = "/decline-draft/" + uid;
+        var modal = new bootstrap.Modal(document.getElementById('declineModal'));
+        modal.show();
+    }
+</script>
+{% endblock %}
