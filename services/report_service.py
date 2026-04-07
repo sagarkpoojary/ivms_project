@@ -490,7 +490,7 @@ def fetch_cached_summaries(vehicles, filter_uid, traccar_from, traccar_to, tracc
     cache_key = f"summaries_v3_{email}_{v_uids}_{filter_uid}_{traccar_from}_{traccar_to}"
     
     cached = cache.get(cache_key)
-    if cached: return cached
+    if cached is not None: return cached
     
     # We need a device map (internal IDs)
     device_map = {}
