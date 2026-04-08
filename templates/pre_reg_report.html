@@ -146,6 +146,11 @@
         padding: 0;
         margin: 0 auto;
     }
+
+    .row-long-idle {
+        background-color: rgba(253, 126, 20, 0.08) !important;
+        border-left: 4px solid #fd7e14 !important;
+    }
 </style>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <div class="col-12">
@@ -247,7 +252,7 @@
                 </div>
             </div>
 
-            {% if selected_uid and selected_report_type != 'Stops' %}
+            {% if selected_uid and selected_report_type != 'Stops' and selected_report_type != 'Idle' %}
             <div class="col-lg-2 col-md-6 col-12">
                 <div class="outlined-group">
                     <select id="stop_threshold" name="stop_threshold" class="form-select form-select-sm"
@@ -259,6 +264,22 @@
                         <option value="60" {% if selected_threshold=='60' %}selected{% endif %}>60 Minutes</option>
                     </select>
                     <label for="stop_threshold">Stop Threshold</label>
+                </div>
+            </div>
+            {% endif %}
+
+            {% if selected_report_type == 'Idle' %}
+            <div class="col-lg-2 col-md-6 col-12">
+                <div class="outlined-group">
+                    <select id="min_idle_time" name="min_idle_time" class="form-select form-select-sm"
+                        onchange="this.form.submit()">
+                        <option value="5" {% if selected_min_idle=='5' %}selected{% endif %}>5 Minutes</option>
+                        <option value="10" {% if selected_min_idle=='10' %}selected{% endif %}>10 Minutes</option>
+                        <option value="15" {% if selected_min_idle=='15' %}selected{% endif %}>15 Minutes</option>
+                        <option value="30" {% if selected_min_idle=='30' %}selected{% endif %}>30 Minutes</option>
+                        <option value="60" {% if selected_min_idle=='60' %}selected{% endif %}>60 Minutes</option>
+                    </select>
+                    <label for="min_idle_time">Min Idle Time</label>
                 </div>
             </div>
             {% endif %}
@@ -428,6 +449,28 @@
     </div>
 </div>
 {% endif %}
+
+{% if selected_report_type == 'Idle' and idle_summary %}
+<div class="card p-4 custom-shadow border-0 mb-4 mt-2">
+    <h5 class="card-title text-dark mb-3">Idle Summary Per Vehicle</h5>
+    <div class="row row-cols-1 row-cols-md-2 row-cols-lg-4 g-3">
+        {% for v_sum in idle_summary %}
+        <div class="col">
+            <div class="d-flex align-items-center p-3 bg-light rounded shadow-sm">
+                <div class="rounded-circle bg-soft-warning p-2 me-3">
+                    <i class="fas fa-clock text-warning"></i>
+                </div>
+                <div>
+                    <div class="small fw-bold text-muted uppercase">{{ v_sum.name }}</div>
+                    <div class="h5 mb-0 fw-bold">{{ v_sum.total_idle_time }} <small class="text-muted">min</small></div>
+                    <div class="smaller text-muted">{{ v_sum.total_idle_events }} sessions</div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
 <div class="card p-4 custom-shadow border-0 mt-4">
     <h5 class="card-title text-dark mb-3">
         {% if selected_report_type == 'Summary' %}
@@ -451,8 +494,11 @@
                     <th class="py-3">Total Distance</th>
                     <th class="py-3">Max Speed</th>
                     <th class="py-3">Avg Speed</th>
-                    <th class="py-3">Total Idling Time</th>
-                    <th class="py-3 pe-4">Total Parked Time</th>
+                    <th class="py-3">Engine Hours</th>
+                    <th class="py-3">Fuel (L)</th>
+                    <th class="py-3">Fuel Cost</th>
+                    <th class="py-3">Total Idling</th>
+                    <th class="py-3 pe-4">Total Parked</th>
                 </tr>
             </thead>
             <tbody>
@@ -525,6 +571,9 @@
                         </span>
                     </td>
                     <td>{{ row.average_speed }} km/h</td>
+                    <td>{{ row.engine_hours | default(0) | round(1) }} h</td>
+                    <td>{{ row.fuel_liters | default(0) | round(1) }} L</td>
+                    <td>{{ row.fuel_cost | default(0) | round(3) }} OMR</td>
                     <td>
                         {% set idle_sec = (row.idle_duration / 1000) | int %}
                         <span {% if idle_sec> 3600 %}title="High idle time detected" class="text-warning"{% endif %}>
@@ -550,8 +599,11 @@
                     <th class="py-3">Total Distance</th>
                     <th class="py-3">Max Speed</th>
                     <th class="py-3">Avg Speed</th>
-                    <th class="py-3">Total Idling Time</th>
-                    <th class="py-3 pe-4">Total Parked Time</th>
+                    <th class="py-3">Engine Hours</th>
+                    <th class="py-3">Fuel (L)</th>
+                    <th class="py-3">Fuel Cost</th>
+                    <th class="py-3">Total Idling</th>
+                    <th class="py-3 pe-4">Total Parked</th>
                 </tr>
             </thead>
             <tbody>
@@ -610,6 +662,9 @@
                         </span>
                     </td>
                     <td>{{ row.average_speed }} km/h</td>
+                    <td>{{ row.engine_hours | default(0) | round(1) }} h</td>
+                    <td>{{ row.fuel_liters | default(0) | round(1) }} L</td>
+                    <td>{{ row.fuel_cost | default(0) | round(3) }} OMR</td>
                     <td>
                         {% set idle_sec = (row.idle_duration / 1000) | int %}
                         <span {% if idle_sec> 3600 %}title="High idle time detected" class="text-warning"{% endif %}>
@@ -635,6 +690,60 @@
                 | Period: {{ selected_period }} ({{ from_date }} to {{ to_date }})
             </p>
         </div>
+    </div>
+</div>
+{% endif %}
+
+{% if selected_report_type == 'Idle' %}
+<div class="card p-4 custom-shadow border-0 mt-4">
+    <h5 class="card-title text-dark mb-3">Idle Report Details</h5>
+    <div class="table-responsive">
+        <table class="table mb-0 align-middle table-hover enterprise-table">
+            <thead class="bg-light">
+                <tr>
+                    <th class="py-3 ps-4">Vehicle Name</th>
+                    <th class="py-3 td-datetime text-center">Start Time</th>
+                    <th class="py-3 td-datetime text-center">End Time</th>
+                    <th class="py-3 td-duration">Duration</th>
+                    <th class="py-3">Location</th>
+                    <th class="py-3 td-location text-center">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in idle_data %}
+                <tr class="{% if row.duration > 30 %}row-long-idle{% endif %}">
+                    <td class="ps-4 fw-medium">{{ row.vehicle_name }}</td>
+                    <td class="td-datetime text-center">
+                        {% set start_parts = row.start_time.split(" ") %}
+                        <span class="date">{{ start_parts[0] }}</span>
+                        <span class="time">{{ start_parts[1] }}</span>
+                    </td>
+                    <td class="td-datetime text-center">
+                        {% set end_parts = row.end_time.split(" ") %}
+                        <span class="date">{{ end_parts[0] }}</span>
+                        <span class="time">{{ end_parts[1] }}</span>
+                    </td>
+                    <td class="td-duration">
+                        <span class="badge bg-soft-warning text-warning">{{ row.duration }} min</span>
+                    </td>
+                    <td class="td-address" title="{{ row.location }}">{{ row.location }}</td>
+                    <td class="td-location text-center">
+                        <button class="btn btn-sm btn-outline-primary btn-map-fixed"
+                            onclick="viewOnePointOnMap('{{ row.latitude }}', '{{ row.longitude }}', '{{ row.vehicle_name | replace("'", "\\'") }}', 'Idle point location')">
+                            <i class="fas fa-map-marker-alt me-1"></i> View on Map
+                        </button>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="6" class="text-center py-5">
+                        <i class="fas fa-info-circle fa-2x text-muted mb-3 d-block"></i>
+                        <span class="text-muted">No idle events found for the selected criteria.</span>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
     </div>
 </div>
 {% endif %}
@@ -1748,12 +1857,13 @@
         const uid = document.getElementById('unique_id').value;
         const period = document.getElementById('period').value;
         const type = document.getElementById('report_type').value;
-        const threshold = document.getElementById('stop_threshold').value;
+        const threshold = document.getElementById('stop_threshold') ? document.getElementById('stop_threshold').value : '5';
+        const minIdle = document.getElementById('min_idle_time') ? document.getElementById('min_idle_time').value : '5';
         const company = document.getElementById('company_filter') ? document.getElementById('company_filter').value : '';
         const from = document.getElementById('from') ? document.getElementById('from').value : '';
         const to = document.getElementById('to') ? document.getElementById('to').value : '';
 
-        let url = `/api/reports/export?report_type=${type}&unique_id=${uid}&period=${period}&stop_threshold=${threshold}&from=${from}&to=${to}&company_filter=${company}`;
+        let url = `/api/reports/export?report_type=${type}&unique_id=${uid}&period=${period}&stop_threshold=${threshold}&min_idle_time=${minIdle}&from=${from}&to=${to}&company_filter=${company}`;
         window.location.href = url;
     }
 </script>

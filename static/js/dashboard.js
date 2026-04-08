@@ -45,8 +45,8 @@
 
     const sumDevices = $('sumDevices');
     const sumDistance = $('sumDistance');
-    const sumIgnOn = $('sumIgnOn');
-    const sumIgnOff = $('sumIgnOff');
+    const sumEngineHours = $('sumEngineHours');
+    const sumFuel = $('sumFuel');
 
 
 
@@ -575,9 +575,7 @@
 
         // 2. Update Performance Overview (Top Row)
         if (sumDevices) sumDevices.textContent = totalDevices;
-        // sumDistance is updated in refreshAll()
-        if (sumIgnOn) sumIgnOn.textContent = ignOn;
-        if (sumIgnOff) sumIgnOff.textContent = ignOff;
+        // sumDistance, sumEngineHours, sumFuel are updated in refreshAll() using period data
 
         // 4. Update the hover lists for all status categories
         // MOVED UP to fix ReferenceError (TDZ)
@@ -748,8 +746,15 @@
             // Map bulk results to our required format
             const allDevicesData = bulkData.devices.map(d => {
                 const reg = registered.find(v => String(v.unique_id) === String(d.uniqueId)) || { unique_id: d.uniqueId, name: d.name };
-                const dist = bulkData.summaries[d.id] || 0;
-                return { registered: reg, device: d, distance: dist };
+                const summary = bulkData.summaries[d.id] || { distance: 0, engineHours: 0, fuelLiters: 0, fuelCost: 0 };
+                return { 
+                    registered: reg, 
+                    device: d, 
+                    distance: summary.distance || 0,
+                    engineHours: summary.engineHours || 0,
+                    fuelLiters: summary.fuelLiters || 0,
+                    fuelCost: summary.fuelCost || 0
+                };
             });
 
             // Filter for displayed metrics if a specific device is selected
@@ -763,9 +768,22 @@
             updateBigChart(allDevicesData);
             updateMap(allDevicesData);
 
-            const totalDisplayedDistance = latest.reduce((s, d) => s + d.distance, 0);
+            const totals = latest.reduce((s, d) => {
+                s.distance += (d.distance || 0);
+                s.engineHours += (d.engineHours || 0);
+                s.fuelLiters += (d.fuelLiters || 0);
+                s.fuelCost += (d.fuelCost || 0);
+                return s;
+            }, { distance: 0, engineHours: 0, fuelLiters: 0, fuelCost: 0 });
+
             if (sumDistance) {
-                sumDistance.textContent = totalDisplayedDistance.toFixed(2) + " km";
+                sumDistance.textContent = totals.distance.toFixed(2) + " km";
+            }
+            if (sumEngineHours) {
+                sumEngineHours.textContent = totals.engineHours.toFixed(1) + " h";
+            }
+            if (sumFuel) {
+                sumFuel.textContent = `${totals.fuelLiters.toFixed(1)} L (${totals.fuelCost.toFixed(3)} OMR)`;
             }
 
             loadAlerts();

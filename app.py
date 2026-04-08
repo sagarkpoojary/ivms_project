@@ -1,6 +1,5 @@
-import os
-from dotenv import load_dotenv
-load_dotenv(os.path.join(os.path.dirname(__file__), '.env'))
+from config import Config
+Config.validate()
 
 from flask import Flask, session, request, redirect, url_for
 from models.database import load_server_config
@@ -11,11 +10,11 @@ from extensions import cache
 # Initialize Extensions
 
 app = Flask(__name__, static_folder='static', template_folder='templates')
-app.secret_key = os.environ.get("FLASK_SECRET", "dev_secret_change_me")
+app.secret_key = Config.SECRET_KEY
 
 # Cache Config
 app.config['CACHE_TYPE'] = 'FileSystemCache'
-app.config['CACHE_DIR'] = '/home/concept/.cache/flask_cache'
+app.config['CACHE_DIR'] = Config.CACHE_DIR
 app.config['CACHE_DEFAULT_TIMEOUT'] = 300
 cache.init_app(app)
 
@@ -78,4 +77,4 @@ def add_header(response):
     return response
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    app.run(host='0.0.0.0', port=Config.PORT, debug=Config.DEBUG)

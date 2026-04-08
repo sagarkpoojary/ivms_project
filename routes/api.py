@@ -8,6 +8,7 @@ from auth.utils import role_required, get_filtered_vehicles
 from services.traccar_service import full_traccar_host, try_traccar_get
 from models.database import load_server_config, save_server_config
 from extensions import cache
+from config import Config, BASE_DIR
 
 api_bp = Blueprint('api', __name__)
 
@@ -44,12 +45,14 @@ def api_alerts():
             "to": tr_to
         }, timeout=10)
         if r.status_code != 200:
-            with open("api_errors.log", "a") as f:
+            log_path = os.path.join(BASE_DIR, "api_errors.log")
+            with open(log_path, "a") as f:
                 f.write(f"Alerts Error: Status {r.status_code}, Body: {r.text}\n")
         return jsonify(r.json())
     except Exception as e:
         import traceback
-        with open("api_errors.log", "a") as f:
+        log_path = os.path.join(BASE_DIR, "api_errors.log")
+        with open(log_path, "a") as f:
             f.write(f"Alerts Exception: {str(e)}\n{traceback.format_exc()}\n")
         return jsonify({"error": str(e)}), 500
 
@@ -247,7 +250,36 @@ def api_dashboard_bulk_sync():
         summary_map = {}
         if sum_r.status_code == 200:
             for s in sum_r.json():
-                summary_map[s['deviceId']] = round(s.get('distance', 0) / 1000, 2)
+                dist_km = round(s.get('distance', 0) / 1000, 2)
+                engine_on_ms = s.get('engineHours', 0)
+                engine_on_h = engine_on_ms / 3600000
+                
+                # estimate moving time from distance and avg speed
+                avg_spd = (s.get('averageSpeed', 0) or 0) * 1.852 # kn to kmh
+                moving_h = 0
+                if avg_spd > 5: # Only if moving at significant speed
+                    moving_h = dist_km / avg_spd
+                
+                # Idle time = Total Engine ON - Moving time
+                # If engineHours not available (0), fallback to distance-only fuel
+                # But if engineHours > 0, we can refine the fuel estimate
+                
+                if engine_on_h > 0:
+                    idle_h = max(0, engine_on_h - moving_h)
+                    fuel_liters = (dist_km / Config.MILEAGE_KM_PER_LITER) + (idle_h * Config.IDLE_FUEL_LPH)
+                else:
+                    # Fallback to pure distance-based if engineHours is 0
+                    fuel_liters = dist_km / Config.MILEAGE_KM_PER_LITER
+                
+                fuel_liters = round(fuel_liters, 2)
+                fuel_cost = round(fuel_liters * Config.FUEL_PRICE_OMR, 3)
+                
+                summary_map[s['deviceId']] = {
+                    'distance': dist_km,
+                    'engineHours': round(engine_on_h, 1),
+                    'fuelLiters': fuel_liters,
+                    'fuelCost': fuel_cost
+                }
 
         result = {
             'devices': my_devices,
@@ -263,6 +295,56 @@ def api_dashboard_bulk_sync():
             f.write(f"Bulk Sync Exception: {str(e)}\n{traceback.format_exc()}\n")
         current_app.logger.error(f"Bulk sync error: {e}")
         return jsonify({'error': str(e)}), 500
+
+@api_bp.route('/api/reports/idle')
+@role_required('user')
+def api_idle_report():
+    from services.report_service import get_idle_events, get_period_dates
+    from services.traccar_service import full_traccar_host, get_traccar_session
+    from pytz import utc
+    
+    uid = request.args.get('vehicle_id')
+    from_date = request.args.get('start_date')
+    to_date = request.args.get('end_date')
+    try:
+        min_idle = int(request.args.get('min_idle_time', 5))
+    except:
+        min_idle = 5
+
+    # Get Date Range
+    start_dt, end_dt = get_period_dates('Custom', from_date, to_date)
+    traccar_from = start_dt.astimezone(utc).strftime('%Y-%m-%dT%H:%M:%SZ')
+    traccar_to = end_dt.astimezone(utc).strftime('%Y-%m-%dT%H:%M:%SZ')
+
+    vehicles = get_filtered_vehicles()
+    if uid:
+        vehicles = [v for v in vehicles if str(v.get('unique_id')) == str(uid)]
+    
+    s = get_traccar_session()
+    traccar = full_traccar_host()
+    
+    device_map = {}
+    try:
+        r_dev = s.get(f"{traccar}/api/devices", timeout=10)
+        if r_dev.status_code == 200:
+            for d in r_dev.json():
+                device_map[str(d.get("uniqueId"))] = d.get("id")
+    except: pass
+
+    results = []
+    for v in vehicles:
+        iid = device_map.get(str(v.get('unique_id')))
+        if iid:
+            res = get_idle_events(v, traccar_from, traccar_to, min_idle, traccar, s, internal_id=iid)
+            results.append({
+                'vehicle_id': v.get('unique_id'),
+                'vehicle_name': v.get('name'),
+                'total_idle_time': res.get('summary', {}).get('total_idle_time', 0),
+                'total_idle_events': res.get('summary', {}).get('total_idle_events', 0),
+                'idle_events': res.get('events', [])
+            })
+    
+    return jsonify(results)
 
 @api_bp.route('/api/dashboard/combined-report')
 @role_required('user')

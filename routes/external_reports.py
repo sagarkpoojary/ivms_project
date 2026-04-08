@@ -4,10 +4,10 @@ import functools
 
 external_reports_bp = Blueprint('external_reports', __name__)
 
-import os
+from config import Config
 
-# STATIC TOKEN FOR ODOO INTEGRATION (Env var or fallback)
-ODOO_REPORT_STATIC_TOKEN = os.environ.get("ODOO_REPORT_TOKEN", "ivms_odoo_secure_token_2024")
+# STATIC TOKEN FOR ODOO INTEGRATION
+ODOO_REPORT_STATIC_TOKEN = Config.ODOO_REPORT_TOKEN
 
 def token_required(f):
     @functools.wraps(f)

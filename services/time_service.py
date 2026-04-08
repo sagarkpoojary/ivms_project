@@ -1,11 +1,13 @@
 import pytz
 from datetime import datetime
 
-OMAN_TZ = pytz.timezone('Asia/Muscat')
+from config import Config
+
+SYSTEM_TZ = pytz.timezone(Config.TIMEZONE)
 
 def get_oman_now():
-    """Returns the current time in Oman (UTC+4)."""
-    return datetime.now(OMAN_TZ)
+    """Returns the current time in system timezone."""
+    return datetime.now(SYSTEM_TZ)
 
 def format_to_oman(dt):
     """Converts a naive or aware datetime to Oman time and returns it as an aware datetime."""
@@ -14,7 +16,7 @@ def format_to_oman(dt):
     if dt.tzinfo is None:
         # Assume it's UTC if naive
         dt = pytz.utc.localize(dt)
-    return dt.astimezone(OMAN_TZ)
+    return dt.astimezone(SYSTEM_TZ)
 
 def parse_traccar_time(time_str):
     """Parses Traccar UTC time string and converts to Oman datetime."""
@@ -31,7 +33,7 @@ def parse_traccar_time(time_str):
             base = time_str[:19]
             dt = datetime.strptime(base, '%Y-%m-%dT%H:%M:%S')
             dt = pytz.utc.localize(dt)
-        return dt.astimezone(OMAN_TZ)
+        return dt.astimezone(SYSTEM_TZ)
     except:
         return None
 

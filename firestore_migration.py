@@ -7,7 +7,8 @@ import os
 # 1. Setup Firebase
 # Ensure you have your 'serviceAccountKey.json' in this directory
 # Download it from Firebase Console -> Project Settings -> Service accounts
-cred_path = "serviceAccountKey.json"
+from config import BASE_DIR
+cred_path = os.path.join(BASE_DIR, "serviceAccountKey.json")
 
 if not os.path.exists(cred_path):
     print(f"Error: {cred_path} not found. Please place your Firebase service account JSON file here.")

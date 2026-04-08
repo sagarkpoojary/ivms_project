@@ -185,7 +185,7 @@ def forgot_password():
 
     # Always show success (prevents email enumeration)
     return render_template('forgot_password.html',
-                           success="If that email is registered, a reset link has been sent. Check your inbox.")
+                           success="A password reset link has been sent — but only if that email is registered in our system. If you don't receive an email within a few minutes, you don't have an account with us.")
 
 
 # ── Reset Password ──────────────────────────────────────────────────────────

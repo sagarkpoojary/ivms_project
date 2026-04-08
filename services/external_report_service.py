@@ -1,7 +1,7 @@
 import pytz
 from datetime import datetime, timedelta
 from services.traccar_service import try_traccar_get
-from services.time_service import OMAN_TZ, parse_traccar_to_oman_str
+from services.time_service import SYSTEM_TZ, parse_traccar_to_oman_str
 
 from flask import current_app
 
@@ -47,8 +47,8 @@ def get_vehicle_summary_report(vehicle_uid, from_date_str, to_date_str):
             day_str = current_date.strftime('%Y-%m-%d')
             
             # Define period for the day in Oman time
-            day_start = OMAN_TZ.localize(current_date.replace(hour=0, minute=0, second=0, microsecond=0))
-            day_end = OMAN_TZ.localize(current_date.replace(hour=23, minute=59, second=59, microsecond=999999))
+            day_start = SYSTEM_TZ.localize(current_date.replace(hour=0, minute=0, second=0, microsecond=0))
+            day_end = SYSTEM_TZ.localize(current_date.replace(hour=23, minute=59, second=59, microsecond=999999))
             
             # Convert to UTC for Traccar
             traccar_from = day_start.astimezone(pytz.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
@@ -136,7 +136,7 @@ def format_traccar_time_to_str(traccar_time_str):
         
         # Manually parse to ensure seconds are included
         dt_utc = datetime.fromisoformat(traccar_time_str.replace('Z', '+00:00'))
-        dt_oman = dt_utc.astimezone(OMAN_TZ)
+        dt_oman = dt_utc.astimezone(SYSTEM_TZ)
         return dt_oman.strftime('%Y-%m-%d %H:%M:%S')
     except:
         return None

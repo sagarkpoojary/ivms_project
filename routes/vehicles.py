@@ -100,8 +100,9 @@ def register_vehicle():
     traccar_device = check_device_exists(unique_id)
     
     if not traccar_device:
+        from config import Config
         return render_template('vehicle_form.html', 
-                               error="Vehicle not found in Traccar server. For direct registration, please add it to Traccar (172.16.1.26:8082) first.", 
+                               error=f"Vehicle not found in Traccar server. For direct registration, please add it to Traccar ({Config.TRACCAR_IP}) first.", 
                                vehicles=get_filtered_vehicles(include_all=True), 
                                role=role)
 

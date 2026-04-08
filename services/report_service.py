@@ -1,11 +1,12 @@
 from datetime import datetime, timedelta
 import pytz
-from services.time_service import get_oman_now, format_to_oman, OMAN_TZ, parse_traccar_to_oman_str
+from services.time_service import get_oman_now, format_to_oman, SYSTEM_TZ, parse_traccar_to_oman_str
 from flask import request, session, render_template, current_app
 from models.database import load_server_config
 from services.traccar_service import full_traccar_host, get_traccar_session, save_traccar_cookies
 from auth.utils import get_filtered_vehicles
 from extensions import cache
+from config import Config
 
 def get_period_dates(period, from_str=None, to_str=None):
     now = get_oman_now()
@@ -29,10 +30,10 @@ def get_period_dates(period, from_str=None, to_str=None):
         try:
             # User input from HTML datetime-local is usually in local time (Oman)
             start_dt = datetime.strptime(from_str, '%Y-%m-%dT%H:%M')
-            start_dt = OMAN_TZ.localize(start_dt)
+            start_dt = SYSTEM_TZ.localize(start_dt)
             if to_str:
                 end_dt = datetime.strptime(to_str, '%Y-%m-%dT%H:%M')
-                end_dt = OMAN_TZ.localize(end_dt)
+                end_dt = SYSTEM_TZ.localize(end_dt)
         except:
             pass
     else: # Today
@@ -183,6 +184,10 @@ def render_report_logic(forced_report_type=None):
                             avg_spd_kmh = round((t.get('averageSpeed') or 0) * 1.852, 2)
                             max_spd_kmh = round((t.get('maxSpeed') or 0) * 1.852, 2)
                             
+                            # Estimate fuel if sensor not present
+                            fuel_liters = round(dist_km / Config.MILEAGE_KM_PER_LITER, 2)
+                            fuel_cost = round(fuel_liters * Config.FUEL_PRICE_OMR, 3)
+
                             driver_name = '-' 
                             for v in vehicles:
                                 if str(v.get('unique_id')) == str(filter_uid):
@@ -203,7 +208,7 @@ def render_report_logic(forced_report_type=None):
                                 'endOdometer': f"{round((t.get('endOdometer') or 0) / 1000, 2)} km",
                                 'startAddress': t.get('startAddress', 'N/A'),
                                 'endAddress': t.get('endAddress', 'N/A'),
-                                'spentFuel': f"{round((t.get('spentFuel') or 0), 2)} L",
+                                'spentFuel': f"{fuel_liters} L ({fuel_cost} OMR)",
                                 'duration': t.get('duration'),
                                 'driverName': driver_name,
                                 'startLat': t.get('startLat'),
@@ -220,25 +225,35 @@ def render_report_logic(forced_report_type=None):
                         # Remove manual Stop filtering. Respect Traccar backend report.
                         
                         engine_status = "OFF"
-
                         if s_item.get('engine') is True: 
                             engine_status = "ON"
 
-                            
-                        dist_meters = s_item.get('totalDistance') or 0
-                        odo_km = round(dist_meters / 1000, 2)
+                        # Duration fallback for engine hours if Traccar data is missing
+                        dur_ms = s_item.get('duration') or 0
+                        dur_h = round(dur_ms / 3600000, 2)
+                        
+                        eng_h = round((s_item.get('engineHours') or 0) / 3600000, 2)
+                        if eng_h == 0 and engine_status == "ON":
+                            eng_h = dur_h
+                        
+                        # Fuel fallback for idling if Traccar data is missing
+                        fuel_l = round(s_item.get('spentFuel') or 0, 2)
+                        if fuel_l == 0 and engine_status == "ON":
+                            fuel_l = round(dur_h * Config.IDLE_FUEL_LPH, 2)
+
+                        odo_km = round((s_item.get('startOdometer') or 0) / 1000, 2)
                         
                         row = {
                             'deviceId': s_item.get('deviceId'),
                             'deviceName': s_item.get('deviceName'),
                             'startTime': parse_traccar_to_oman_str(s_item.get('startTime')),
                             'endTime': parse_traccar_to_oman_str(s_item.get('endTime')),
-                            'duration': s_item.get('duration'),
+                            'duration': dur_ms,
                             'address': s_item.get('address', 'N/A'),
                             'odometer': odo_km,
                             'engine': engine_status,
-                            'spentFuel': f"{round((s_item.get('spentFuel') or 0), 2)} L",
-                            'engineHours': f"{round((s_item.get('engineHours') or 0) / 3600000, 2)} h",
+                            'spentFuel': f"{fuel_l} L",
+                            'engineHours': f"{eng_h} h",
                             'latitude': s_item.get('latitude'),
                             'longitude': s_item.get('longitude')
                         }
@@ -421,6 +436,38 @@ def render_report_logic(forced_report_type=None):
             except Exception as e:
                 current_app.logger.error(f"Failed to fetch fleet-wide stops: {e}")
 
+    elif report_type == 'Idle':
+        try:
+            val = request.args.get('min_idle_time', '')
+            min_idle_time = int(val) if val else 5
+        except (ValueError, TypeError):
+            min_idle_time = 5
+            
+        idle_data = [] # Detailed events list for template
+        fleet_idle_summary = [] # Grouped by vehicle for the overview
+        
+        target_vehicles_for_idle = vehicles
+        if filter_uid:
+            target_vehicles_for_idle = [v for v in vehicles if str(v.get('unique_id')) == str(filter_uid)]
+            
+        for v in target_vehicles_for_idle:
+            iid = device_map.get(str(v.get('unique_id')))
+            if iid:
+                result = get_idle_events(v, traccar_from, traccar_to, min_idle_time, traccar, s, internal_id=iid)
+                events = result.get('events', [])
+                idle_data.extend(events)
+                fleet_idle_summary.append({
+                    'vehicle_id': v.get('unique_id'),
+                    'name': v.get('name'),
+                    'total_idle_time': result.get('summary', {}).get('total_idle_time', 0),
+                    'total_idle_events': result.get('summary', {}).get('total_idle_events', 0)
+                })
+        
+        # Sort events by duration DESC by default
+        idle_data.sort(key=lambda x: x['duration'], reverse=True)
+        # Sort summary by total idle time DESC
+        fleet_idle_summary.sort(key=lambda x: x['total_idle_time'], reverse=True)
+
     groups = []
     try:
         r_grp = s.get(f"{traccar}/api/groups", timeout=10)
@@ -478,6 +525,9 @@ def render_report_logic(forced_report_type=None):
                           selected_group=filter_group,
                           selected_report_type=report_type,
                           selected_threshold=str(stop_threshold_mins),
+                          selected_min_idle=str(request.args.get('min_idle_time', 5)),
+                          idle_data=idle_data if report_type == 'Idle' else [],
+                          idle_summary=fleet_idle_summary if report_type == 'Idle' else [],
                           selected_columns=selected_columns,
                           internal_id=internal_id,
                           traccar_admin_warning=traccar_admin_warning,
@@ -571,6 +621,7 @@ def fetch_cached_summaries(vehicles, filter_uid, traccar_from, traccar_to, tracc
             "internal_id": internal_id
         }
         
+        row["engine_hours"] = 0
         engine_on_ms = 0
         if internal_id and internal_id in summary_data_map:
             item = summary_data_map[internal_id]
@@ -579,8 +630,10 @@ def fetch_cached_summaries(vehicles, filter_uid, traccar_from, traccar_to, tracc
                 row["average_speed"] = round(float(item.get("averageSpeed", 0)) * 1.852, 2)
                 row["total_distance"] = round(float(item.get("distance", 0)) / 1000, 2)
                 engine_on_ms = float(item.get("engineHours", 0))
+                row["engine_hours"] = round(engine_on_ms / 3600000, 1)
             except: pass
         
+        # 2. Get Idling from Stops (already bulk fetched above)
         if internal_id and internal_id in stop_data_map:
             stops = stop_data_map[internal_id]
             idle_ms = 0
@@ -589,6 +642,23 @@ def fetch_cached_summaries(vehicles, filter_uid, traccar_from, traccar_to, tracc
                     idle_ms += st.get('duration', 0)
             row["idle_duration"] = idle_ms
             
+            # Refine engine hours if 0 (estimate from idling stops + trips) 
+            # Note: For full accuracy we'd need Trips too, but Idling is the main missing piece for many trackers.
+            if row["engine_hours"] == 0 and idle_ms > 0:
+                row["engine_hours"] = round(idle_ms / 3600000, 1)
+
+        # 3. Fuel Calcs (Combine trip distance fuel + idling fuel)
+        dist_km = row["total_distance"]
+        idle_h = row["idle_duration"] / 3600000
+        
+        # Initial estimate based on distance
+        fuel_liters = dist_km / Config.MILEAGE_KM_PER_LITER
+        # Add idling consumption
+        fuel_liters += (idle_h * Config.IDLE_FUEL_LPH)
+        
+        row["fuel_liters"] = round(fuel_liters, 2)
+        row["fuel_cost"] = round(fuel_liters * Config.FUEL_PRICE_OMR, 3)
+
         # off_duration = period - engineON
         row["off_duration"] = max(0, total_period_ms - engine_on_ms)
 
@@ -628,3 +698,135 @@ def fetch_cached_summaries(vehicles, filter_uid, traccar_from, traccar_to, tracc
     # Cache for 2 minutes
     cache.set(cache_key, report_data, timeout=120)
     return report_data
+
+def get_idle_events(v, traccar_from, traccar_to, min_idle, traccar, s, internal_id=None):
+    uid = v.get('unique_id')
+    name = v.get('name')
+    
+    if not internal_id:
+        try:
+            r_dev = s.get(f"{traccar}/api/devices", params={'uniqueId': uid}, timeout=10)
+            if r_dev.status_code == 200:
+                devs = r_dev.json()
+                if devs: internal_id = devs[0]['id']
+        except: 
+            return {'summary': {'total_idle_time': 0, 'total_idle_events': 0}, 'events': []}
+
+    if not internal_id: 
+        return {'summary': {'total_idle_time': 0, 'total_idle_events': 0}, 'events': []}
+
+    try:
+        # Enforce date range limit (max 31 days) to prevent memory issues
+        t_from = datetime.fromisoformat(traccar_from.replace('Z', '+00:00'))
+        t_to = datetime.fromisoformat(traccar_to.replace('Z', '+00:00'))
+        if (t_to - t_from).days > 31:
+             t_to = t_from + timedelta(days=31)
+             traccar_to = t_to.strftime('%Y-%m-%dT%H:%M:%SZ')
+
+        url = f"{traccar}/api/reports/route?deviceId={internal_id}&from={traccar_from}&to={traccar_to}"
+        r = s.get(url, headers={'Accept': 'application/json'}, timeout=45)
+        if r.status_code != 200: 
+            return {'summary': {'total_idle_time': 0, 'total_idle_events': 0}, 'events': []}
+        
+        positions = r.json()
+        if not positions: 
+            return {'summary': {'total_idle_time': 0, 'total_idle_events': 0}, 'events': []}
+        
+        # Ensure sorting and handle potential out-of-order data
+        positions.sort(key=lambda x: x.get('fixTime', ''))
+        
+        idle_events = []
+        current_idle_start = None
+        last_processed_pos = None
+        
+        total_idle_time = 0
+        
+        for pos in positions:
+            # 1. Engine Detection Logic (Harden check)
+            attrs = pos.get('attributes', {})
+            ignition = attrs.get('ignition')
+            motion = attrs.get('motion')
+            speed_kmh = (pos.get('speed', 0) or 0) * 1.852
+            
+            # Use ignition if available, else motion/speed fallback
+            engine_on = False
+            if ignition is not None:
+                engine_on = ignition
+            elif motion is not None:
+                # If moving, engine must be on; if stopped and motion is true, likely idling
+                engine_on = motion or speed_kmh > 0
+            else:
+                engine_on = speed_kmh > 0
+            
+            is_idle_now = engine_on and speed_kmh < Config.IDLE_SPEED_THRESHOLD
+            
+            # 2. Data Gap Detection
+            gap_detected = False
+            if last_processed_pos:
+                try:
+                    t_last = datetime.fromisoformat(last_processed_pos['fixTime'].replace('Z', '+00:00').split('.')[0])
+                    t_curr = datetime.fromisoformat(pos['fixTime'].replace('Z', '+00:00').split('.')[0])
+                    gap_sec = (t_curr - t_last).total_seconds()
+                    if gap_sec > (Config.MAX_DATA_GAP_MINUTES * 60):
+                        gap_detected = True
+                except: pass
+            
+            # 3. Session Management
+            if current_idle_start:
+                # Idle session ends if: not idling anymore, OR engine turned off, OR gap detected
+                if not is_idle_now or gap_detected:
+                    try:
+                        t_start = datetime.fromisoformat(current_idle_start['fixTime'].replace('Z', '+00:00').split('.')[0])
+                        # End time is the last position that was STILL idle
+                        t_end = datetime.fromisoformat(last_processed_pos['fixTime'].replace('Z', '+00:00').split('.')[0])
+                        dur_min = (t_end - t_start).total_seconds() / 60
+                        
+                        if dur_min >= min_idle:
+                            idle_events.append({
+                                'vehicle_id': uid,
+                                'vehicle_name': name,
+                                'start_time': parse_traccar_to_oman_str(current_idle_start['fixTime']),
+                                'end_time': parse_traccar_to_oman_str(last_processed_pos['fixTime']),
+                                'duration': round(dur_min, 1),
+                                'location': last_processed_pos.get('address') or f"{last_processed_pos.get('latitude')}, {last_processed_pos.get('longitude')}",
+                                'latitude': last_processed_pos.get('latitude'),
+                                'longitude': last_processed_pos.get('longitude')
+                            })
+                            total_idle_time += dur_min
+                    except: pass
+                    current_idle_start = pos if is_idle_now else None
+            elif is_idle_now:
+                current_idle_start = pos
+                
+            last_processed_pos = pos
+        
+        # 4. Handle trailing idle spell
+        if current_idle_start and last_processed_pos:
+            try:
+                t_start = datetime.fromisoformat(current_idle_start['fixTime'].replace('Z', '+00:00').split('.')[0])
+                t_end = datetime.fromisoformat(last_processed_pos['fixTime'].replace('Z', '+00:00').split('.')[0])
+                dur_min = (t_end - t_start).total_seconds() / 60
+                if dur_min >= min_idle:
+                    idle_events.append({
+                        'vehicle_id': uid,
+                        'vehicle_name': name,
+                        'start_time': parse_traccar_to_oman_str(current_idle_start['fixTime']),
+                        'end_time': parse_traccar_to_oman_str(last_processed_pos['fixTime']),
+                        'duration': round(dur_min, 1),
+                        'location': last_processed_pos.get('address') or f"{last_processed_pos.get('latitude')}, {last_processed_pos.get('longitude')}",
+                        'latitude': last_processed_pos.get('latitude'),
+                        'longitude': last_processed_pos.get('longitude')
+                    })
+                    total_idle_time += dur_min
+            except: pass
+        
+        return {
+            'summary': {
+                'total_idle_time': round(total_idle_time, 1),
+                'total_idle_events': len(idle_events)
+            },
+            'events': idle_events
+        }
+    except Exception as e:
+        current_app.logger.error(f"Enhanced Idle report error for {uid}: {e}")
+        return {'summary': {'total_idle_time': 0, 'total_idle_events': 0}, 'events': []}

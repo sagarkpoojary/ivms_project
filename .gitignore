@@ -1,0 +1,17 @@
+# Environments
+.env
+.venv/
+__pycache__/
+*.pyc
+
+# Secrets & Keys
+serviceAccountKey.json
+cookies.txt
+*.json
+
+# Logs & Caches
+*.log
+.cache/
+
+# Docker
+.dockerignore

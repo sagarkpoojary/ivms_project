@@ -1,12 +1,14 @@
 import psycopg2
 import psycopg2.extras
 from services.time_service import get_oman_now
+from config import Config
 
 DB_CONFIG = {
-    "dbname": "ivmsdb",
-    "user": "ivmsuser",
-    "password": "ivms_secure_2026",
-    "host": "localhost"
+    "dbname": Config.DB_NAME,
+    "user": Config.DB_USER,
+    "password": Config.DB_PASS,
+    "host": Config.DB_HOST,
+    "port": Config.DB_PORT
 }
 
 def get_conn():

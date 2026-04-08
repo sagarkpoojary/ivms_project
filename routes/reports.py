@@ -35,6 +35,11 @@ def report_stops():
 def report_combined():
     return render_report_logic('Combined')
 
+@reports_bp.route('/reports/idle')
+@role_required('user')
+def report_idle():
+    return render_report_logic('Idle')
+
 @reports_bp.route('/api/reports/export')
 @role_required('user')
 def export_report():
@@ -192,7 +197,7 @@ def export_report():
                         cw.writerow([row['time'], name, row['type'], row['loc'], row['details']])
 
     elif report_type == 'Summary':
-        cw.writerow(['Vehicle', 'Max Speed', 'Avg Speed', 'Total Distance', 'Total Idle Stop', 'Ending OFF', 'Engine ON Stop'])
+        cw.writerow(['Vehicle', 'Max Speed', 'Avg Speed', 'Total Distance', 'Engine Hours', 'Fuel (L)', 'Fuel Cost (OMR)', 'Total Idle Stop', 'Ending OFF', 'Engine ON Stop'])
         # Use the logic from fetch_cached_summaries but we need it here
         data = fetch_cached_summaries(target_vehicles, filter_uid, traccar_from, traccar_to, traccar, s)
         for row in data:
@@ -207,10 +212,37 @@ def export_report():
                 f"{row.get('max_speed', 0)} km/h",
                 f"{row.get('average_speed', 0)} km/h",
                 f"{row.get('total_distance', 0)} km",
+                f"{round(row.get('engine_hours', 0), 1)} h",
+                f"{round(row.get('fuel_liters', 0), 1)} L",
+                f"{round(row.get('fuel_cost', 0), 3)} OMR",
                 idle_str,
                 off_str,
                 idle_str # Engine ON Stop
             ])
+    
+    elif report_type == 'Idle':
+        cw.writerow(['Vehicle Name', 'Start Time', 'End Time', 'Duration (min)', 'Location'])
+        # We'll need to fetch idle data here for export
+        # For simplicity, I'll call a service method we'll define soon
+        from services.report_service import get_idle_events
+        s = get_traccar_session()
+        traccar = full_traccar_host()
+        
+        try:
+            min_idle = int(request.args.get('min_idle_time', 5))
+        except:
+            min_idle = 5
+
+        for v in target_vehicles:
+            events = get_idle_events(v, traccar_from, traccar_to, min_idle, traccar, s)
+            for ev in events:
+                cw.writerow([
+                    ev['vehicle_name'],
+                    ev['start_time'],
+                    ev['end_time'],
+                    ev['duration'],
+                    ev['location']
+                ])
 
     output = make_response(si.getvalue())
     output.headers["Content-Disposition"] = f"attachment; filename=report_{report_type.lower()}_{datetime.now().strftime('%Y%m%d')}.csv"

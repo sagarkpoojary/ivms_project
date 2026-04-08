@@ -8,28 +8,26 @@ from email.mime.base import MIMEBase
 from email.mime.text import MIMEText
 from email import encoders
 import pytz
-from dotenv import load_dotenv
+from config import Config
+Config.validate()
 
-# Load environment variables from .env file if it exists
-load_dotenv(os.path.join(os.path.dirname(__file__), '.env'))
+# --- CONFIGURATION (via Centralized Config) ---
+API_BASE_URL = Config.IVMS_API_URL
+API_TOKEN = Config.ODOO_REPORT_TOKEN
 
-# --- CONFIGURATION (via Environment Variables) ---
-API_BASE_URL = os.environ.get("IVMS_API_URL", "http://127.0.0.1:5000")
-API_TOKEN = os.environ.get("ODOO_REPORT_TOKEN", "ivms_odoo_secure_token_2024")
-
-SMTP_SERVER = os.environ.get("SMTP_SERVER", "smtp.gmail.com")
-SMTP_PORT = int(os.environ.get("SMTP_PORT", 587))
-SMTP_USER = os.environ.get("SMTP_USER", "")
-SMTP_PASS = os.environ.get("SMTP_PASS", "")
-EMAIL_SENDER = os.environ.get("EMAIL_SENDER", SMTP_USER)
+SMTP_SERVER = Config.SMTP_SERVER
+SMTP_PORT = Config.SMTP_PORT
+SMTP_USER = Config.SMTP_USER
+SMTP_PASS = Config.SMTP_PASS
+EMAIL_SENDER = Config.EMAIL_SENDER
 EMAIL_RECIPIENTS = os.environ.get("REPORT_RECIPIENTS", "").split(",")
 
 # Timezone
-OMAN_TZ = pytz.timezone('Asia/Muscat')
+SYSTEM_TZ = pytz.timezone(Config.TIMEZONE)
 
 def get_yesterday_oman():
     """Returns yesterday's date string in YYYY-MM-DD format for Oman."""
-    now_oman = datetime.now(OMAN_TZ)
+    now_oman = datetime.now(SYSTEM_TZ)
     yesterday = now_oman - timedelta(days=1)
     return yesterday.strftime('%Y-%m-%d')
 

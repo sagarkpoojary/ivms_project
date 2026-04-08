@@ -3,14 +3,15 @@ import json
 import requests
 from flask import session, has_request_context
 from models.database import load_server_config
+from config import Config, BASE_DIR
 
 def get_master_credentials():
     """Load master Traccar admin credentials from system config or environment vars.
     Returns (email, password) or (None, None) if not configured.
     """
     cfg = load_server_config()
-    email = cfg.get('admin_email') or os.environ.get('TRACCAR_ADMIN_EMAIL')
-    pwd = cfg.get('admin_pass') or os.environ.get('TRACCAR_ADMIN_PASS')
+    email = cfg.get('admin_email') or Config.TRACCAR_ADMIN_EMAIL
+    pwd = cfg.get('admin_pass') or Config.TRACCAR_ADMIN_PASS
     
     # DEBUG: Masked credentials check
     try:
@@ -42,7 +43,7 @@ def get_traccar_session(use_session_cookies=False): # Returns a requests.Session
     if not host: return s
 
     # 1. Try to load existing master cookies from file
-    cookie_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'cookies.txt')
+    cookie_path = os.path.join(BASE_DIR, 'cookies.txt')
     if os.path.exists(cookie_path):
         try:
             with open(cookie_path, 'r') as f:
@@ -105,9 +106,11 @@ def ensure_admin_login(s):
             return True
         else:
             try:
-                with open("api_errors.log", "a") as f:
+                log_path = os.path.join(BASE_DIR, "api_errors.log")
+                with open(log_path, "a") as f:
                     f.write(f"Login failed: Status {r_login.status_code}, Body: {r_login.text}\n")
-            except: pass
+            except: 
+                pass
             if current_app:
                 current_app.logger.warning(f"Proxy login failed (status={r_login.status_code}): {r_login.text}")
     except Exception as e:
@@ -122,9 +125,8 @@ def get_admin_traccar_session():
 
 def save_traccar_cookies(s, is_admin=True):
     cookies = requests.utils.dict_from_cookiejar(s.cookies)
-    # Only save to file for the master admin
     if is_admin:
-        cookie_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'cookies.txt')
+        cookie_path = os.path.join(BASE_DIR, 'cookies.txt')
         try:
             with open(cookie_path, 'w') as f:
                 json.dump(cookies, f)
@@ -149,7 +151,7 @@ def try_traccar_get(endpoint, params=None, timeout=10, headers=None, _retry=True
         # Connection reset — clear cookies and retry once with fresh login
         if _retry:
             import os
-            cookie_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'cookies.txt')
+            cookie_path = os.path.join(BASE_DIR, 'cookies.txt')
             try: os.remove(cookie_path)
             except: pass
             s2 = requests.Session()
