@@ -71,7 +71,7 @@ def devices_proxy():
     email = session.get('email')
     cache_key = f"devices_proxy_{email}_{uid}"
     cached = cache.get(cache_key)
-    if cached: return jsonify(cached)
+    if cached is not None: return jsonify(cached)
 
     try:
         r, traccar_host = try_traccar_get("api/devices", timeout=10)
@@ -187,7 +187,7 @@ def api_dashboard_bulk_sync():
     
     cache_key = f"bulk_sync_{email}_{period}_{device_uid}"
     cached = cache.get(cache_key)
-    if cached: return jsonify(cached)
+    if cached is not None: return jsonify(cached)
 
     # 1. Fetch Traccar Host
     host = full_traccar_host()
