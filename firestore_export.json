@@ -84,11 +84,11 @@
     "traccar_settings": {
       "stop_threshold": 5,
       "servers": [
-        "172.16.1.26:8082"
+        "REDACTED"
       ],
-      "admin_email": "alireza@conceptgrps.com",
-      "admin_pass": "1234",
-      "active_ip": "172.16.1.26:8082"
+      "admin_email": "REDACTED",
+      "admin_pass": "REDACTED",
+      "active_ip": "REDACTED"
     }
   },
   "users": {
@@ -100,7 +100,7 @@
       "vehicle_limit": 10000,
       "account_module": "Premium",
       "company_name": "Concept Groups",
-      "password_hash": "scrypt:32768:8:1$r9agBUSDABLvwOjw$50c81596ab1f5aff253818a91383eead871db796fa264efd5091ddaf667e0e36e0691469991d48b2e00678a6a97d13e524e19b880312b53adf48c41f84ffaa3f",
+      "password_hash": "REDACTED",
       "role": "main_admin"
     },
     "dinesh@conceptgrps.com": {
@@ -113,7 +113,7 @@
       "account_module": "Normal",
       "vehicle_limit": 10,
       "company_name": "Concept Technologies",
-      "password_hash": "scrypt:32768:8:1$gRtLD3SeBYquOCwc$f958934cd944898cc6edf303c54494c32b6042c0ed6c4e814dd3597b3693a25383b4c938e10fbaff04b39b0dec811f6484e1e8b13771f02d6bb465187f056b69",
+      "password_hash": "REDACTED",
       "role": "admin"
     },
     "saga@gmail.com": {
@@ -124,7 +124,7 @@
       "vehicle_limit": 100000,
       "account_module": "Premium",
       "company_name": "System",
-      "password_hash": "scrypt:32768:8:1$4s4cnWs2RGzr9PNQ$7439e9c4d7ac2d867a77b1dba4dfc3888d194c49c77369a5fc1b8ad05a08f73b333b884fb0b425df276dab81bb7fe00329572377414cda79afde5efc4f5b2cb1",
+      "password_hash": "REDACTED",
       "role": "super_admin"
     }
   },
