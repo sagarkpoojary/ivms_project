@@ -108,9 +108,10 @@ def render_report_logic(forced_report_type=None):
     except Exception as e:
         current_app.logger.error(f"Failed to fetch devices: {e}")
     
+    from services.native_report_service import native_report_service
     if report_type != 'Combined' or not filter_uid:
-        # Batch fetch/Cache summaries to avoid N+1 slow reads
-        report_data = fetch_cached_summaries(vehicles, filter_uid, traccar_from, traccar_to, traccar, s)
+        # Use native fleet summary
+        report_data = native_report_service.get_fleet_summary(vehicles, start_dt, end_dt)
 
 
     # Define columns based on report type
@@ -172,52 +173,25 @@ def render_report_logic(forced_report_type=None):
             if report_type == 'Trips':
 
                 try:
-                    url = f"{traccar}/api/reports/trips?deviceId={internal_id}&from={traccar_from}&to={traccar_to}"
-                    r_trips = s.get(url, headers={'Accept': 'application/json'}, timeout=15)
-                    save_traccar_cookies(s)
-                    if r_trips.status_code == 200:
-                        processed_trips = r_trips.json()
-                        processed_trips.sort(key=lambda x: x.get('startTime', ''))
-                        
-                        for t in processed_trips:
-                            dist_km = round((t.get('distance') or 0) / 1000, 2)
-                            avg_spd_kmh = round((t.get('averageSpeed') or 0) * 1.852, 2)
-                            max_spd_kmh = round((t.get('maxSpeed') or 0) * 1.852, 2)
-                            
-                            # Estimate fuel if sensor not present
-                            fuel_liters = round(dist_km / Config.MILEAGE_KM_PER_LITER, 2)
-                            fuel_cost = round(fuel_liters * Config.FUEL_PRICE_OMR, 3)
-
-                            driver_name = '-' 
-                            for v in vehicles:
-                                if str(v.get('unique_id')) == str(filter_uid):
-                                    driver_name = v.get('driver_name', '-')
-                                    break
-
-                            trip_data.append({
-                                'deviceId': t.get('deviceId'),
-                                'deviceName': t.get('deviceName'),
-                                'startTime': parse_traccar_to_oman_str(t.get('startTime')),
-                                'endTime': parse_traccar_to_oman_str(t.get('endTime')),
-                                'rawStartTime': t.get('startTime'),
-                                'rawEndTime': t.get('endTime'),
-                                'distance': f"{dist_km} km",
-                                'averageSpeed': f"{avg_spd_kmh} km/h",
-                                'maxSpeed': f"{max_spd_kmh} km/h",
-                                'startOdometer': f"{round((t.get('startOdometer') or 0) / 1000, 2)} km",
-                                'endOdometer': f"{round((t.get('endOdometer') or 0) / 1000, 2)} km",
-                                'startAddress': t.get('startAddress', 'N/A'),
-                                'endAddress': t.get('endAddress', 'N/A'),
-                                'spentFuel': f"{fuel_liters} L ({fuel_cost} OMR)",
-                                'duration': t.get('duration'),
-                                'driverName': driver_name,
-                                'startLat': t.get('startLat'),
-                                'startLon': t.get('startLon'),
-                                'endLat': t.get('endLat'),
-                                'endLon': t.get('endLon')
-                            })
+                    from services.native_report_service import native_report_service
+                    processed_trips = native_report_service.get_trip_report(filter_uid, start_dt, end_dt)
+                    
+                    for t in processed_trips:
+                        trip_data.append({
+                            'deviceId': t.get('imei'),
+                            'deviceName': t.get('imei'),
+                            'startTime': t.get('start_time').strftime('%Y-%m-%d %H:%M:%S'),
+                            'endTime': t.get('end_time').strftime('%Y-%m-%d %H:%M:%S'),
+                            'distance': f"{round(t.get('distance_km', 0), 2)} km",
+                            'averageSpeed': f"{round(t.get('avg_speed', 0), 2)} km/h",
+                            'maxSpeed': f"{round(t.get('max_speed', 0), 2)} km/h",
+                            'duration': t.get('duration_sec', 0) * 1000, # to ms
+                            'startAddress': t.get('start_address', 'N/A'),
+                            'endAddress': t.get('end_address', 'N/A'),
+                            'spentFuel': f"{round(t.get('fuel_consumed', 0), 2)} L"
+                        })
                 except Exception as e:
-                    current_app.logger.error(f"Failed to fetch trips for {filter_uid}: {e}")
+                    current_app.logger.error(f"Failed to fetch native trips for {filter_uid}: {e}")
             
             elif report_type == 'Stops':
                 try:

@@ -5,7 +5,6 @@ import pytz
 from services.time_service import get_oman_now
 from flask import Blueprint, request, jsonify, session, current_app, render_template, redirect, url_for
 from auth.utils import role_required, get_filtered_vehicles
-from services.traccar_service import full_traccar_host, try_traccar_get
 from models.database import load_server_config, save_server_config
 from extensions import cache
 from config import Config, BASE_DIR
@@ -34,27 +33,13 @@ def api_alerts():
     if not session.get("logged_in"): return jsonify([]), 401
     try:
         from services.report_service import get_period_dates
+        from services.native_report_service import native_report_service
         start_dt, end_dt = get_period_dates('Today')
-        # Convert to UTC as required by Traccar
-        from pytz import utc
-        tr_from = start_dt.astimezone(utc).strftime('%Y-%m-%dT%H:%M:%SZ')
-        tr_to = end_dt.astimezone(utc).strftime('%Y-%m-%dT%H:%M:%SZ')
         
-        r, _ = try_traccar_get("api/reports/events", params={
-            "type": "deviceOverspeed", 
-            "from": tr_from,
-            "to": tr_to
-        }, timeout=10)
-        if r.status_code != 200:
-            log_path = os.path.join(BASE_DIR, "api_errors.log")
-            with open(log_path, "a") as f:
-                f.write(f"Alerts Error: Status {r.status_code}, Body: {r.text}\n")
-        return jsonify(r.json())
+        # Fetch overspeed events from native analytics
+        events = native_report_service.get_analytics_events(None, 'overspeed', start_dt, end_dt)
+        return jsonify(events)
     except Exception as e:
-        import traceback
-        log_path = os.path.join(BASE_DIR, "api_errors.log")
-        with open(log_path, "a") as f:
-            f.write(f"Alerts Exception: {str(e)}\n{traceback.format_exc()}\n")
         return jsonify({"error": str(e)}), 500
 
 @api_bp.route("/api/system-stats")
@@ -68,7 +53,6 @@ def api_system_stats():
 def devices_proxy():
     uid = request.args.get("uid")
     from auth.utils import get_filtered_vehicles
-    from services.telemetry_service import telemetry_service
     
     v_list = get_filtered_vehicles()
     if uid:
@@ -140,40 +124,28 @@ def device_models():
 @api_bp.route('/api/dashboard/devices')
 @role_required('user')
 def api_dashboard_devices():
-    try:
-        r, _ = try_traccar_get("api/devices", timeout=10)
-        if r.status_code != 200: return jsonify({'error': 'bad_status'}), 500
-        allowed_uids = {str(v.get('unique_id')) for v in get_filtered_vehicles()}
-        return jsonify([d for d in r.json() if str(d.get('uniqueId')) in allowed_uids])
-    except Exception as e: return jsonify({'error': str(e)}), 500
+    from auth.utils import get_filtered_vehicles
+    return jsonify(get_filtered_vehicles())
 
 @api_bp.route('/api/dashboard/groups')
 @role_required('user')
-@cache.cached(timeout=600) 
 def api_dashboard_groups():
-    try:
-        r, _ = try_traccar_get("api/groups", timeout=10)
-        if r.status_code == 200: return jsonify(r.json())
-    except: pass
+    # Native groups logic (if any) or just return empty for now
     return jsonify([])
 
 @api_bp.route('/api/dashboard/distance')
 @role_required('user')
 def api_dashboard_distance():
-    device_id = request.args.get('id')
-    if not device_id: return jsonify({'error': 'missing_id'}), 400
-    from_p = request.args.get('from'); to_p = request.args.get('to')
-    if not from_p or not to_p:
-        now = get_oman_now()
-        start = now.replace(hour=0, minute=0, second=0, microsecond=0)
-        # Convert to UTC for Traccar
-        from_p = start.astimezone(pytz.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
-        to_p = now.astimezone(pytz.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
-    try:
-        r, _ = try_traccar_get("api/reports/summary", params={"deviceId": device_id, "from": from_p, "to": to_p}, timeout=12)
-        if r.status_code == 200 and r.json():
-            return jsonify({'distance': round(r.json()[0].get('distance', 0) / 1000, 2)})
-    except Exception as e: pass
+    device_uid = request.args.get('id')
+    if not device_uid: return jsonify({'error': 'missing_id'}), 400
+    
+    from services.report_service import get_period_dates
+    from services.native_report_service import native_report_service
+    start_dt, end_dt = get_period_dates('Today')
+    
+    summary = native_report_service.get_fleet_summary([{'unique_id': device_uid}], start_dt, end_dt)
+    if summary:
+        return jsonify({'distance': summary[0]['total_distance']})
     return jsonify({'distance': 0})
 
 @api_bp.route('/api/dashboard/bulk-sync')
@@ -181,136 +153,64 @@ def api_dashboard_distance():
 def api_dashboard_bulk_sync():
     period = request.args.get('period', 'Today')
     device_uid = request.args.get('uid')
-    email = session.get('email')
     
-    cache_key = f"bulk_sync_{email}_{period}_{device_uid}"
-    cached = cache.get(cache_key)
-    if cached is not None: return jsonify(cached)
-
-    # 1. Fetch Traccar Host
-    host = full_traccar_host()
-    if not host: return jsonify({'error': 'no_host'}), 500
+    from services.report_service import get_period_dates
+    from services.native_report_service import native_report_service
+    start_dt, end_dt = get_period_dates(period)
     
-    # 2. Identify allowed vehicles
-    from auth.utils import get_filtered_vehicles
     allowed_vehicles = get_filtered_vehicles()
-    if not allowed_vehicles:
-        return jsonify({'devices': [], 'summaries': {}})
-    
-    allowed_uids = {str(v.get('unique_id')) for v in allowed_vehicles}
-    
-    # Filter by specific UID if requested
     if device_uid:
-        if device_uid not in allowed_uids:
-            return jsonify({'devices': [], 'summaries': {}})
-        allowed_uids = {device_uid}
+        allowed_vehicles = [v for v in allowed_vehicles if str(v.get('unique_id')) == str(device_uid)]
 
-    try:
-        # 3. Fetch all devices from Traccar (one call)
-        r_dev, _ = try_traccar_get("api/devices", timeout=10)
-        if r_dev.status_code != 200: return jsonify({'error': 'traccar_error'}), 500
+    # Fetch live status from Redis and aggregates from DB
+    devices = []
+    summaries = {}
+    
+    for v in allowed_vehicles:
+        imei = str(v.get('unique_id'))
+        live = telemetry_service.get_live_status(imei)
         
-        all_traccar_devices = r_dev.json()
-        my_devices = [d for d in all_traccar_devices if str(d.get('uniqueId')) in allowed_uids]
-        
-        if not my_devices:
-            return jsonify({'devices': [], 'summaries': {}})
-
-        # 4. Fetch positions for these devices in one call
-        # Fetching all positions is more reliable than passing a list of IDs which can be dropped by some servers/providers
-        device_ids = [d['id'] for d in my_devices]
-        pos_r, _ = try_traccar_get("api/positions", timeout=10)
-        pos_map = {}
-        if pos_r.status_code == 200:
-            for p in pos_r.json():
-                pos_map[p['deviceId']] = p
-        
-        for d in my_devices:
-            imei = str(d.get('uniqueId'))
-            local_status = telemetry_service.get_live_status(imei)
-            
-            if local_status:
-                d['status'] = 'online'
-                d['position'] = {
-                    "deviceId": d['id'],
-                    "latitude": local_status["latitude"],
-                    "longitude": local_status["longitude"],
-                    "speed": local_status["speed"],
-                    "course": local_status["angle"],
-                    "altitude": local_status["altitude"],
-                    "deviceTime": local_status["timestamp"],
-                    "attributes": {
-                        "sat": local_status["satellites"],
-                        "batteryLevel": int(local_status.get("bat_v", 0) * 10)
-                    }
+        device_data = {
+            "id": imei,
+            "uniqueId": imei,
+            "name": v.get('name'),
+            "status": live.get('status', 'offline') if live else 'offline',
+            "position": {
+                "latitude": live.get('latitude') if live else None,
+                "longitude": live.get('longitude') if live else None,
+                "speed": live.get('speed', 0) if live else 0,
+                "course": live.get('angle', 0) if live else 0,
+                "deviceTime": live.get('timestamp') if live else None,
+                "attributes": {
+                    "ignition": live.get('ignition', False) if live else False,
+                    "gsm": live.get('gsm', 0) if live else 0
                 }
-            else:
-                d['position'] = pos_map.get(d['id'])
-
-        # 5. Fetch distances for all devices in one call (or small batch)
-        # We need date range
-        from services.report_service import get_period_dates
-        import pytz
-        start_dt, end_dt = get_period_dates(period)
-        
-        # Correctly convert Oman time (from get_period_dates) to UTC for Traccar
-        tr_from = start_dt.astimezone(pytz.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
-        tr_to = end_dt.astimezone(pytz.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
-        
-        sum_r, _ = try_traccar_get("api/reports/summary", params={
-            "deviceId": device_ids,
-            "from": tr_from,
-            "to": tr_to
-        }, timeout=30)
-        
-        summary_map = {}
-        if sum_r.status_code == 200:
-            for s in sum_r.json():
-                dist_km = round(s.get('distance', 0) / 1000, 2)
-                engine_on_ms = s.get('engineHours', 0)
-                engine_on_h = engine_on_ms / 3600000
-                
-                avg_spd = (s.get('averageSpeed', 0) or 0) * 1.852 # kn to kmh
-                moving_h = 0
-                if avg_spd > 5:
-                    moving_h = dist_km / avg_spd
-                
-                if engine_on_h > 0:
-                    idle_h = max(0, engine_on_h - moving_h)
-                    fuel_liters = (dist_km / Config.MILEAGE_KM_PER_LITER) + (idle_h * Config.IDLE_FUEL_LPH)
-                else:
-                    fuel_liters = dist_km / Config.MILEAGE_KM_PER_LITER
-                
-                fuel_liters = round(fuel_liters, 2)
-                fuel_cost = round(fuel_liters * Config.FUEL_PRICE_OMR, 3)
-                
-                summary_map[s['deviceId']] = {
-                    'distance': dist_km,
-                    'engineHours': round(engine_on_h, 1),
-                    'fuelLiters': fuel_liters,
-                    'fuelCost': fuel_cost
-                }
-
-        result = {
-            'devices': my_devices,
-            'summaries': summary_map,
-            'period': period
+            } if live else None
         }
-        cache.set(cache_key, result, timeout=20)
-        return jsonify(result)
+        devices.append(device_data)
+        
+        # Summaries for cards
+        # In a real high-scale scenario, we'd batch this. For now, call the service.
+        summary_list = native_report_service.get_fleet_summary([v], start_dt, end_dt)
+        if summary_list:
+            s = summary_list[0]
+            summaries[imei] = {
+                'distance': s['total_distance'],
+                'engineHours': round(s['total_duration'] / 3600, 1),
+                'fuelLiters': s['fuel_liters'],
+                'fuelCost': round(s['fuel_liters'] * Config.FUEL_PRICE_OMR, 3)
+            }
 
-    except Exception as e:
-        import traceback
-        with open("api_errors.log", "a") as f:
-            f.write(f"Bulk Sync Exception: {str(e)}\n{traceback.format_exc()}\n")
-        current_app.logger.error(f"Bulk sync error: {e}")
-        return jsonify({'error': str(e)}), 500
+    return jsonify({
+        'devices': devices,
+        'summaries': summaries,
+        'period': period
+    })
 
 @api_bp.route('/api/reports/idle')
 @role_required('user')
 def api_idle_report():
-    from services.report_service import get_idle_events, get_period_dates
-    from services.traccar_service import full_traccar_host, get_traccar_session
+    from services.report_service import get_period_dates
     from pytz import utc
     
     uid = request.args.get('vehicle_id')
@@ -448,59 +348,33 @@ def api_report_route():
     from_p = request.args.get('from')
     to_p = request.args.get('to')
     
-    # Log parameters to app logger
-    current_app.logger.info(f"API Route Request: unique_id={unique_id}, from={from_p}, to={to_p}")
-
     if not unique_id or not from_p or not to_p:
         return jsonify({'error': 'Missing parameters'}), 400
 
     try:
-        # Resolve internal device ID
-        # Traccar api/devices with uniqueId returns a list [Device] or []
-        current_app.logger.info(f"Route API: Fetching device info for unique_id={unique_id}")
-        r_dev, _ = try_traccar_get("api/devices", params={"uniqueId": unique_id}, timeout=10)
+        from services.report_service import get_period_dates
+        from services.native_report_service import native_report_service
         
-        if r_dev.status_code != 200:
-            current_app.logger.error(f"Device fetch failed: status={r_dev.status_code}, body={r_dev.text[:500]}")
-            return jsonify({'error': f'Failed to resolve device (Status: {r_dev.status_code})', 'details': r_dev.text[:500]}), r_dev.status_code
-            
-        try:
-            devices = r_dev.json()
-        except Exception as je:
-            current_app.logger.error(f"Error parsing device JSON. Status: {r_dev.status_code}, Body: {r_dev.text[:500]}")
-            return jsonify({'error': 'Invalid JSON response from device API', 'details': r_dev.text[:500]}), 500
-
-        if not devices:
-            current_app.logger.error(f"Device not found for unique_id={unique_id}")
-            return jsonify({'error': 'Device not found in Traccar'}), 404
+        # Parse ISO strings to Oman datetime
+        start_dt = datetime.fromisoformat(from_p.replace('Z', '+00:00'))
+        end_dt = datetime.fromisoformat(to_p.replace('Z', '+00:00'))
         
-        internal_id = devices[0]['id']
-        current_app.logger.info(f"Resolved unique_id={unique_id} to internal_id={internal_id}")
+        records = native_report_service.get_playback_data(unique_id, start_dt, end_dt)
         
-        # Fetch route
-        current_app.logger.info(f"Route API: Fetching route for internal_id={internal_id} from {from_p} to {to_p}")
-        r_route, _ = try_traccar_get("api/reports/route", params={
-            "deviceId": internal_id,
-            "from": from_p,
-            "to": to_p
-        }, timeout=30, headers={'Accept': 'application/json'})
+        # Transform to Traccar-compatible format for the frontend JS
+        traccar_records = []
+        for r in records:
+            traccar_records.append({
+                "deviceId": r['imei'],
+                "fixTime": r['timestamp'].isoformat(),
+                "latitude": r['latitude'],
+                "longitude": r['longitude'],
+                "speed": r['speed'],
+                "course": r['angle'],
+                "attributes": json.loads(r['io_elements']) if isinstance(r['io_elements'], str) else r['io_elements']
+            })
         
-        if r_route.status_code == 200:
-            try:
-                return jsonify(r_route.json())
-            except Exception as je:
-                current_app.logger.error(f"Error parsing route JSON. Body starts with: {r_route.text[:500]}")
-                return jsonify({'error': 'Invalid JSON response from route API', 'details': r_route.text[:500]}), 500
-        else:
-            current_app.logger.error(f"Route fetch failed: status={r_route.status_code}, type={r_route.headers.get('Content-Type')}, body={r_route.text[:500]}")
-            return jsonify({
-                'error': 'Failed to fetch route from Traccar', 
-                'upstream_status': r_route.status_code, 
-                'upstream_body': r_route.text[:500]
-            }), r_route.status_code
+        return jsonify(traccar_records)
             
     except Exception as e:
-        import traceback
-        tb = traceback.format_exc()
-        current_app.logger.error(f"Route API Critical Exception: {e}\n{tb}")
         return jsonify({'error': str(e)}), 500
