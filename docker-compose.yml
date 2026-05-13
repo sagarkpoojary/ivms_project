@@ -14,16 +14,70 @@ services:
       - flask_cache:/app/.cache/flask_cache
 
   db:
-    image: postgres:15-alpine
+    image: timescale/timescaledb:latest-pg15
     environment:
       POSTGRES_DB: ${DB_NAME:-ivmsdb}
       POSTGRES_USER: ${DB_USER:-ivmsuser}
       POSTGRES_PASSWORD: ${DB_PASS:-ivms_secure_2026}
+    command: postgres -c shared_preload_libraries=timescaledb
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${DB_USER} -d $${DB_NAME}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: always
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: always
+
+  ingestion:
+    build:
+      context: .
+      dockerfile: Dockerfile.ingestion
+    ports:
+      - "5027:5027"
+      - "9090:9090"
+    env_file:
+      - .env
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - .:/app
+    restart: always
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - .:/app
+    restart: always
 
 volumes:
   postgres_data:
   flask_cache:
+  redis_data:

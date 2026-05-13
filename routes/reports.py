@@ -40,6 +40,16 @@ def report_combined():
 def report_idle():
     return render_report_logic('Idle')
 
+@reports_bp.route('/playback')
+@role_required('user')
+def playback_page():
+    return render_template('playback.html')
+
+@reports_bp.route('/analytics')
+@role_required('user')
+def analytics_page():
+    return render_template('analytics.html')
+
 @reports_bp.route('/api/reports/export')
 @role_required('user')
 def export_report():

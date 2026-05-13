@@ -9,6 +9,7 @@ from services.traccar_service import full_traccar_host, try_traccar_get
 from models.database import load_server_config, save_server_config
 from extensions import cache
 from config import Config, BASE_DIR
+from services.telemetry_service import telemetry_service
 
 api_bp = Blueprint('api', __name__)
 
@@ -66,41 +67,38 @@ def api_system_stats():
 @role_required('user')
 def devices_proxy():
     uid = request.args.get("uid")
+    from auth.utils import get_filtered_vehicles
+    from services.telemetry_service import telemetry_service
     
-    # Cache key for authorized devices list
-    email = session.get('email')
-    cache_key = f"devices_proxy_{email}_{uid}"
-    cached = cache.get(cache_key)
-    if cached is not None: return jsonify(cached)
-
-    try:
-        r, traccar_host = try_traccar_get("api/devices", timeout=10)
-        if r.status_code != 200: return jsonify({'error': 'bad_status'}), 500
+    v_list = get_filtered_vehicles()
+    if uid:
+        v_list = [v for v in v_list if str(v.get('unique_id')) == str(uid)]
+    
+    results = []
+    for v in v_list:
+        imei = str(v.get('unique_id'))
+        live = telemetry_service.get_live_status(imei)
         
-        devices = r.json()
-        v_list = get_filtered_vehicles()
-        allowed_uids = {str(v.get('unique_id')) for v in v_list}
-        devices = [d for d in devices if str(d.get("uniqueId")) in allowed_uids]
+        device_data = {
+            "id": imei,
+            "uniqueId": imei,
+            "name": v.get('name'),
+            "status": live.get('status', 'offline') if live else "offline",
+            "lastUpdate": live.get('timestamp') if live else "-",
+            "position": {
+                "latitude": live.get('latitude') if live else None,
+                "longitude": live.get('longitude') if live else None,
+                "speed": live.get('speed', 0) if live else 0,
+                "course": live.get('angle', 0) if live else 0,
+                "attributes": {
+                    "ignition": live.get('ignition', False) if live else False,
+                    "bat_v": live.get('bat_v', 0) if live else 0
+                }
+            } if live else None
+        }
+        results.append(device_data)
         
-        if uid: devices = [d for d in devices if str(d.get("uniqueId")) == str(uid)]
-        
-        device_ids = [d["id"] for d in devices if d.get("id")]
-        if device_ids:
-            try:
-                # Need to join IDs meticulously or pass as list params (requests handles list params as repeative keys)
-                # However, previous tests showed list params can be unreliable. fetching all positions is safer.
-                pos_r, _ = try_traccar_get("api/positions", timeout=10)
-                if pos_r.status_code == 200:
-                    pos_map = {p["deviceId"]: p for p in pos_r.json()}
-                    for d in devices:
-                        if d["id"] in pos_map:
-                            d["position"] = pos_map[d["id"]]
-            except Exception as e:
-                current_app.logger.error(f"Failed to fetch positions in proxy: {e}")
-        
-        cache.set(cache_key, devices, timeout=30) 
-        return jsonify(devices)
-    except Exception as e: return jsonify({'error': str(e)}), 500
+    return jsonify(results)
 
 @api_bp.route('/server-settings', methods=['GET', 'POST'])
 @role_required('main_admin')
@@ -228,19 +226,37 @@ def api_dashboard_bulk_sync():
                 pos_map[p['deviceId']] = p
         
         for d in my_devices:
-            d['position'] = pos_map.get(d['id'])
+            imei = str(d.get('uniqueId'))
+            local_status = telemetry_service.get_live_status(imei)
+            
+            if local_status:
+                d['status'] = 'online'
+                d['position'] = {
+                    "deviceId": d['id'],
+                    "latitude": local_status["latitude"],
+                    "longitude": local_status["longitude"],
+                    "speed": local_status["speed"],
+                    "course": local_status["angle"],
+                    "altitude": local_status["altitude"],
+                    "deviceTime": local_status["timestamp"],
+                    "attributes": {
+                        "sat": local_status["satellites"],
+                        "batteryLevel": int(local_status.get("bat_v", 0) * 10)
+                    }
+                }
+            else:
+                d['position'] = pos_map.get(d['id'])
 
         # 5. Fetch distances for all devices in one call (or small batch)
         # We need date range
         from services.report_service import get_period_dates
+        import pytz
         start_dt, end_dt = get_period_dates(period)
         
         # Correctly convert Oman time (from get_period_dates) to UTC for Traccar
         tr_from = start_dt.astimezone(pytz.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
         tr_to = end_dt.astimezone(pytz.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
         
-        # Note: Traccar reports/summary can take multiple deviceId parameters
-        # requests.get(..., params={'deviceId': [1,2,3]}) -> ?deviceId=1&deviceId=2&deviceId=3
         sum_r, _ = try_traccar_get("api/reports/summary", params={
             "deviceId": device_ids,
             "from": tr_from,
@@ -254,21 +270,15 @@ def api_dashboard_bulk_sync():
                 engine_on_ms = s.get('engineHours', 0)
                 engine_on_h = engine_on_ms / 3600000
                 
-                # estimate moving time from distance and avg speed
                 avg_spd = (s.get('averageSpeed', 0) or 0) * 1.852 # kn to kmh
                 moving_h = 0
-                if avg_spd > 5: # Only if moving at significant speed
+                if avg_spd > 5:
                     moving_h = dist_km / avg_spd
-                
-                # Idle time = Total Engine ON - Moving time
-                # If engineHours not available (0), fallback to distance-only fuel
-                # But if engineHours > 0, we can refine the fuel estimate
                 
                 if engine_on_h > 0:
                     idle_h = max(0, engine_on_h - moving_h)
                     fuel_liters = (dist_km / Config.MILEAGE_KM_PER_LITER) + (idle_h * Config.IDLE_FUEL_LPH)
                 else:
-                    # Fallback to pure distance-based if engineHours is 0
                     fuel_liters = dist_km / Config.MILEAGE_KM_PER_LITER
                 
                 fuel_liters = round(fuel_liters, 2)

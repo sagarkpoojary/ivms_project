@@ -1,0 +1,148 @@
+{% extends "base.html" %}
+
+{% block content %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h3 class="m-0"><i class="fas fa-history text-primary me-2"></i>Historical Playback</h3>
+</div>
+
+<div class="row">
+    <div class="col-md-3">
+        <div class="card p-3 shadow-sm border-0 mb-4">
+            <h6 class="fw-bold mb-3">Playback Filters</h6>
+            <div class="mb-3">
+                <label class="form-label small fw-bold">Select Vehicle</label>
+                <select id="vehicleSelect" class="form-select">
+                    <option value="">Loading vehicles...</option>
+                </select>
+            </div>
+            <div class="mb-3">
+                <label class="form-label small fw-bold">Start Time</label>
+                <input type="datetime-local" id="startTime" class="form-control">
+            </div>
+            <div class="mb-3">
+                <label class="form-label small fw-bold">End Time</label>
+                <input type="datetime-local" id="endTime" class="form-control">
+            </div>
+            <button id="loadHistory" class="btn btn-primary w-100 mt-2">
+                <i class="fas fa-play me-1"></i> Load History
+            </button>
+        </div>
+
+        <div class="card p-3 shadow-sm border-0" id="statsCard" style="display:none;">
+            <h6 class="fw-bold mb-3">Trip Stats</h6>
+            <div class="d-flex justify-content-between mb-2">
+                <span class="text-muted small">Points:</span>
+                <span id="statPoints" class="fw-bold">0</span>
+            </div>
+            <div class="d-flex justify-content-between mb-2">
+                <span class="text-muted small">Max Speed:</span>
+                <span id="statMaxSpeed" class="fw-bold">0 km/h</span>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-9">
+        <div class="card p-0 shadow-sm border-0 overflow-hidden" style="height: 600px;">
+            <div id="playbackMap" style="height: 100%; width: 100%;"></div>
+        </div>
+        <div class="mt-3 card p-2 shadow-sm border-0" id="timelineContainer" style="display:none;">
+            <input type="range" class="form-range" id="playbackRange" min="0" max="100" step="1" value="0">
+            <div class="d-flex justify-content-between small text-muted">
+                <span id="currentPointTime">00:00:00</span>
+                <span id="currentPointSpeed">0 km/h</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+    let map, pathLine, marker, historyData = [];
+
+    document.addEventListener('DOMContentLoaded', async () => {
+        initMap();
+        loadVehicles();
+        
+        // Default time: today
+        const now = new Date();
+        const start = new Date(now.setHours(0,0,0,0));
+        const end = new Date();
+        document.getElementById('startTime').value = start.toISOString().slice(0, 16);
+        document.getElementById('endTime').value = end.toISOString().slice(0, 16);
+
+        document.getElementById('loadHistory').addEventListener('click', loadHistory);
+        document.getElementById('playbackRange').addEventListener('input', updateMarkerPos);
+    });
+
+    function initMap() {
+        map = L.map('playbackMap').setView([23.5, 58.5], 6);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+        pathLine = L.polyline([], {color: '#0d63f8', weight: 4}).addTo(map);
+        marker = L.circleMarker([0,0], {radius: 8, color: '#fff', fillColor: '#ef4444', fillOpacity: 1, weight: 3}).addTo(map);
+    }
+
+    async function loadVehicles() {
+        const res = await fetch('/api/devices');
+        const data = await res.json();
+        const select = document.getElementById('vehicleSelect');
+        select.innerHTML = '<option value="">-- Choose Vehicle --</option>';
+        data.forEach(v => {
+            select.innerHTML += `<option value="${v.imei}">${v.name || v.imei}</option>`;
+        });
+    }
+
+    async function loadHistory() {
+        const imei = document.getElementById('vehicleSelect').value;
+        const start = document.getElementById('startTime').value;
+        const end = document.getElementById('endTime').value;
+        
+        if(!imei) return alert("Select a vehicle");
+
+        const btn = document.getElementById('loadHistory');
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Loading...';
+
+        try {
+            const res = await fetch(`/api/v2/reports/history/${imei}?start=${new Date(start).toISOString()}&end=${new Date(end).toISOString()}`);
+            historyData = await res.json();
+            
+            if(historyData.length === 0) {
+                alert("No history found for this period");
+                return;
+            }
+
+            const latlngs = historyData.map(p => [p.latitude, p.longitude]);
+            pathLine.setLatLngs(latlngs);
+            map.fitBounds(pathLine.getBounds());
+            
+            document.getElementById('playbackRange').max = historyData.length - 1;
+            document.getElementById('playbackRange').value = 0;
+            document.getElementById('timelineContainer').style.display = 'block';
+            document.getElementById('statsCard').style.display = 'block';
+            document.getElementById('statPoints').innerText = historyData.length;
+            document.getElementById('statMaxSpeed').innerText = Math.max(...historyData.map(p => p.speed)) + ' km/h';
+            
+            updateMarkerPos();
+        } catch(e) {
+            console.error(e);
+            alert("Error loading history");
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-play me-1"></i> Load History';
+        }
+    }
+
+    function updateMarkerPos() {
+        const idx = document.getElementById('playbackRange').value;
+        const point = historyData[idx];
+        if(!point) return;
+
+        marker.setLatLng([point.latitude, point.longitude]);
+        document.getElementById('currentPointTime').innerText = new Date(point.timestamp).toLocaleString();
+        document.getElementById('currentPointSpeed').innerText = Math.round(point.speed) + ' km/h';
+    }
+</script>
+{% endblock %}

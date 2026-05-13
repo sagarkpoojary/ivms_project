@@ -95,17 +95,7 @@ def register_vehicle():
         add_vehicle_db(new_vehicle)
         return render_template('vehicle_form.html', success="Vehicle submitted as DRAFT. Please contact Main Admin for approval and registration.", vehicles=get_filtered_vehicles(include_all=True), role=role)
 
-    # DIRECT REGISTRATION/SYNC for Main Admin / Super Admin (Requires Traccar Check)
-    from services.traccar_service import check_device_exists
-    traccar_device = check_device_exists(unique_id)
-    
-    if not traccar_device:
-        from config import Config
-        return render_template('vehicle_form.html', 
-                               error=f"Vehicle not found in Traccar server. For direct registration, please add it to Traccar ({Config.TRACCAR_IP}) first.", 
-                               vehicles=get_filtered_vehicles(include_all=True), 
-                               role=role)
-
+    # DIRECT REGISTRATION/SYNC for Main Admin / Super Admin (Bypasses Traccar)
     try:
         new_vehicle = {
             "name": name, 
@@ -114,12 +104,22 @@ def register_vehicle():
             "driver_name": driver_name,
             "parent_email": v_parent,
             "company_name": current_data.get('company_name'),
-            "status": "active"
+            "status": "active",
+            "created_at": str(datetime.now()),
+            "approval_date": str(datetime.now())
         }
         add_vehicle_db(new_vehicle)
-        return render_template('vehicle_form.html', success="Vehicle synced and registered successfully.", vehicles=get_filtered_vehicles(include_all=True), role=role)
+        
+        # Initialize vehicle status
+        from models.database import get_conn
+        conn = get_conn(); cur = conn.cursor()
+        cur.execute("INSERT INTO live_vehicle_status (imei, status, last_timestamp) VALUES (%s, %s, %s) ON CONFLICT (imei) DO NOTHING",
+                    (unique_id, 'offline', datetime.now()))
+        conn.commit(); cur.close(); conn.close()
+        
+        return render_template('vehicle_form.html', success="Vehicle registered successfully. Tracking will start as soon as the device connects.", vehicles=get_filtered_vehicles(include_all=True), role=role)
     except Exception as e:
-        return render_template('vehicle_form.html', error=f"Sync error: {str(e)}", vehicles=get_filtered_vehicles(include_all=True), role=role)
+        return render_template('vehicle_form.html', error=f"Registration error: {str(e)}", vehicles=get_filtered_vehicles(include_all=True), role=role)
 
 @vehicles_bp.route('/manage-drafts')
 @role_required('main_admin')
@@ -151,35 +151,18 @@ def approve_draft(unique_id):
         return redirect(url_for('vehicles.manage_drafts', error=limit_error))
 
     try:
-        from services.traccar_service import get_admin_traccar_session, full_traccar_host, ensure_admin_login, check_device_exists
-        traccar = full_traccar_host()
-        s = get_admin_traccar_session()
+        v['status'] = 'active'
+        v['approval_date'] = str(datetime.now())
+        update_vehicle_db(unique_id, v)
         
-        # Ensure we have a valid session (refreshes if needed)
-        if not ensure_admin_login(s):
-             return redirect(url_for('vehicles.manage_drafts', error="Traccar Admin Login Failed. Please check server logs."))
-
-        # 1. Check if device already exists in Traccar
-        existing_device = check_device_exists(v['unique_id'])
-        if existing_device:
-            v['status'] = 'active'
-            v['approval_date'] = str(datetime.now())
-            update_vehicle_db(unique_id, v)
-            return redirect(url_for('vehicles.manage_drafts', success=f"Vehicle {v['name']} found in Traccar. Approved/Synced successfully."))
-
-        # 2. If not found, Manual Registration in Traccar
-        payload = {"name": v['name'], "uniqueId": str(v['unique_id']), "model": v.get('device_model', '')}
-        r = s.post(f"{traccar}/api/devices", json=payload, timeout=10)
+        # Initialize vehicle status
+        from models.database import get_conn
+        conn = get_conn(); cur = conn.cursor()
+        cur.execute("INSERT INTO live_vehicle_status (imei, status, last_timestamp) VALUES (%s, %s, %s) ON CONFLICT (imei) DO NOTHING",
+                    (unique_id, 'offline', datetime.now()))
+        conn.commit(); cur.close(); conn.close()
         
-        if r.status_code in [200, 201] or "Unique index or primary key violation" in r.text or "unique index" in r.text.lower():
-            v['status'] = 'active'
-            v['approval_date'] = str(datetime.now())
-            update_vehicle_db(unique_id, v)
-            return redirect(url_for('vehicles.manage_drafts', success=f"Vehicle {v['name']} registered in Traccar and approved."))
-        else:
-            # Truncate error message to avoid 414 Request-URI Too Large
-            error_msg = r.text[:200] + "..." if len(r.text) > 200 else r.text
-            return redirect(url_for('vehicles.manage_drafts', error=f"Traccar registration failed: {error_msg}"))
+        return redirect(url_for('vehicles.manage_drafts', success=f"Vehicle {v['name']} approved and registered successfully."))
     except Exception as e:
         error_msg = str(e)[:200] + "..." if len(str(e)) > 200 else str(e)
         return redirect(url_for('vehicles.manage_drafts', error=f"Approval error: {error_msg}"))

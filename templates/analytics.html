@@ -1,0 +1,150 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h3 class="m-0"><i class="fas fa-chart-line text-primary me-2"></i>Enterprise Analytics</h3>
+</div>
+
+<div class="row mb-4">
+    <div class="col-md-12">
+        <div class="card p-3 shadow-sm border-0">
+            <div class="row g-2">
+                <div class="col-md-3">
+                    <label class="form-label small fw-bold">Vehicle</label>
+                    <select id="vehicleSelect" class="form-select"></select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label small fw-bold">Start Date</label>
+                    <input type="date" id="startDate" class="form-control">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label small fw-bold">End Date</label>
+                    <input type="date" id="endDate" class="form-control">
+                </div>
+                <div class="col-md-3 d-flex align-items-end">
+                    <button id="fetchAnalytics" class="btn btn-primary w-100">Generate Report</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card shadow-sm border-0 mb-4">
+            <div class="card-header bg-white py-3">
+                <h6 class="m-0 fw-bold"><i class="fas fa-route text-primary me-2"></i>Trip Summary</h6>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Start Time</th>
+                            <th>End Time</th>
+                            <th>Duration</th>
+                            <th>Distance</th>
+                            <th>Max Speed</th>
+                            <th>Driver</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tripsBody">
+                        <tr><td colspan="6" class="text-center py-4 text-muted">Select filters to view trips</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card shadow-sm border-0">
+            <div class="card-header bg-white py-3">
+                <h6 class="m-0 fw-bold"><i class="fas fa-exclamation-triangle text-danger me-2"></i>Violation Alerts</h6>
+            </div>
+            <div class="p-0">
+                <ul class="list-group list-group-flush" id="eventsList">
+                    <li class="list-group-item text-center py-4 text-muted">No events to show</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        loadVehicles();
+        const today = new Date().toISOString().split('T')[0];
+        document.getElementById('startDate').value = today;
+        document.getElementById('endDate').value = today;
+        document.getElementById('fetchAnalytics').addEventListener('click', fetchReport);
+    });
+
+    async function loadVehicles() {
+        const res = await fetch('/api/devices');
+        const data = await res.json();
+        const select = document.getElementById('vehicleSelect');
+        data.forEach(v => {
+            select.innerHTML += `<option value="${v.imei}">${v.name || v.imei}</option>`;
+        });
+    }
+
+    async function fetchReport() {
+        const imei = document.getElementById('vehicleSelect').value;
+        const start = document.getElementById('startDate').value;
+        const end = document.getElementById('endDate').value;
+        
+        if(!imei) return;
+
+        // Fetch Trips
+        const tripsRes = await fetch(`/api/v2/reports/trips/${imei}?start=${start}T00:00:00Z&end=${end}T23:59:59Z`);
+        const trips = await tripsRes.json();
+        const tripsBody = document.getElementById('tripsBody');
+        tripsBody.innerHTML = '';
+        
+        if(trips.length === 0) {
+            tripsBody.innerHTML = '<tr><td colspan="6" class="text-center py-4 text-muted">No trips found</td></tr>';
+        } else {
+            trips.forEach(t => {
+                const startT = new Date(t.start_time);
+                const endT = t.end_time ? new Date(t.end_time) : null;
+                const duration = endT ? Math.round((endT - startT) / 60000) + ' min' : 'Ongoing';
+                
+                tripsBody.innerHTML += `
+                    <tr>
+                        <td>${startT.toLocaleString()}</td>
+                        <td>${endT ? endT.toLocaleString() : '-'}</td>
+                        <td>${duration}</td>
+                        <td>${t.distance_km.toFixed(2)} km</td>
+                        <td>${t.max_speed} km/h</td>
+                        <td><span class="badge bg-light text-dark">${t.driver_id || 'Unknown'}</span></td>
+                    </tr>
+                `;
+            });
+        }
+
+        // Fetch Events
+        const eventsRes = await fetch(`/api/v2/reports/events/${imei}`);
+        const events = await eventsRes.json();
+        const eventsList = document.getElementById('eventsList');
+        eventsList.innerHTML = '';
+
+        if(events.length === 0) {
+            eventsList.innerHTML = '<li class="list-group-item text-center py-4 text-muted">No events recorded</li>';
+        } else {
+            events.forEach(e => {
+                const color = e.event_type === 'overspeed' ? 'danger' : 'primary';
+                eventsList.innerHTML += `
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        <div>
+                            <div class="fw-bold text-${color}">${e.event_type.replace('_', ' ').toUpperCase()}</div>
+                            <div class="small text-muted">${new Date(e.timestamp).toLocaleString()}</div>
+                        </div>
+                        <span class="badge bg-${color}">${e.value ? e.value + ' km/h' : '!!'}</span>
+                    </li>
+                `;
+            });
+        }
+    }
+</script>
+{% endblock %}

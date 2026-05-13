@@ -138,37 +138,31 @@
           <th>Actions</th>
         </tr>
       </thead>
-      <tbody>
+      <tbody id="devicesBody">
         {% for v in vehicles %}
-        <tr>
+        <tr id="row-{{ v.unique_id }}">
           <td>{{ loop.index }}</td>
-          <td>{{ v.name }}</td>
-          <td>{{ v.device_model }}</td>
+          <td><strong>{{ v.name }}</strong></td>
+          <td>{{ v.device_model or '-' }}</td>
           <td>{{ v.unique_id }}</td>
           <td>{{ v.driver_name or '-' }}</td>
           <td>
-            {% if v.status == 'active' %}
-            <span class="badge bg-success">Approved / Active</span>
-            {% elif v.status == 'draft' %}
-            <span class="badge bg-warning text-dark">Pending Approval</span>
-            {% elif v.status == 'declined' %}
-            <span class="badge bg-danger" title="{{ v.rejection_reason or 'No reason provided' }}">Declined</span>
-            {% if v.rejection_reason %}
-            <div class="x-small text-danger mt-1" style="font-size: 0.75rem;">Reason: {{ v.rejection_reason }}</div>
-            {% endif %}
-            {% else %}
-            <span class="badge bg-secondary">{{ v.status }}</span>
-            {% endif %}
+            <span id="status-{{ v.unique_id }}" class="badge {% if v.status == 'active' %}bg-success{% elif v.status == 'draft' %}bg-warning text-dark{% elif v.status == 'declined' %}bg-danger{% else %}bg-secondary{% endif %}">
+              {% if v.status == 'active' %}Approved / Active{% elif v.status == 'draft' %}Pending Approval{% else %}{{ v.status }}{% endif %}
+            </span>
+            <span id="ign-{{ v.unique_id }}" class="ms-1" style="display:none;"><i class="fas fa-bolt text-warning" title="Ignition ON"></i></span>
           </td>
           <td>
-            {% if v.status == 'active' %}
-            <button class="btn btn-sm btn-info text-white me-1"
-              onclick="openEditModal('{{ v.unique_id|escape }}', '{{ (v.name or "")|escape }}', '{{ (v.device_model or "")|escape }}', '{{ (v.driver_name or "")|escape }}')">
-              Edit
-            </button>
-            {% endif %}
-            <a href="/vehicle/delete/{{ v.unique_id }}" class="btn btn-sm btn-danger"
-              onclick="return confirm('Are you sure?')">Delete</a>
+            <div class="d-flex align-items-center">
+              {% if v.status == 'active' %}
+              <button class="btn btn-sm btn-outline-info me-1"
+                onclick="openEditModal('{{ v.unique_id|escape }}', '{{ (v.name or "")|escape }}', '{{ (v.device_model or "")|escape }}', '{{ (v.driver_name or "")|escape }}')">
+                <i class="fas fa-edit"></i>
+              </button>
+              {% endif %}
+              <a href="/vehicle/delete/{{ v.unique_id }}" class="btn btn-sm btn-outline-danger"
+                onclick="return confirm('Are you sure?')"><i class="fas fa-trash"></i></a>
+            </div>
           </td>
         </tr>
         {% else %}
@@ -225,8 +219,8 @@
   function openEditModal(uid, name, model, driver) {
     document.getElementById('edit_unique_id').value = uid;
     document.getElementById('edit_name').value = name;
-    document.getElementById('edit_device_model').value = (model == 'None' || !model) ? '' : model;
-    document.getElementById('edit_driver_name').value = (driver == 'None' || !driver) ? '' : driver;
+    document.getElementById('edit_device_model').value = (model == 'None' || !model || model == 'undefined') ? '' : model;
+    document.getElementById('edit_driver_name').value = (driver == 'None' || !driver || driver == 'undefined') ? '' : driver;
 
     // Set form action
     document.getElementById('editVehicleForm').action = "/vehicle/update/" + uid;
@@ -234,6 +228,34 @@
     var myModal = new bootstrap.Modal(document.getElementById('editVehicleModal'));
     myModal.show();
   }
+
+  // Real-time Status Updates via WebSocket
+  (function() {
+    const wsUrl = `ws://${window.location.hostname}:8000/ws/live`;
+    let socket;
+
+    function connect() {
+        socket = new WebSocket(wsUrl);
+        socket.onmessage = (event) => {
+            try {
+                const data = JSON.parse(event.data);
+                const imei = data.imei;
+                const statusBadge = document.getElementById(`status-${imei}`);
+                const ignIcon = document.getElementById(`ign-${imei}`);
+
+                if (statusBadge) {
+                    statusBadge.className = "badge bg-success";
+                    statusBadge.innerText = data.speed > 0 ? `moving (${data.speed} km/h)` : "online";
+                }
+                if (ignIcon) {
+                    ignIcon.style.display = data.ignition ? "inline" : "none";
+                }
+            } catch (e) { console.error("WS Parse Error:", e); }
+        };
+        socket.onclose = () => setTimeout(connect, 5000);
+    }
+    connect();
+  })();
 </script>
 
 {% endblock %}

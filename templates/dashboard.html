@@ -223,5 +223,37 @@
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="/static/js/dashboard.js?v=fix_ignition_fallback"></script>
+<script>
+    // Real-time WebSocket Integration for Direct Teltonika Ingestion
+    (function() {
+        const wsUrl = `ws://${window.location.hostname}:8000/ws/live`;
+        let ws;
+
+        function connect() {
+            console.log("Connecting to Live Telemetry Stream...");
+            ws = new WebSocket(wsUrl);
+            ws.onmessage = function(event) {
+                try {
+                    const data = JSON.parse(event.data);
+                    if (window.updateSingleVehicleLive) {
+                        window.updateSingleVehicleLive(data);
+                    }
+                } catch (e) {
+                    console.error("WS Message Error:", e);
+                }
+            };
+            ws.onclose = function() {
+                console.log("Live stream closed. Reconnecting in 5s...");
+                setTimeout(connect, 5000);
+            };
+            ws.onerror = function(err) {
+                console.error("WS Connection Error:", err);
+            };
+        }
+        
+        // Wait for dashboard to initialize
+        setTimeout(connect, 2000);
+    })();
+</script>
 
 {% endblock %}

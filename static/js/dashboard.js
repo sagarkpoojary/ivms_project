@@ -820,6 +820,40 @@
         autoTimer = setInterval(refreshAll, REFRESH_MS);
     };
 
+    // Expose for WebSocket integration
+    window.updateSingleVehicleLive = (data) => {
+        // data format: {imei, latitude, longitude, speed, ...}
+        const imei = String(data.imei);
+        let found = false;
+        
+        // Update the 'latest' array which is used for rendering
+        latest.forEach(d => {
+            if (String(d.registered.unique_id) === imei) {
+                d.device.status = 'online';
+                d.device.position = {
+                    deviceId: d.device.id,
+                    latitude: data.latitude,
+                    longitude: data.longitude,
+                    speed: data.speed,
+                    course: data.angle,
+                    altitude: data.altitude,
+                    deviceTime: data.timestamp,
+                    attributes: {
+                        sat: data.satellites,
+                        batteryLevel: parseInt(data.bat_v * 10)
+                    }
+                };
+                found = true;
+            }
+        });
+
+        if (found) {
+            updateCounts(latest);
+            updateBigChart(latest);
+            updateMap(latest);
+        }
+    };
+
     // ------------------------
     // INIT
     // ------------------------

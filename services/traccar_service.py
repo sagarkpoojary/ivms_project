@@ -150,14 +150,23 @@ def try_traccar_get(endpoint, params=None, timeout=10, headers=None, _retry=True
     except (requests.exceptions.RequestException, ConnectionResetError) as e:
         # Connection reset — clear cookies and retry once with fresh login
         if _retry:
-            import os
-            cookie_path = os.path.join(BASE_DIR, 'cookies.txt')
-            try: os.remove(cookie_path)
+            try:
+                import os
+                cookie_path = os.path.join(BASE_DIR, 'cookies.txt')
+                if os.path.exists(cookie_path):
+                    os.remove(cookie_path)
             except: pass
             s2 = requests.Session()
-            if ensure_admin_login(s2):
-                return try_traccar_get(endpoint, params=params, timeout=timeout, headers=headers, _retry=False)
-        raise Exception(f"Traccar unreachable: {e}")
+            try:
+                if ensure_admin_login(s2):
+                    return try_traccar_get(endpoint, params=params, timeout=timeout, headers=headers, _retry=False)
+            except: pass
+        
+        # Instead of raising, return a mock 503 response or empty list
+        mock_r = requests.Response()
+        mock_r.status_code = 503
+        mock_r._content = b'{"error": "Traccar unreachable"}'
+        return mock_r, host
 
     if r.status_code == 401:
         # Session expired — re-login and retry once
