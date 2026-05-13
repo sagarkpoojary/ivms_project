@@ -29,11 +29,18 @@ class NativeReportService:
         conn = get_conn()
         cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         try:
-            cur.execute("""
-                SELECT * FROM analytics_events 
-                WHERE imei = %s AND event_type = %s AND timestamp BETWEEN %s AND %s
-                ORDER BY timestamp ASC
-            """, (str(imei), event_type, start_dt, end_dt))
+            if event_type == 'all':
+                cur.execute("""
+                    SELECT * FROM analytics_events 
+                    WHERE (imei = %s OR %s IS NULL) AND timestamp BETWEEN %s AND %s
+                    ORDER BY timestamp DESC LIMIT 100
+                """, (str(imei) if imei else None, imei, start_dt, end_dt))
+            else:
+                cur.execute("""
+                    SELECT * FROM analytics_events 
+                    WHERE imei = %s AND event_type = %s AND timestamp BETWEEN %s AND %s
+                    ORDER BY timestamp ASC
+                """, (str(imei), event_type, start_dt, end_dt))
             events = cur.fetchall()
             return [dict(e) for e in events]
         finally:
@@ -101,12 +108,12 @@ class NativeReportService:
                 results.append({
                     "name": v.get('name'),
                     "unique_id": imei,
-                    "total_distance": round(summary['total_distance'] or 0, 2),
+                    "total_distance": round((summary['total_distance'] or 0), 2),
                     "total_duration": int(summary['total_duration'] or 0),
-                    "max_speed": round(summary['max_speed'] or 0, 2),
-                    "average_speed": round(summary['avg_speed'] or 0, 2),
+                    "max_speed": round((summary['max_speed'] or 0), 2),
+                    "average_speed": round((summary['avg_speed'] or 0), 2),
                     "idle_duration": int((idle['total_idle_sec'] or 0) * 1000), # to ms
-                    "fuel_liters": round(summary['total_fuel'] or 0, 2),
+                    "fuel_liters": round((summary['total_fuel'] or 0), 2),
                     "status": "active"
                 })
             return results

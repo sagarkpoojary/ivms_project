@@ -3,7 +3,6 @@ from datetime import datetime
 from flask import Blueprint, render_template, request, redirect, url_for, session
 from auth.utils import role_required, get_filtered_vehicles, get_current_user_data
 from models.database import load_vehicles, add_vehicle_db, delete_vehicle_db, update_vehicle_db
-from services.traccar_service import try_traccar_get
 from services.limit_validator import validate_vehicle_registration_limit, validate_draft_approval_limit, get_usage_stats
 
 vehicles_bp = Blueprint('vehicles', __name__)

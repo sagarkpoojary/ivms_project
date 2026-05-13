@@ -1,12 +1,9 @@
 import io
 import csv
 from datetime import datetime
-import pytz
-from services.time_service import get_oman_now
 from flask import Blueprint, render_template, request, session, make_response
 from auth.utils import role_required, get_filtered_vehicles
-from services.report_service import render_report_logic, get_period_dates, fetch_cached_summaries
-from services.traccar_service import full_traccar_host, get_traccar_session
+from services.report_service import render_report_logic, get_period_dates
 
 reports_bp = Blueprint('reports', __name__)
 
@@ -50,14 +47,13 @@ def playback_page():
 def analytics_page():
     return render_template('analytics.html')
 
-@reports@api_bp.route('/api/reports/export')
+@reports_bp.route('/api/reports/export')
 @role_required('user')
 def export_report():
     period = request.args.get('period', 'Today')
     report_type = request.args.get('report_type', 'Trips')
     filter_uid = request.args.get('unique_id')
     
-    from services.report_service import get_period_dates
     from services.native_report_service import native_report_service
     start_dt, end_dt = get_period_dates(period, request.args.get('from'), request.args.get('to'))
 
@@ -97,11 +93,6 @@ def export_report():
                 round(s['idle_duration'] / 60000, 1),
                 s['fuel_liters']
             ])
-
-    output = make_response(si.getvalue())
-    output.headers["Content-Disposition"] = f"attachment; filename=report_{report_type.lower()}_{datetime.now().strftime('%Y%m%d')}.csv"
-    output.headers["Content-type"] = "text/csv"
-    return output
 
     output = make_response(si.getvalue())
     output.headers["Content-Disposition"] = f"attachment; filename=report_{report_type.lower()}_{datetime.now().strftime('%Y%m%d')}.csv"

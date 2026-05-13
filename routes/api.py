@@ -1,4 +1,5 @@
 import os
+import json
 import requests
 from datetime import datetime, timedelta
 import pytz
@@ -12,21 +13,31 @@ from services.telemetry_service import telemetry_service
 
 api_bp = Blueprint('api', __name__)
 
+def json_serial(obj):
+    """JSON serializer for objects not serializable by default json code"""
+    if isinstance(obj, (datetime, timedelta)):
+        return obj.isoformat()
+    raise TypeError ("Type %s not serializable" % type(obj))
+
+def safe_jsonify(data):
+    return current_app.response_class(
+        json.dumps(data, default=json_serial),
+        mimetype='application/json'
+    )
+
 @api_bp.route("/api/events")
 def proxy_events():
     if not session.get("logged_in"): return jsonify([]), 401
     try:
-        now = get_oman_now()
-        start = now - timedelta(hours=24)
-        # Traccar expects UTC
-        params = {
-            "from": start.astimezone(pytz.utc).strftime('%Y-%m-%dT%H:%M:%SZ'),
-            "to": now.astimezone(pytz.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
-        }
-        r, _ = try_traccar_get("api/events", params=params, timeout=10)
-        return jsonify(r.json()), 200
+        from services.report_service import get_period_dates
+        from services.native_report_service import native_report_service
+        start_dt, end_dt = get_period_dates('Today')
+        
+        # Native events
+        events = native_report_service.get_analytics_events(None, 'all', start_dt, end_dt)
+        return safe_jsonify(events)
     except Exception as e:
-        return jsonify({"error": str(e)}), 502
+        return jsonify([]), 200 # Return empty instead of 500 for UI stability
 
 @api_bp.route("/api/alerts")
 def api_alerts():
@@ -38,9 +49,10 @@ def api_alerts():
         
         # Fetch overspeed events from native analytics
         events = native_report_service.get_analytics_events(None, 'overspeed', start_dt, end_dt)
-        return jsonify(events)
+        if not isinstance(events, list): return jsonify([])
+        return safe_jsonify(events)
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return jsonify([])
 
 @api_bp.route("/api/system-stats")
 @role_required('user')
@@ -201,7 +213,7 @@ def api_dashboard_bulk_sync():
                 'fuelCost': round(s['fuel_liters'] * Config.FUEL_PRICE_OMR, 3)
             }
 
-    return jsonify({
+    return safe_jsonify({
         'devices': devices,
         'summaries': summaries,
         'period': period
@@ -230,31 +242,28 @@ def api_idle_report():
     if uid:
         vehicles = [v for v in vehicles if str(v.get('unique_id')) == str(uid)]
     
-    s = get_traccar_session()
-    traccar = full_traccar_host()
-    
-    device_map = {}
-    try:
-        r_dev = s.get(f"{traccar}/api/devices", timeout=10)
-        if r_dev.status_code == 200:
-            for d in r_dev.json():
-                device_map[str(d.get("uniqueId"))] = d.get("id")
-    except: pass
-
     results = []
-    for v in vehicles:
-        iid = device_map.get(str(v.get('unique_id')))
-        if iid:
-            res = get_idle_events(v, traccar_from, traccar_to, min_idle, traccar, s, internal_id=iid)
-            results.append({
-                'vehicle_id': v.get('unique_id'),
-                'vehicle_name': v.get('name'),
-                'total_idle_time': res.get('summary', {}).get('total_idle_time', 0),
-                'total_idle_events': res.get('summary', {}).get('total_idle_events', 0),
-                'idle_events': res.get('events', [])
-            })
     
-    return jsonify(results)
+    try:
+        from services.native_report_service import native_report_service
+        from services.report_service import get_period_dates
+        
+        start_dt, end_dt = get_period_dates('Custom', from_date, to_date)
+        
+        # Native Idle
+        events = native_report_service.get_analytics_events(uid, 'idle', start_dt, end_dt)
+        
+        results.append({
+            'vehicle_id': uid,
+            'vehicle_name': uid, # Fallback
+            'total_idle_time': sum(e['value'] for e in events),
+            'total_idle_events': len(events),
+            'idle_events': events
+        })
+    except Exception as e:
+        current_app.logger.exception("Idle Report Error")
+    
+    return safe_jsonify(results)
 
 @api_bp.route('/api/dashboard/combined-report')
 @role_required('user')
@@ -268,37 +277,22 @@ def api_combined_report():
     result = {'trips': [], 'events': [], 'stops': []}
     
     try:
-        # Fetch trips
-        trips_r, _ = try_traccar_get("api/reports/trips", params={"deviceId": device_id, "from": from_p, "to": to_p}, timeout=15)
-        if trips_r.status_code == 200:
-            result['trips'] = trips_r.json()
+        from services.native_report_service import native_report_service
+        from services.report_service import get_period_dates
         
-        # Fetch events with position data
-        events_r, _ = try_traccar_get("api/reports/events", params={"deviceId": device_id, "from": from_p, "to": to_p}, timeout=15)
-        if events_r.status_code == 200:
-            events = events_r.json()
-            # Fetch positions for each event to get address
-            for event in events:
-                if event.get('positionId'):
-                    try:
-                        pos_r, _ = try_traccar_get(f"api/positions", params={"id": event['positionId']}, timeout=5)
-                        if pos_r.status_code == 200:
-                            positions = pos_r.json()
-                            if positions:
-                                event['position'] = positions[0]
-                    except:
-                        pass
-            result['events'] = events
+        start_dt = datetime.fromisoformat(from_p.replace('Z', '+00:00'))
+        end_dt = datetime.fromisoformat(to_p.replace('Z', '+00:00'))
         
-        # Fetch stops
-        stops_r, _ = try_traccar_get("api/reports/stops", params={"deviceId": device_id, "from": from_p, "to": to_p}, timeout=15)
-        if stops_r.status_code == 200:
-            result['stops'] = stops_r.json()
-            
-        return jsonify(result)
+        # Fetch data natively
+        result['trips'] = native_report_service.get_trip_report(device_id, start_dt, end_dt)
+        result['events'] = native_report_service.get_analytics_events(device_id, 'all', start_dt, end_dt)
+        # Stops are approximated as idle events for now
+        result['stops'] = native_report_service.get_analytics_events(device_id, 'idle', start_dt, end_dt)
+        
+        return safe_jsonify(result)
     except Exception as e:
-        current_app.logger.error(f"Combined report error: {e}")
-        return jsonify({'trips': [], 'events': [], 'stops': [], 'error': str(e)})
+        current_app.logger.exception("Combined Report Error")
+        return safe_jsonify({'trips': [], 'events': [], 'stops': [], 'error': str(e)})
 
 @api_bp.route('/api/debug/device/<uid>')
 @role_required('admin')
@@ -317,29 +311,30 @@ def debug_device(uid):
     return jsonify(result)
 
 
-@api_bp.route('/api/debug/traccar')
-@role_required('admin')
-def debug_traccar():
-    """Return Traccar host, credentials presence and a session check for debugging."""
-    cfg = load_server_config()
-    tr = full_traccar_host()
-    email = cfg.get('admin_email') or None
-    has_creds = bool(email or ("TRACCAR_ADMIN_EMAIL" in (os.environ if 'os' in globals() else {})))
-
-    result = {'traccar_host': tr, 'has_master_credentials': has_creds, 'session_ok': False, 'detail': None}
-    if not tr:
-        result['detail'] = 'No active Traccar host configured (active_ip)'
-        return jsonify(result), 200
-
+@api_bp.route('/api/v2/reports/history/<imei>')
+@role_required('user')
+def api_history_report(imei):
+    start = request.args.get('start')
+    end = request.args.get('end')
+    if not start or not end:
+        return jsonify({'error': 'Missing range'}), 400
+    
     try:
-        from services.traccar_service import get_traccar_session, ensure_admin_login
-        s = get_traccar_session()
-        ok = ensure_admin_login(s)
-        result['session_ok'] = bool(ok)
+        from services.native_report_service import native_report_service
+        start_dt = datetime.fromisoformat(start.replace('Z', '+00:00'))
+        end_dt = datetime.fromisoformat(end.replace('Z', '+00:00'))
+        
+        # Native playback data
+        records = native_report_service.get_playback_data(imei, start_dt, end_dt, limit=2000)
+        
+        return safe_jsonify([{
+            'latitude': r['latitude'],
+            'longitude': r['longitude'],
+            'speed': r['speed'],
+            'timestamp': r['timestamp']
+        } for r in records])
     except Exception as e:
-        result['detail'] = str(e)
-
-    return jsonify(result)
+        return jsonify({'error': str(e)}), 500
 
 @api_bp.route('/api/reports/route')
 @role_required('user')
@@ -366,7 +361,7 @@ def api_report_route():
         for r in records:
             traccar_records.append({
                 "deviceId": r['imei'],
-                "fixTime": r['timestamp'].isoformat(),
+                "fixTime": r['timestamp'],
                 "latitude": r['latitude'],
                 "longitude": r['longitude'],
                 "speed": r['speed'],
@@ -374,7 +369,7 @@ def api_report_route():
                 "attributes": json.loads(r['io_elements']) if isinstance(r['io_elements'], str) else r['io_elements']
             })
         
-        return jsonify(traccar_records)
+        return safe_jsonify(traccar_records)
             
     except Exception as e:
         return jsonify({'error': str(e)}), 500
