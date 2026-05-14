@@ -12,10 +12,13 @@ RUN pip install --no-cache-dir -r requirements.ingestion.txt
 
 COPY api/ ./api/
 COPY core/ ./core/
+COPY services/ ./services/
+COPY models/ ./models/
+COPY auth/ ./auth/
 COPY static/ ./static/
 COPY config.py .
 COPY .env .
 
 EXPOSE 8000
 
-CMD ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "4", "--proxy-headers", "--forwarded-allow-ips", "*"]

@@ -6,7 +6,7 @@ from typing import Optional
 from core.commands import CommandEngine
 from core.cache import LiveCache
 
-router = APIRouter(prefix="/api/v2/commands", tags=["Commands"])
+router = APIRouter()
 cache = LiveCache()
 
 DB_URL = f"postgresql://{os.getenv('DB_USER')}:{os.getenv('DB_PASS')}@{os.getenv('DB_HOST')}:{os.getenv('DB_PORT')}/{os.getenv('DB_NAME')}"

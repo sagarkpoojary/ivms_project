@@ -30,4 +30,4 @@ ENV FLASK_APP=app.py
 ENV FLASK_PORT=5000
 
 # Start the application using Gunicorn for production readiness
-CMD ["gunicorn", "--bind", "0.0.0.0:5000", "app:app"]
+CMD ["gunicorn", "--bind", "0.0.0.0:5000", "app:app", "--workers", "4", "--threads", "2", "--timeout", "120"]

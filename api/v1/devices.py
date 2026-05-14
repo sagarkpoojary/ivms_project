@@ -4,7 +4,7 @@ import os
 from typing import List, Optional
 from pydantic import BaseModel
 
-router = APIRouter(prefix="/api/v1/devices", tags=["Devices"])
+router = APIRouter()
 
 DB_URL = f"postgresql://{os.getenv('DB_USER')}:{os.getenv('DB_PASS')}@{os.getenv('DB_HOST')}:{os.getenv('DB_PORT')}/{os.getenv('DB_NAME')}"
 
@@ -21,7 +21,7 @@ async def get_db():
     finally:
         await conn.close()
 
-@router.get("/")
+@router.get("")
 async def list_devices(db = Depends(get_db)):
     # Join with live_vehicle_status to get current position and status
     rows = await db.fetch("""

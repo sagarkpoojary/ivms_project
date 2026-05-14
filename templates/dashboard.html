@@ -226,7 +226,8 @@
 <script>
     // Real-time WebSocket Integration for Direct Teltonika Ingestion
     (function() {
-        const wsUrl = `ws://${window.location.hostname}:8000/ws/live`;
+        const protocol = window.location.protocol === "https:" ? "wss" : "ws";
+        const wsUrl = `${protocol}://${window.location.host}/ws/live`;
         let ws;
 
         function connect() {

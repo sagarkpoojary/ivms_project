@@ -16,9 +16,38 @@ load_dotenv()
 app = FastAPI(title="Enterprise IVMS API", version="2.0")
 cache = LiveCache()
 
-app.include_router(devices.router)
-app.include_router(commands.router)
-app.include_router(reports.router)
+# Unify API paths to match dashboard expectations
+app.include_router(devices.router, prefix="/api/devices", tags=["Devices"])
+app.include_router(commands.router, prefix="/api/commands", tags=["Commands"])
+app.include_router(reports.router, prefix="/api/reports", tags=["Reports"])
+
+@app.get("/api/alerts")
+async def get_alerts():
+    """Returns live overspeed alerts for today."""
+    try:
+        from services.report_service import get_period_dates
+        from services.native_report_service import native_report_service
+        start_dt, end_dt = get_period_dates('Today')
+        events = native_report_service.get_analytics_events(None, 'overspeed', start_dt, end_dt)
+        return events
+    except Exception as e:
+        return []
+
+@app.get("/api/events")
+async def get_events():
+    """Returns all analytics events for today."""
+    try:
+        from services.report_service import get_period_dates
+        from services.native_report_service import native_report_service
+        start_dt, end_dt = get_period_dates('Today')
+        events = native_report_service.get_analytics_events(None, 'all', start_dt, end_dt)
+        return events
+    except Exception as e:
+        return []
+
+# Versioned aliases for compatibility
+app.include_router(devices.router, prefix="/api/v1/devices", include_in_schema=False)
+app.include_router(reports.router, prefix="/api/v2/reports", include_in_schema=False)
 
 app.add_middleware(
     CORSMiddleware,

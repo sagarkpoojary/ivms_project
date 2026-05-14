@@ -231,7 +231,8 @@
 
   // Real-time Status Updates via WebSocket
   (function() {
-    const wsUrl = `ws://${window.location.hostname}:8000/ws/live`;
+    const protocol = window.location.protocol === "https:" ? "wss" : "ws";
+    const wsUrl = `${protocol}://${window.location.host}/ws/live`;
     let socket;
 
     function connect() {
