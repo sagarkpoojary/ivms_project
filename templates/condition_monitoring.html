@@ -1,0 +1,144 @@
+{% extends "base.html" %}
+
+{% block content %}
+<style>
+    .condition-card {
+        border: none;
+        border-radius: 20px;
+        background: #fff;
+        padding: 25px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.03);
+        transition: all 0.3s;
+    }
+    .condition-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 10px 25px rgba(0,0,0,0.05) !important;
+    }
+    .gauge-container {
+        position: relative;
+        height: 120px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    .gauge-value {
+        position: absolute;
+        font-size: 1.5rem;
+        font-weight: 800;
+        color: #111827;
+    }
+    .stat-circle {
+        width: 45px;
+        height: 45px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.2rem;
+    }
+</style>
+
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="fw-bold mb-0">Live Condition Monitoring</h2>
+            <p class="text-muted">Real-time telematics health and sensor diagnostics</p>
+        </div>
+        <div class="d-flex gap-2">
+            <button class="btn btn-outline-primary rounded-pill px-4">
+                <i class="fas fa-download me-2"></i>Export Logs
+            </button>
+            <button class="btn btn-primary rounded-pill px-4" onclick="location.reload()">
+                <i class="fas fa-sync-alt me-2"></i>Refresh All
+            </button>
+        </div>
+    </div>
+
+    <div class="row g-4" id="conditionGrid">
+        <!-- Cards will be populated here -->
+        <div class="col-12 text-center py-5">
+            <div class="spinner-border text-primary"></div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+    async function loadConditions() {
+        const grid = document.getElementById('conditionGrid');
+        try {
+            const res = await fetch('/api/v2/live-status');
+            const data = await res.json();
+            
+            if (data.length === 0) {
+                grid.innerHTML = `<div class="col-12 text-center py-5 text-muted">No active devices found for monitoring.</div>`;
+            } else {
+                grid.innerHTML = data.map(d => `
+                    <div class="col-xl-4 col-lg-6">
+                        <div class="condition-card">
+                            <div class="d-flex justify-content-between align-items-start mb-4">
+                                <div class="d-flex align-items-center gap-3">
+                                    <div class="stat-circle bg-soft-primary text-primary">
+                                        <i class="fas fa-truck"></i>
+                                    </div>
+                                    <div>
+                                        <div class="fw-bold text-dark">${d.imei}</div>
+                                        <div class="small text-muted">${d.status}</div>
+                                    </div>
+                                </div>
+                                <span class="badge rounded-pill bg-${d.status === 'moving' ? 'success' : (d.status === 'idle' ? 'warning' : 'danger')}">${d.status}</span>
+                            </div>
+                            
+                            <div class="row g-3">
+                                <div class="col-6">
+                                    <div class="p-3 bg-light rounded-4 text-center">
+                                        <div class="small text-muted fw-bold uppercase mb-1">Battery</div>
+                                        <div class="h4 fw-bold mb-0 text-primary">${d.battery_voltage || 0}V</div>
+                                        <div class="progress mt-2" style="height: 4px;">
+                                            <div class="progress-bar bg-primary" style="width: ${Math.min((d.battery_voltage || 0) * 10, 100)}%"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-6">
+                                    <div class="p-3 bg-light rounded-4 text-center">
+                                        <div class="small text-muted fw-bold uppercase mb-1">Power Source</div>
+                                        <div class="h4 fw-bold mb-0 text-success">${d.external_voltage || 0}V</div>
+                                        <div class="progress mt-2" style="height: 4px;">
+                                            <div class="progress-bar bg-success" style="width: ${Math.min((d.external_voltage || 0) * 4, 100)}%"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-6">
+                                    <div class="p-3 bg-light rounded-4 text-center">
+                                        <div class="small text-muted fw-bold uppercase mb-1">Signal Strength</div>
+                                        <div class="h4 fw-bold mb-0 text-info">${d.gsm_signal || 0}/5</div>
+                                        <div class="d-flex gap-1 justify-content-center mt-2">
+                                            ${[1,2,3,4,5].map(i => `<div style="width: 4px; height: 10px; background: ${i <= d.gsm_signal ? '#0dcaf0' : '#dee2e6'}; border-radius: 2px;"></div>`).join('')}
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-6">
+                                    <div class="p-3 bg-light rounded-4 text-center">
+                                        <div class="small text-muted fw-bold uppercase mb-1">Ignition State</div>
+                                        <div class="h4 fw-bold mb-0 ${d.ignition ? 'text-warning' : 'text-muted'}">
+                                            <i class="fas fa-bolt me-1"></i>${d.ignition ? 'ON' : 'OFF'}
+                                        </div>
+                                        <div class="small text-muted mt-2">Engine Link</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `).join('');
+            }
+        } catch (err) {
+            grid.innerHTML = `<div class="col-12 text-center py-5 text-danger">Failed to connect to telematics monitoring service.</div>`;
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', loadConditions);
+    setInterval(loadConditions, 10000); // Update every 10s
+</script>
+{% endblock %}

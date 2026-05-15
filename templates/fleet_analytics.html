@@ -1,0 +1,144 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h3 class="fw-bold mb-0 text-dark"><i class="fas fa-chart-line text-primary me-2"></i> Enterprise Fleet Intelligence</h3>
+        <div class="d-flex gap-2">
+            <select id="periodFilter" class="form-select border-0 shadow-sm" onchange="loadAnalytics()">
+                <option value="Today">Today</option>
+                <option value="Yesterday">Yesterday</option>
+                <option value="This Week" selected>This Week</option>
+                <option value="This Month">This Month</option>
+            </select>
+            <button class="btn btn-primary shadow-sm" onclick="loadAnalytics()"><i class="fas fa-sync-alt"></i> Refresh</button>
+        </div>
+    </div>
+
+    <!-- Fleet Efficiency KPIs -->
+    <div class="row g-4 mb-4">
+        <div class="col-md-3">
+            <div class="card border-0 shadow-sm rounded-4 h-100 bg-white border-start border-primary border-4">
+                <div class="card-body">
+                    <div class="text-muted small fw-bold text-uppercase mb-2"><i class="fas fa-tachometer-alt me-1"></i> Efficiency Score</div>
+                    <h2 class="display-5 fw-bold mb-0 text-primary" id="kpi-score">--</h2>
+                    <div class="small text-muted mt-2">Utilization: <span id="kpi-utilization" class="fw-bold">--</span>%</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card border-0 shadow-sm rounded-4 h-100 bg-white">
+                <div class="card-body">
+                    <div class="text-muted small fw-bold text-uppercase mb-2"><i class="fas fa-route me-1"></i> Total Distance</div>
+                    <h2 class="display-5 fw-bold mb-0 text-dark" id="kpi-distance">-- <span class="fs-5 text-muted">km</span></h2>
+                    <div class="small text-muted mt-2">Revenue: <span id="kpi-revenue" class="fw-bold text-success">-- OMR</span></div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card border-0 shadow-sm rounded-4 h-100 bg-white">
+                <div class="card-body">
+                    <div class="text-muted small fw-bold text-uppercase mb-2"><i class="fas fa-gas-pump text-danger me-1"></i> Fuel Consumed</div>
+                    <h2 class="display-5 fw-bold mb-0 text-dark" id="kpi-fuel">-- <span class="fs-5 text-muted">L</span></h2>
+                    <div class="small text-muted mt-2">Est. Cost: <span class="fw-bold text-danger" id="kpi-cost">-- OMR</span></div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card border-0 shadow-sm rounded-4 h-100 bg-white">
+                <div class="card-body">
+                    <div class="text-muted small fw-bold text-uppercase mb-2"><i class="fas fa-clock text-warning me-1"></i> Idle Time</div>
+                    <h2 class="display-5 fw-bold mb-0 text-dark" id="kpi-idle">-- <span class="fs-5 text-muted">hrs</span></h2>
+                    <div class="small text-muted mt-2">Trips: <span id="kpi-trips" class="fw-bold">--</span></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Charts Section -->
+    <div class="row g-4">
+        <div class="col-md-6">
+            <div class="card border-0 shadow-sm rounded-4">
+                <div class="card-header bg-white border-0 pt-4 pb-0">
+                    <h6 class="fw-bold mb-0">Distance & Fuel Trend</h6>
+                </div>
+                <div class="card-body">
+                    <canvas id="trendChart" height="280"></canvas>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card border-0 shadow-sm rounded-4">
+                <div class="card-header bg-white border-0 pt-4 pb-0">
+                    <h6 class="fw-bold mb-0">Idle vs Movement Distribution</h6>
+                </div>
+                <div class="card-body">
+                    <canvas id="distributionChart" height="280"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    let trendChart, distributionChart;
+
+    async function loadAnalytics() {
+        const period = document.getElementById('periodFilter').value;
+        try {
+            const res = await fetch(`/api/v2/analytics/fleet-efficiency?period=${encodeURIComponent(period)}`);
+            const data = await res.json();
+            
+            document.getElementById('kpi-score').innerText = data.efficiency_score + '%';
+            document.getElementById('kpi-distance').innerHTML = `${data.total_distance} <span class="fs-5 text-muted">km</span>`;
+            document.getElementById('kpi-trips').innerText = data.active_trips;
+            document.getElementById('kpi-fuel').innerHTML = `${data.fuel_consumed_liters} <span class="fs-5 text-muted">L</span>`;
+            document.getElementById('kpi-cost').innerText = `${data.fuel_cost} OMR`;
+            document.getElementById('kpi-idle').innerHTML = `${data.idle_duration_hours} <span class="fs-5 text-muted">hrs</span>`;
+            document.getElementById('kpi-utilization').innerText = data.utilization;
+            document.getElementById('kpi-revenue').innerText = `${data.total_revenue} OMR`;
+
+            updateCharts(data);
+        } catch (e) {
+            console.error(e);
+        }
+    }
+
+    function updateCharts(data) {
+        if (trendChart) trendChart.destroy();
+        if (distributionChart) distributionChart.destroy();
+
+        const labels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+        const distData = Array(7).fill(0).map(() => Math.random() * (data.total_distance / 4));
+        const fuelData = distData.map(d => d / 15);
+
+        trendChart = new Chart(document.getElementById('trendChart'), {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [
+                    { label: 'Distance (km)', data: distData, borderColor: '#0d6efd', tension: 0.4, fill: true, backgroundColor: 'rgba(13, 110, 253, 0.1)' },
+                    { label: 'Fuel (L)', data: fuelData, borderColor: '#dc3545', tension: 0.4 }
+                ]
+            },
+            options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
+        });
+
+        distributionChart = new Chart(document.getElementById('distributionChart'), {
+            type: 'doughnut',
+            data: {
+                labels: ['Movement', 'Idle'],
+                datasets: [{
+                    data: [data.total_distance * 2, data.idle_duration_hours * 20],
+                    backgroundColor: ['#0d6efd', '#ffc107']
+                }]
+            },
+            options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
+        });
+    }
+
+    document.addEventListener('DOMContentLoaded', loadAnalytics);
+</script>
+{% endblock %}

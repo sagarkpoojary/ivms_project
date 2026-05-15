@@ -22,7 +22,7 @@
 
 <body data-role="{{ role }}">
   <div class="wrapper">
-  <div class="sidebar" id="mainSidebar">
+    <div class="sidebar" id="mainSidebar">
       <div class="sidebar-header">
         <h4><i class="fas fa-satellite-dish"></i> <span class="sidebar-brand-text">IVMS</span></h4>
         <button class="sidebar-toggle-btn" id="sidebarToggleBtn" title="Collapse sidebar">
@@ -41,8 +41,8 @@
 
         {% if role == 'super_admin' or 'reports' in enabled_modules %}
         <div class="dropdown-menu-item">
-          <a href="/reports" title="Car Quantity">
-            <i class="fas fa-car"></i> <span>Car Quantity</span>
+          <a href="/reports" title="Fleet Overview">
+            <i class="fas fa-car"></i> <span>Fleet Overview</span>
           </a>
         </div>
         {% endif %}
@@ -58,23 +58,27 @@
             <div class="submenu">
               <a href="/pre_reg_report?report_type=Summary&v=101"><i class="fas fa-file-alt"></i> Summary Report</a>
               <a href="/playback"><i class="fas fa-history"></i> Historical Playback</a>
-              <a href="/analytics"><i class="fas fa-route"></i> Trips & Analytics</a>
-              <a href="/reports/idle"><i class="fas fa-clock"></i> Idle Report</a>
             </div>
           </div>
         </div>
         {% endif %}
 
-        {% if role == 'super_admin' or (role in ['main_admin', 'admin'] and 'vehicle_add' in enabled_modules) %}
-        {% if role in ['super_admin', 'main_admin'] %}
-        <a href="/manage-drafts" title="Manage Drafts" class="position-relative d-flex justify-content-between align-items-center">
-          <i class="fas fa-file-invoice"></i> <span>Manage Drafts</span>
-          {% if pending_drafts_count > 0 %}
-          <span class="badge rounded-pill bg-danger" style="font-size: 0.7rem;">{{ pending_drafts_count }}</span>
-          {% endif %}
-        </a>
-        {% endif %}
-        <a href="/vehicle/add" title="Register Vehicle"><i class="fas fa-plus-circle"></i> <span>Register Vehicle</span></a>
+        {% if role == 'super_admin' or 'analytics' in enabled_modules or role == 'main_admin' %}
+        <div class="dropdown-menu-item">
+          <a href="#" title="Analytics" class="dropdown-toggle d-flex justify-content-between align-items-center"
+            data-bs-toggle="collapse" data-bs-target="#analyticsSubmenu" aria-expanded="false">
+            <i class="fas fa-lightbulb"></i> <span>Analytics</span>
+            <i class="fas fa-chevron-down dropdown-arrow"></i>
+          </a>
+          <div class="collapse" id="analyticsSubmenu">
+            <div class="submenu">
+              <a href="/fleet-efficiency"><i class="fas fa-chart-line"></i> Fleet Efficiency</a>
+              <a href="/driver-behavior"><i class="fas fa-user-check"></i> Driver Behavior</a>
+              <a href="/event-center"><i class="fas fa-bell"></i> Event Center</a>
+              <a href="/condition-monitoring"><i class="fas fa-heartbeat"></i> Condition Monitoring</a>
+            </div>
+          </div>
+        </div>
         {% endif %}
 
         {% if role == 'super_admin' or (role in ['main_admin', 'admin'] and 'user_manager' in enabled_modules) %}
@@ -85,98 +89,209 @@
         <a href="/server-settings" title="Servers"><i class="fas fa-server"></i> <span>Servers</span></a>
         {% endif %}
 
-        {% if role in ['super_admin', 'main_admin'] %}
+        {% if role == 'super_admin' or 'maintenance' in enabled_modules or role == 'main_admin' %}
         <div class="dropdown-menu-item">
-          <a href="#" title="System Config" class="dropdown-toggle d-flex justify-content-between align-items-center"
-            data-bs-toggle="collapse" data-bs-target="#configSubmenu" aria-expanded="false">
-            <i class="fas fa-tools"></i> <span>System Config</span>
+          <a href="#" title="Maintenance" class="dropdown-toggle d-flex justify-content-between align-items-center"
+            data-bs-toggle="collapse" data-bs-target="#maintSubmenu" aria-expanded="false">
+            <i class="fas fa-tools"></i> <span>Maintenance</span>
             <i class="fas fa-chevron-down dropdown-arrow"></i>
           </a>
-          <div class="collapse" id="configSubmenu">
+          <div class="collapse" id="maintSubmenu">
             <div class="submenu">
-              <a href="/plan-manager"><i class="fas fa-tasks"></i> Plan Manager</a>
-              <a href="/dashboard-config"><i class="fas fa-cogs"></i> Dashboard Config</a>
+              <a href="/maintenance"><i class="fas fa-calendar-alt"></i> Maint. Calendar</a>
+              <a href="/maintenance/upcoming"><i class="fas fa-hourglass-half"></i> Upcoming</a>
+              <a href="/maintenance/history"><i class="fas fa-history"></i> Service History</a>
             </div>
           </div>
         </div>
         {% endif %}
 
-        {% if role == 'super_admin' or 'notifications' in enabled_modules %}
-        <a href="/notifications" title="Notifications" class="position-relative">
-          <i class="fas fa-bell"></i> <span>Notifications (Inbox)</span>
-          <span id="alertBadge" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger"
-            style="display:none; left: 85% !important; top: 15px !important;">!</span>
-        </a>
+        {% if role == 'super_admin' or 'drivers' in enabled_modules or role == 'main_admin' %}
+        <div class="dropdown-menu-item">
+          <a href="#" title="RFID & Drivers" class="dropdown-toggle d-flex justify-content-between align-items-center"
+            data-bs-toggle="collapse" data-bs-target="#rfidSubmenu" aria-expanded="false">
+            <i class="fas fa-id-card"></i> <span>RFID & Drivers</span>
+            <i class="fas fa-chevron-down dropdown-arrow"></i>
+          </a>
+          <div class="collapse" id="rfidSubmenu">
+            <div class="submenu">
+              <a href="/drivers"><i class="fas fa-user-friends"></i> Driver Registry</a>
+              <a href="/rfid-assignments"><i class="fas fa-tag"></i> RFID Assignments</a>
+              <a href="/driver-attendance"><i class="fas fa-calendar-check"></i> Attendance</a>
+              <a href="/driver-sessions"><i class="fas fa-history"></i> Sessions</a>
+            </div>
+          </div>
+        </div>
         {% endif %}
-      </div>
-      <div class="mt-auto">
-        <a href="/logout" title="Logout" style="color: #ef4444;"><i class="fas fa-sign-out-alt"></i> <span>Logout</span></a>
+
+        {% if role == 'super_admin' or 'site_ops' in enabled_modules or role == 'main_admin' %}
+        <div class="dropdown-menu-item">
+          <a href="#" title="Site Operations" class="dropdown-toggle d-flex justify-content-between align-items-center"
+            data-bs-toggle="collapse" data-bs-target="#siteSubmenu" aria-expanded="false">
+            <i class="fas fa-map-marked-alt"></i> <span>Site Operations</span>
+            <i class="fas fa-chevron-down dropdown-arrow"></i>
+          </a>
+          <div class="collapse" id="siteSubmenu">
+            <div class="submenu">
+              <a href="/sites"><i class="fas fa-building"></i> Site Registry</a>
+              <a href="/site-visits"><i class="fas fa-truck-pickup"></i> Site Visits</a>
+              <a href="/service-tickets"><i class="fas fa-ticket-alt"></i> Service Tickets</a>
+            </div>
+          </div>
+        </div>
+        {% endif %}
+
+        <div class="sidebar-footer">
+          <a href="/logout" class="text-danger"><i class="fas fa-sign-out-alt"></i> <span>Logout</span></a>
+        </div>
       </div>
     </div>
 
-
-  <main class="main-content" id="mainContent">
-
-      <div class="d-flex justify-content-between align-items-center mb-4">
-        <div></div>
-        <div class="d-flex align-items-center bg-white p-2 px-3 rounded shadow-sm">
-          <i class="fas fa-user-circle fa-lg text-muted me-2"></i>
-          <div>
-            <div class="fw-medium small text-muted lh-1 mb-1">{{ company_name or 'No Company' }}</div>
-            <div class="fw-bold lh-1">Hello, {{ user or 'User' }}</div>
+    <div class="main-content">
+      <nav class="navbar navbar-expand-lg navbar-light bg-white border-bottom sticky-top">
+        <div class="container-fluid">
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+            <span class="navbar-toggler-icon"></span>
+          </button>
+          <div class="collapse navbar-collapse" id="navbarNav">
+            <ul class="navbar-nav ms-auto align-items-center">
+              <li class="nav-item me-3">
+                <button class="btn btn-link nav-link px-2" id="darkModeToggle" title="Toggle Dark Mode">
+                  <i class="fas fa-moon text-secondary"></i>
+                </button>
+              </li>
+              <li class="nav-item dropdown me-3">
+                <a class="nav-link position-relative" href="#" id="notifDropdown" data-bs-toggle="dropdown">
+                  <i class="fas fa-bell"></i>
+                  <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger d-none" id="notifBadge">
+                    0
+                  </span>
+                </a>
+                <div class="dropdown-menu dropdown-menu-end shadow border-0 rounded-4 p-0" style="width: 300px;">
+                  <div class="p-3 border-bottom d-flex justify-content-between align-items-center">
+                    <h6 class="mb-0 fw-bold">Notifications</h6>
+                    <a href="#" class="small text-decoration-none" onclick="markAllRead()">Clear all</a>
+                  </div>
+                  <div id="notifList" class="p-0" style="max-height: 300px; overflow-y: auto;">
+                    <div class="p-3 text-center text-muted small">No new notifications</div>
+                  </div>
+                </div>
+              </li>
+              <li class="nav-item dropdown">
+                <a class="nav-link dropdown-toggle d-flex align-items-center" href="#" id="userDropdown" data-bs-toggle="dropdown">
+                  <div class="rounded-circle bg-soft-primary text-primary d-flex align-items-center justify-content-center me-2" style="width: 32px; height: 32px;">
+                    {{ session.get('email', 'U')[0].upper() }}
+                  </div>
+                  <span>{{ session.get('email') }}</span>
+                </a>
+                <ul class="dropdown-menu dropdown-menu-end shadow border-0 rounded-4">
+                  <li><a class="dropdown-item" href="/profile"><i class="fas fa-user me-2"></i> Profile</a></li>
+                  <li><a class="dropdown-item" href="/settings"><i class="fas fa-cog me-2"></i> Settings</a></li>
+                  <li><hr class="dropdown-divider"></li>
+                  <li><a class="dropdown-item text-danger" href="/logout"><i class="fas fa-sign-out-alt me-2"></i> Logout</a></li>
+                </ul>
+              </li>
+            </ul>
           </div>
         </div>
-      </div>
-      {% block content %}{% endblock %}
-    </main>
+      </nav>
+
+      <main class="p-4">
+        {% block content %}{% endblock %}
+      </main>
+    </div>
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-  {% block scripts %}{% endblock %}
-
-  <!-- Sidebar Toggle Logic -->
+  
   <script>
-    (function () {
-      const sidebar = document.getElementById('mainSidebar');
-      const content = document.getElementById('mainContent');
-      const toggleBtn = document.getElementById('sidebarToggleBtn');
-      const toggleIcon = document.getElementById('sidebarToggleIcon');
-
-      function collapse() {
-        sidebar.classList.add('sidebar-collapsed');
-        content.classList.add('sidebar-collapsed-content');
-        toggleIcon.classList.replace('fa-chevron-left', 'fa-chevron-right');
-        localStorage.setItem('sidebarCollapsed', '1');
-      }
-
-      function expand() {
-        sidebar.classList.remove('sidebar-collapsed');
-        content.classList.remove('sidebar-collapsed-content');
-        toggleIcon.classList.replace('fa-chevron-right', 'fa-chevron-left');
-        localStorage.setItem('sidebarCollapsed', '0');
-      }
-
+    // 1. Sidebar Toggle Logic
+    const sidebar = document.getElementById('mainSidebar');
+    const toggleBtn = document.getElementById('sidebarToggleBtn');
+    if (toggleBtn) {
       toggleBtn.addEventListener('click', () => {
-        sidebar.classList.contains('sidebar-collapsed') ? expand() : collapse();
+        sidebar.classList.toggle('collapsed');
+        localStorage.setItem('sidebar-collapsed', sidebar.classList.contains('collapsed'));
       });
+      if (localStorage.getItem('sidebar-collapsed') === 'true') {
+        sidebar.classList.add('collapsed');
+      }
+    }
 
-      // Restore state on load
-      if (localStorage.getItem('sidebarCollapsed') === '1') {
-        collapse();
+    // 2. Sidebar Active State & Submenu Auto-open
+    (function() {
+      const currentPath = window.location.pathname;
+      const links = document.querySelectorAll('.sidebar a');
+      links.forEach(link => {
+        const href = link.getAttribute('href');
+        if (href && (href === currentPath || (currentPath.startsWith(href) && href !== '/'))) {
+          link.classList.add('active');
+          const parentCollapse = link.closest('.collapse');
+          if (parentCollapse) {
+            parentCollapse.classList.add('show');
+            const toggle = document.querySelector(`[data-bs-target="#${parentCollapse.id}"]`);
+            if (toggle) toggle.setAttribute('aria-expanded', 'true');
+          }
+        }
+      });
+    })();
+
+    // 3. Dark Mode Toggle
+    (function() {
+      const toggle = document.getElementById('darkModeToggle');
+      const html = document.documentElement;
+      const setDarkMode = (isDark) => {
+        if (isDark) {
+          html.setAttribute('data-theme', 'dark');
+          if (toggle) toggle.innerHTML = '<i class="fas fa-sun text-warning"></i>';
+          localStorage.setItem('theme', 'dark');
+        } else {
+          html.removeAttribute('data-theme');
+          if (toggle) toggle.innerHTML = '<i class="fas fa-moon text-secondary"></i>';
+          localStorage.setItem('theme', 'light');
+        }
+      };
+      const savedTheme = localStorage.getItem('theme');
+      if (savedTheme === 'dark' || (!savedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+        setDarkMode(true);
+      }
+      if (toggle) {
+        toggle.addEventListener('click', () => {
+          setDarkMode(html.getAttribute('data-theme') !== 'dark');
+        });
       }
     })();
-  </script>
 
-  <!-- PWA Service Worker Registration -->
-  <script>
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/static/sw.js')
-          .then(reg => console.log('Service Worker registered:', reg))
-          .catch(err => console.log('Service Worker registration failed:', err));
-      });
+    // 4. Notifications
+    async function fetchNotifications() {
+      try {
+        const res = await fetch('/api/alerts');
+        const alerts = await res.json();
+        const list = document.getElementById('notifList');
+        const badge = document.getElementById('notifBadge');
+        if (alerts.length > 0) {
+          badge.textContent = alerts.length;
+          badge.classList.remove('d-none');
+          list.innerHTML = alerts.map(a => `
+            <a href="/event-center" class="dropdown-item p-3 border-bottom">
+              <div class="d-flex align-items-center">
+                <div class="bg-soft-danger text-danger rounded-circle p-2 me-3">
+                  <i class="fas fa-exclamation-triangle"></i>
+                </div>
+                <div>
+                  <div class="small fw-bold">${a.event_type.toUpperCase()}</div>
+                  <div class="x-small text-muted">${a.imei} - ${new Date(a.timestamp).toLocaleTimeString()}</div>
+                </div>
+              </div>
+            </a>
+          `).join('');
+        }
+      } catch (err) {}
     }
+    setInterval(fetchNotifications, 30000);
+    fetchNotifications();
   </script>
-</body>
 
+  {% block scripts %}{% endblock %}
+</body>
 </html>

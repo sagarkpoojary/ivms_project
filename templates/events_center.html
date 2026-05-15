@@ -1,0 +1,416 @@
+{% extends "base.html" %}
+
+{% block content %}
+<style>
+    .event-card {
+        border: none;
+        border-radius: 12px;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        border-left: 5px solid transparent;
+        background: #fff;
+    }
+    .event-card:hover {
+        transform: translateX(5px);
+        box-shadow: 0 10px 25px rgba(0,0,0,0.05) !important;
+    }
+    .event-critical { border-left-color: #ef4444; background: rgba(239, 68, 68, 0.02); }
+    .event-warning { border-left-color: #f59e0b; background: rgba(245, 158, 11, 0.02); }
+    .event-info { border-left-color: #3b82f6; background: rgba(59, 130, 246, 0.02); }
+    .event-success { border-left-color: #10b981; background: rgba(16, 185, 129, 0.02); }
+    .event-security { border-left-color: #8b5cf6; background: rgba(139, 92, 246, 0.02); }
+    
+    .severity-badge {
+        font-size: 0.7rem;
+        padding: 0.35em 0.8em;
+        border-radius: 50rem;
+        font-weight: 700;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+    }
+    
+    .filter-sidebar {
+        position: sticky;
+        top: 20px;
+    }
+    
+    .event-timestamp {
+        font-size: 0.8rem;
+        color: #6b7280;
+    }
+    
+    .event-title {
+        font-weight: 700;
+        color: #111827;
+        margin-bottom: 2px;
+    }
+    
+    .event-meta {
+        font-size: 0.85rem;
+        color: #4b5563;
+    }
+
+    .empty-state {
+        padding: 100px 20px;
+        text-align: center;
+        background: #f9fafb;
+        border-radius: 20px;
+        border: 2px dashed #e5e7eb;
+    }
+</style>
+
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="fw-bold mb-0">Events Center</h2>
+            <p class="text-muted">Real-time enterprise event stream</p>
+        </div>
+        <div class="d-flex gap-2">
+            <button class="btn btn-outline-primary rounded-pill px-4" onclick="loadEvents(true)">
+                <i class="fas fa-sync-alt me-2"></i>Refresh
+            </button>
+            <button class="btn btn-primary rounded-pill px-4" onclick="acknowledgeAll()">
+                <i class="fas fa-check-double me-2"></i>Mark All Read
+            </button>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <!-- Filters Sidebar -->
+        <div class="col-lg-3">
+            <div class="card p-4 border-0 shadow-sm filter-sidebar rounded-4">
+                <h5 class="fw-bold mb-4">Filters</h5>
+                
+                <div class="mb-4">
+                    <label class="form-label small fw-bold text-uppercase text-muted">Search</label>
+                    <div class="input-group">
+                        <span class="input-group-text bg-light border-0"><i class="fas fa-search text-muted"></i></span>
+                        <input type="text" id="filterSearch" class="form-control bg-light border-0" placeholder="Type to search...">
+                    </div>
+                </div>
+
+                <div class="mb-4">
+                    <label class="form-label small fw-bold text-uppercase text-muted">Severity</label>
+                    <select id="filterSeverity" class="form-select bg-light border-0">
+                        <option value="">All Severities</option>
+                        <option value="CRITICAL">Critical</option>
+                        <option value="WARNING">Warning</option>
+                        <option value="INFO">Info</option>
+                        <option value="SUCCESS">Success</option>
+                        <option value="SECURITY">Security</option>
+                    </select>
+                </div>
+
+                <div class="mb-4">
+                    <label class="form-label small fw-bold text-uppercase text-muted">Category</label>
+                    <select id="filterCategory" class="form-select bg-light border-0">
+                        <option value="">All Categories</option>
+                        <option value="Movement">Movement</option>
+                        <option value="Safety">Safety</option>
+                        <option value="Security">Security</option>
+                        <option value="RFID">RFID</option>
+                        <option value="System">System</option>
+                        <option value="Maintenance">Maintenance</option>
+                    </select>
+                </div>
+
+                <div class="mb-4">
+                    <label class="form-label small fw-bold text-uppercase text-muted">Vehicle</label>
+                    <select id="filterVehicle" class="form-select bg-light border-0">
+                        <option value="">All Vehicles</option>
+                        <!-- Populated via JS -->
+                    </select>
+                </div>
+
+                <div class="mb-4">
+                    <label class="form-label small fw-bold text-uppercase text-muted">Date Range</label>
+                    <input type="date" id="filterDate" class="form-control bg-light border-0">
+                </div>
+
+                <button class="btn btn-dark w-100 rounded-pill mt-2" onclick="applyFilters()">
+                    Apply Filters
+                </button>
+            </div>
+        </div>
+
+        <!-- Event List -->
+        <div class="col-lg-9">
+            <div id="eventStream" class="d-flex flex-column gap-3">
+                <!-- Event cards will be injected here -->
+                <div class="text-center py-5">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div id="loadMoreContainer" class="text-center mt-4" style="display: none;">
+                <button class="btn btn-light rounded-pill px-5 shadow-sm border" onclick="loadEvents()">
+                    Load More Events
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Event Details Modal -->
+<div class="modal fade" id="eventModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 rounded-4 shadow">
+            <div class="modal-header border-0 pb-0">
+                <h5 class="modal-title fw-bold" id="modalTitle">Event Details</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-4">
+                <div id="modalContent">
+                    <!-- Dynamic content -->
+                </div>
+            </div>
+            <div class="modal-footer border-0 pt-0">
+                <button type="button" class="btn btn-light rounded-pill px-4" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary rounded-pill px-4" id="btnAcknowledge">Acknowledge</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+    let currentPage = 1;
+    let isLoading = false;
+    let hasMore = true;
+
+    async function loadEvents(reset = false) {
+        if (isLoading) return;
+        if (reset) {
+            currentPage = 1;
+            hasMore = true;
+            document.getElementById('eventStream').innerHTML = '';
+        }
+        if (!hasMore) return;
+
+        isLoading = true;
+        const stream = document.getElementById('eventStream');
+        
+        try {
+            const params = new URLSearchParams({
+                page: currentPage,
+                search: document.getElementById('filterSearch').value,
+                severity: document.getElementById('filterSeverity').value,
+                category: document.getElementById('filterCategory').value,
+                imei: document.getElementById('filterVehicle').value,
+                date: document.getElementById('filterDate').value
+            });
+
+            const res = await fetch(`/api/events-center?${params.toString()}`);
+            const data = await res.json();
+            
+            if (data.events.length === 0 && currentPage === 1) {
+                stream.innerHTML = `
+                    <div class="empty-state">
+                        <i class="fas fa-calendar-times fa-4x text-muted mb-4"></i>
+                        <h4 class="fw-bold">No Events Found</h4>
+                        <p class="text-muted">Try adjusting your filters or search terms.</p>
+                    </div>
+                `;
+                document.getElementById('loadMoreContainer').style.display = 'none';
+            } else {
+                data.events.forEach(event => {
+                    const card = createEventCard(event);
+                    stream.appendChild(card);
+                });
+                
+                hasMore = data.has_more;
+                document.getElementById('loadMoreContainer').style.display = hasMore ? 'block' : 'none';
+                currentPage++;
+            }
+        } catch (err) {
+            console.error("Failed to load events", err);
+            if (currentPage === 1) {
+                stream.innerHTML = `<div class="alert alert-danger rounded-4">Failed to load events. Please try again.</div>`;
+            }
+        } finally {
+            isLoading = false;
+        }
+    }
+
+    function createEventCard(event) {
+        const div = document.createElement('div');
+        div.className = `card event-card shadow-sm p-3 event-${event.severity.toLowerCase()}`;
+        
+        const date = new Date(event.created_at).toLocaleString();
+        const severityClass = getSeverityBadgeClass(event.severity);
+        
+        div.innerHTML = `
+            <div class="d-flex justify-content-between align-items-start">
+                <div class="d-flex gap-3">
+                    <div class="rounded-circle bg-light d-flex align-items-center justify-content-center shadow-sm" style="width: 45px; height: 45px; flex-shrink: 0;">
+                        <i class="${getCategoryIcon(event.category)} text-primary fs-5"></i>
+                    </div>
+                    <div>
+                        <div class="event-title">${event.title}</div>
+                        <div class="event-meta mb-1">
+                            <span class="fw-bold">${event.vehicle_id || 'System'}</span> 
+                            <span class="text-muted mx-1">•</span> 
+                            <span>${event.category}</span>
+                        </div>
+                        <p class="small text-muted mb-0">${event.description}</p>
+                    </div>
+                </div>
+                <div class="text-end">
+                    <span class="badge severity-badge ${severityClass} mb-2">${event.severity}</span>
+                    <div class="event-timestamp">${date}</div>
+                </div>
+            </div>
+        `;
+        
+        div.onclick = () => showEventDetails(event);
+        return div;
+    }
+
+    function getSeverityBadgeClass(sev) {
+        switch(sev) {
+            case 'CRITICAL': return 'bg-danger';
+            case 'WARNING': return 'bg-warning text-dark';
+            case 'INFO': return 'bg-primary';
+            case 'SUCCESS': return 'bg-success';
+            case 'SECURITY': return 'bg-dark';
+            default: return 'bg-secondary';
+        }
+    }
+
+    function getCategoryIcon(cat) {
+        switch(cat) {
+            case 'Movement': return 'fas fa-truck-moving';
+            case 'Safety': return 'fas fa-shield-heart';
+            case 'Security': return 'fas fa-user-shield';
+            case 'RFID': return 'fas fa-id-badge';
+            case 'System': return 'fas fa-server';
+            case 'Maintenance': return 'fas fa-wrench';
+            default: return 'fas fa-bolt';
+        }
+    }
+
+    function showEventDetails(event) {
+        const modal = new bootstrap.Modal(document.getElementById('eventModal'));
+        document.getElementById('modalTitle').innerText = event.title;
+        
+        const date = new Date(event.created_at).toLocaleString();
+        
+        document.getElementById('modalContent').innerHTML = `
+            <div class="d-flex align-items-center gap-3 mb-4">
+                <div class="rounded-circle bg-light d-flex align-items-center justify-content-center" style="width: 60px; height: 60px;">
+                    <i class="${getCategoryIcon(event.category)} text-primary fs-3"></i>
+                </div>
+                <div>
+                    <h5 class="fw-bold mb-0">${event.vehicle_id || 'System Event'}</h5>
+                    <span class="badge ${getSeverityBadgeClass(event.severity)}">${event.severity}</span>
+                </div>
+            </div>
+            
+            <div class="row g-3 mb-4">
+                <div class="col-6">
+                    <label class="small text-muted text-uppercase fw-bold">Timestamp</label>
+                    <div class="fw-medium">${date}</div>
+                </div>
+                <div class="col-6">
+                    <label class="small text-muted text-uppercase fw-bold">Category</label>
+                    <div class="fw-medium">${event.category}</div>
+                </div>
+                <div class="col-6">
+                    <label class="small text-muted text-uppercase fw-bold">IMEI</label>
+                    <div class="fw-medium">${event.imei || 'N/A'}</div>
+                </div>
+                <div class="col-6">
+                    <label class="small text-muted text-uppercase fw-bold">Source</label>
+                    <div class="fw-medium text-capitalize">${event.source}</div>
+                </div>
+            </div>
+            
+            <div class="mb-4">
+                <label class="small text-muted text-uppercase fw-bold">Description</label>
+                <p class="mb-0 p-3 bg-light rounded-3">${event.description}</p>
+            </div>
+            
+            ${event.latitude ? `
+            <div class="mb-4">
+                <label class="small text-muted text-uppercase fw-bold">Location</label>
+                <div class="fw-medium">
+                    <i class="fas fa-map-marker-alt text-danger me-1"></i> ${event.latitude}, ${event.longitude}
+                    <a href="https://www.google.com/maps?q=${event.latitude},${event.longitude}" target="_blank" class="ms-2 small">View Map</a>
+                </div>
+            </div>
+            ` : ''}
+
+            ${event.raw_payload ? `
+            <div>
+                <label class="small text-muted text-uppercase fw-bold">Raw Metadata</label>
+                <pre class="small p-3 bg-dark text-light rounded-3 mt-1" style="max-height: 150px; overflow-y: auto;">${JSON.stringify(event.raw_payload, null, 2)}</pre>
+            </div>
+            ` : ''}
+        `;
+        
+        const btnAck = document.getElementById('btnAcknowledge');
+        btnAck.onclick = async () => {
+            await acknowledgeEvent(event.id);
+            modal.hide();
+            loadEvents(true);
+        };
+        
+        modal.show();
+    }
+
+    async function acknowledgeEvent(id) {
+        try {
+            await fetch(`/api/events/acknowledge/${id}`, { method: 'POST' });
+        } catch (err) {
+            console.error("Failed to acknowledge event", err);
+        }
+    }
+
+    async function acknowledgeAll() {
+        if (!confirm("Are you sure you want to acknowledge all visible events?")) return;
+        try {
+            await fetch(`/api/events/acknowledge-all`, { method: 'POST' });
+            loadEvents(true);
+        } catch (err) {
+            console.error("Failed to acknowledge all events", err);
+        }
+    }
+
+    function applyFilters() {
+        loadEvents(true);
+    }
+
+    // Populate Vehicles dropdown
+    async function loadVehicles() {
+        try {
+            const res = await fetch('/api/vehicles/list');
+            const vehicles = await res.json();
+            const select = document.getElementById('filterVehicle');
+            vehicles.forEach(v => {
+                const opt = document.createElement('option');
+                opt.value = v.unique_id;
+                opt.innerText = v.name;
+                select.appendChild(opt);
+            });
+        } catch (err) {}
+    }
+
+    // Initial load
+    document.addEventListener('DOMContentLoaded', () => {
+        loadVehicles();
+        loadEvents();
+    });
+
+    // WebSocket implementation (Phase 2 integration)
+    // socket.on('new_event', (event) => {
+    //     if (document.getElementById('filterSearch').value === '' && currentPage === 2) { // only if on first page
+    //         const stream = document.getElementById('eventStream');
+    //         const card = createEventCard(event);
+    //         stream.prepend(card);
+    //     }
+    // });
+</script>
+{% endblock %}

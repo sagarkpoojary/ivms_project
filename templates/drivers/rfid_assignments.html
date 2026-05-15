@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h3 class="fw-bold mb-0 text-dark"><i class="fas fa-tag text-primary me-2"></i> RFID Assignments</h3>
+        <div class="d-flex gap-2">
+            <input type="text" id="searchInput" class="form-control border-0 shadow-sm" placeholder="Search Tag or Driver..." onkeyup="filterTable()">
+            <button class="btn btn-primary shadow-sm" onclick="loadRFIDData()"><i class="fas fa-sync-alt"></i> Refresh</button>
+        </div>
+    </div>
+
+    <div class="card border-0 shadow-sm rounded-4">
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0" id="rfidTable">
+                    <thead>
+                        <tr>
+                            <th>RFID Tag ID</th>
+                            <th>Assigned Driver</th>
+                            <th>Phone</th>
+                            <th>Status</th>
+                            <th>Last Used</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="rfidTableBody">
+                        <!-- Loaded via API -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    async function loadRFIDData() {
+        const res = await fetch('/api/v2/ops/drivers');
+        const drivers = await res.json();
+        const tbody = document.getElementById('rfidTableBody');
+        
+        tbody.innerHTML = drivers.map(d => `
+            <tr>
+                <td class="fw-bold text-primary"><i class="fas fa-id-badge me-2"></i>${d.rfid_tag || 'Unassigned'}</td>
+                <td>${d.name}</td>
+                <td>${d.phone || 'N/A'}</td>
+                <td><span class="badge ${d.rfid_tag ? 'bg-soft-success' : 'bg-soft-warning'}">${d.rfid_tag ? 'Active' : 'Missing Tag'}</span></td>
+                <td>Today, 08:30 AM</td>
+                <td>
+                    <button class="btn btn-sm btn-light border" title="Update Tag"><i class="fas fa-sync"></i></button>
+                    <button class="btn btn-sm btn-light border text-danger" title="Unbind Tag"><i class="fas fa-unlink"></i></button>
+                </td>
+            </tr>
+        `).join('');
+    }
+
+    function filterTable() {
+        const input = document.getElementById("searchInput");
+        const filter = input.value.toUpperCase();
+        const table = document.getElementById("rfidTable");
+        const tr = table.getElementsByTagName("tr");
+
+        for (let i = 1; i < tr.length; i++) {
+            const td = tr[i].getElementsByTagName("td");
+            let found = false;
+            for(let j=0; j<td.length; j++) {
+                if (td[j] && td[j].innerText.toUpperCase().indexOf(filter) > -1) {
+                    found = true;
+                    break;
+                }
+            }
+            tr[i].style.display = found ? "" : "none";
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', loadRFIDData);
+</script>
+{% endblock %}

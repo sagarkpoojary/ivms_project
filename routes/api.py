@@ -1,6 +1,4 @@
-import os
 import json
-import requests
 from datetime import datetime, timedelta
 import pytz
 from services.time_service import get_oman_now
@@ -26,43 +24,49 @@ def safe_jsonify(data):
     )
 
 @api_bp.route("/api/events")
-def proxy_events():
-    if not session.get("logged_in"): return jsonify([]), 401
+def api_events():
+    if not session.get("logged_in"): return safe_jsonify([]), 401
     try:
         from services.report_service import get_period_dates
         from services.native_report_service import native_report_service
         start_dt, end_dt = get_period_dates('Today')
         
+        allowed_vehicles = get_filtered_vehicles()
+        allowed_imeis = [str(v.get('unique_id')) for v in allowed_vehicles]
+        
         # Native events
-        events = native_report_service.get_analytics_events(None, 'all', start_dt, end_dt)
+        events = native_report_service.get_analytics_events(None, 'all', start_dt, end_dt, allowed_imeis)
         return safe_jsonify(events)
     except Exception as e:
-        return jsonify([]), 200 # Return empty instead of 500 for UI stability
+        return safe_jsonify([]), 200
 
 @api_bp.route("/api/alerts")
 def api_alerts():
-    if not session.get("logged_in"): return jsonify([]), 401
+    if not session.get("logged_in"): return safe_jsonify([]), 401
     try:
         from services.report_service import get_period_dates
         from services.native_report_service import native_report_service
         start_dt, end_dt = get_period_dates('Today')
         
+        allowed_vehicles = get_filtered_vehicles()
+        allowed_imeis = [str(v.get('unique_id')) for v in allowed_vehicles]
+        
         # Fetch overspeed events from native analytics
-        events = native_report_service.get_analytics_events(None, 'overspeed', start_dt, end_dt)
+        events = native_report_service.get_analytics_events(None, 'overspeed', start_dt, end_dt, allowed_imeis)
         if not isinstance(events, list): return jsonify([])
         return safe_jsonify(events)
     except Exception as e:
-        return jsonify([])
+        return safe_jsonify([])
 
 @api_bp.route("/api/system-stats")
-@role_required('user')
+@role_required('main_admin')
 def api_system_stats():
     from models.database import get_system_stats
-    return jsonify(get_system_stats())
+    return safe_jsonify(get_system_stats())
 
 @api_bp.route('/api/devices')
 @role_required('user')
-def devices_proxy():
+def api_devices():
     uid = request.args.get("uid")
     from auth.utils import get_filtered_vehicles
     
@@ -81,6 +85,8 @@ def devices_proxy():
             "name": v.get('name'),
             "status": live.get('status', 'offline') if live else "offline",
             "lastUpdate": live.get('timestamp') if live else "-",
+            "driver_name": live.get('driver_name') if live else None,
+            "driver_id": live.get('driver_id') if live else None,
             "position": {
                 "latitude": live.get('latitude') if live else None,
                 "longitude": live.get('longitude') if live else None,
@@ -88,39 +94,24 @@ def devices_proxy():
                 "course": live.get('angle', 0) if live else 0,
                 "attributes": {
                     "ignition": live.get('ignition', False) if live else False,
-                    "bat_v": live.get('bat_v', 0) if live else 0
+                    "bat_v": live.get('bat_v', 0) if live else 0,
+                    "rfid": live.get('rfid') if live else None
                 }
             } if live else None
         }
         results.append(device_data)
         
-    return jsonify(results)
+    return safe_jsonify(results)
 
 @api_bp.route('/server-settings', methods=['GET', 'POST'])
 @role_required('main_admin')
 def server_settings():
     cfg = load_server_config()
     if request.method == 'POST':
-        new_ip = request.form.get('server_ip', '').strip()
         new_threshold = request.form.get('stop_threshold', '5').strip()
-        admin_email = request.form.get('admin_email', '').strip()
-        admin_pass = request.form.get('admin_pass', '').strip()
-
-        if new_ip:
-            if new_ip.startswith("http://") or new_ip.startswith("https://"):
-                new_ip = new_ip.split("://", 1)[1]
-            servers = cfg.get("servers", [])
-            if new_ip not in servers: servers.append(new_ip)
-            cfg["servers"] = servers
-            cfg["active_ip"] = new_ip
 
         if new_threshold.isdigit():
             cfg["stop_threshold"] = int(new_threshold)
-
-        if admin_email:
-            cfg['admin_email'] = admin_email
-        if admin_pass:
-            cfg['admin_pass'] = admin_pass
 
         save_server_config(cfg)
         return redirect(url_for('api.server_settings'))
@@ -128,16 +119,22 @@ def server_settings():
 
 @api_bp.route("/api/device-models")
 def device_models():
+    """Returns supported device models list from local config."""
+    from pathlib import Path
+    import json
     try:
-        r = requests.get("https://www.traccar.org/devices/", timeout=5)
-        return jsonify({"html": r.text})
+        data_path = Path(BASE_DIR) / 'static' / 'data' / 'device_models.json'
+        if data_path.exists():
+            with open(data_path, 'r') as f:
+                return jsonify(json.load(f))
+        return jsonify({"models": ["Teltonika FMC130", "Teltonika FMB120", "Teltonika FMB920"]})
     except Exception as e: return jsonify({"error": str(e)}), 500
 
 @api_bp.route('/api/dashboard/devices')
 @role_required('user')
 def api_dashboard_devices():
     from auth.utils import get_filtered_vehicles
-    return jsonify(get_filtered_vehicles())
+    return safe_jsonify(get_filtered_vehicles())
 
 @api_bp.route('/api/dashboard/groups')
 @role_required('user')
@@ -151,6 +148,10 @@ def api_dashboard_distance():
     device_uid = request.args.get('id')
     if not device_uid: return jsonify({'error': 'missing_id'}), 400
     
+    allowed_vehicles = get_filtered_vehicles()
+    if not any(str(v.get('unique_id')) == str(device_uid) for v in allowed_vehicles):
+        return jsonify({'error': 'access_denied'}), 403
+        
     from services.report_service import get_period_dates
     from services.native_report_service import native_report_service
     start_dt, end_dt = get_period_dates('Today')
@@ -187,6 +188,8 @@ def api_dashboard_bulk_sync():
             "uniqueId": imei,
             "name": v.get('name'),
             "status": live.get('status', 'offline') if live else 'offline',
+            "driver_name": live.get('driver_name') if live else None,
+            "driver_id": live.get('driver_id') if live else None,
             "position": {
                 "latitude": live.get('latitude') if live else None,
                 "longitude": live.get('longitude') if live else None,
@@ -195,7 +198,8 @@ def api_dashboard_bulk_sync():
                 "deviceTime": live.get('timestamp') if live else None,
                 "attributes": {
                     "ignition": live.get('ignition', False) if live else False,
-                    "gsm": live.get('gsm', 0) if live else 0
+                    "gsm": live.get('gsm', 0) if live else 0,
+                    "rfid": live.get('rfid') if live else None
                 }
             } if live else None
         }
@@ -223,35 +227,23 @@ def api_dashboard_bulk_sync():
 @role_required('user')
 def api_idle_report():
     from services.report_service import get_period_dates
-    from pytz import utc
+    from services.native_report_service import native_report_service
     
     uid = request.args.get('vehicle_id')
     from_date = request.args.get('start_date')
     to_date = request.args.get('end_date')
-    try:
-        min_idle = int(request.args.get('min_idle_time', 5))
-    except:
-        min_idle = 5
-
-    # Get Date Range
+    
+    allowed_vehicles = get_filtered_vehicles()
+    if uid and not any(str(v.get('unique_id')) == str(uid) for v in allowed_vehicles):
+         return jsonify({'error': 'access_denied'}), 403
+    
+    # Date range parsed natively
     start_dt, end_dt = get_period_dates('Custom', from_date, to_date)
-    traccar_from = start_dt.astimezone(utc).strftime('%Y-%m-%dT%H:%M:%SZ')
-    traccar_to = end_dt.astimezone(utc).strftime('%Y-%m-%dT%H:%M:%SZ')
-
-    vehicles = get_filtered_vehicles()
-    if uid:
-        vehicles = [v for v in vehicles if str(v.get('unique_id')) == str(uid)]
     
     results = []
-    
     try:
-        from services.native_report_service import native_report_service
-        from services.report_service import get_period_dates
-        
-        start_dt, end_dt = get_period_dates('Custom', from_date, to_date)
-        
         # Native Idle
-        events = native_report_service.get_analytics_events(uid, 'idle', start_dt, end_dt)
+        events = native_report_service.get_analytics_events(uid, 'idle', start_dt, end_dt, [str(v.get('unique_id')) for v in allowed_vehicles] if not uid else None)
         
         results.append({
             'vehicle_id': uid,
@@ -270,25 +262,25 @@ def api_idle_report():
 def api_combined_report():
     device_id = request.args.get('deviceId')
     if not device_id: return jsonify({'error': 'no_id'}), 400
+    
+    allowed_vehicles = get_filtered_vehicles()
+    if not any(str(v.get('unique_id')) == str(device_id) for v in allowed_vehicles):
+         return jsonify({'error': 'access_denied'}), 403
+
     from_p = request.args.get('from')
     to_p = request.args.get('to')
     if not from_p or not to_p: return jsonify({'error': 'missing_range'}), 400
     
     result = {'trips': [], 'events': [], 'stops': []}
-    
     try:
         from services.native_report_service import native_report_service
-        from services.report_service import get_period_dates
-        
         start_dt = datetime.fromisoformat(from_p.replace('Z', '+00:00'))
         end_dt = datetime.fromisoformat(to_p.replace('Z', '+00:00'))
         
         # Fetch data natively
         result['trips'] = native_report_service.get_trip_report(device_id, start_dt, end_dt)
         result['events'] = native_report_service.get_analytics_events(device_id, 'all', start_dt, end_dt)
-        # Stops are approximated as idle events for now
         result['stops'] = native_report_service.get_analytics_events(device_id, 'idle', start_dt, end_dt)
-        
         return safe_jsonify(result)
     except Exception as e:
         current_app.logger.exception("Combined Report Error")
@@ -297,36 +289,35 @@ def api_combined_report():
 @api_bp.route('/api/debug/device/<uid>')
 @role_required('admin')
 def debug_device(uid):
-    result = {'uid': uid, 'traccar_host': full_traccar_host(), 'device_data': None, 'position_data': None, 'errors': []}
-    try:
-        r, tr = try_traccar_get("api/devices", timeout=10)
-        result['traccar_host'] = tr
-        if r.status_code == 200:
-            device = next((d for d in r.json() if str(d.get("uniqueId")) == str(uid)), None)
-            if device:
-                result['device_data'] = device
-                pos_r, _ = try_traccar_get("api/positions", params={"deviceId": device.get('id')}, timeout=10)
-                if pos_r.status_code == 200: result['position_data'] = pos_r.json()
-    except Exception as e: result['errors'].append(str(e))
-    return jsonify(result)
+    """Native debugging for a device."""
+    from services.telemetry_service import telemetry_service
+    live = telemetry_service.get_live_status(uid)
+    return jsonify({
+        'uid': uid, 
+        'source': 'native_redis',
+        'live_status': live,
+        'timestamp': datetime.now().isoformat()
+    })
 
 
 @api_bp.route('/api/v2/reports/history/<imei>')
 @role_required('user')
 def api_history_report(imei):
+    allowed_vehicles = get_filtered_vehicles()
+    if not any(str(v.get('unique_id')) == str(imei) for v in allowed_vehicles):
+         return jsonify({'error': 'access_denied'}), 403
+
     start = request.args.get('start')
     end = request.args.get('end')
     if not start or not end:
-        return jsonify({'error': 'Missing range'}), 400
+        return safe_jsonify({'error': 'Missing range'}), 400
     
     try:
         from services.native_report_service import native_report_service
         start_dt = datetime.fromisoformat(start.replace('Z', '+00:00'))
         end_dt = datetime.fromisoformat(end.replace('Z', '+00:00'))
         
-        # Native playback data
         records = native_report_service.get_playback_data(imei, start_dt, end_dt, limit=2000)
-        
         return safe_jsonify([{
             'latitude': r['latitude'],
             'longitude': r['longitude'],
@@ -334,7 +325,7 @@ def api_history_report(imei):
             'timestamp': r['timestamp']
         } for r in records])
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        return safe_jsonify({'error': str(e)}), 500
 
 @api_bp.route('/api/reports/route')
 @role_required('user')
@@ -346,20 +337,20 @@ def api_report_route():
     if not unique_id or not from_p or not to_p:
         return jsonify({'error': 'Missing parameters'}), 400
 
+    allowed_vehicles = get_filtered_vehicles()
+    if not any(str(v.get('unique_id')) == str(unique_id) for v in allowed_vehicles):
+         return jsonify({'error': 'access_denied'}), 403
+
     try:
-        from services.report_service import get_period_dates
         from services.native_report_service import native_report_service
-        
-        # Parse ISO strings to Oman datetime
         start_dt = datetime.fromisoformat(from_p.replace('Z', '+00:00'))
         end_dt = datetime.fromisoformat(to_p.replace('Z', '+00:00'))
         
         records = native_report_service.get_playback_data(unique_id, start_dt, end_dt)
         
-        # Transform to Traccar-compatible format for the frontend JS
-        traccar_records = []
+        native_records = []
         for r in records:
-            traccar_records.append({
+            native_records.append({
                 "deviceId": r['imei'],
                 "fixTime": r['timestamp'],
                 "latitude": r['latitude'],
@@ -368,8 +359,39 @@ def api_report_route():
                 "course": r['angle'],
                 "attributes": json.loads(r['io_elements']) if isinstance(r['io_elements'], str) else r['io_elements']
             })
-        
-        return safe_jsonify(traccar_records)
-            
+        return safe_jsonify(native_records)
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+@api_bp.route('/api/reports/driver-attendance')
+@role_required('user')
+def api_driver_attendance():
+    from services.report_service import get_period_dates
+    from services.native_report_service import native_report_service
+    
+    period = request.args.get('period', 'Today')
+    start_dt, end_dt = get_period_dates(period)
+    
+    allowed_vehicles = get_filtered_vehicles()
+    allowed_imeis = [str(v.get('unique_id')) for v in allowed_vehicles]
+    
+    data = native_report_service.get_driver_attendance(start_dt, end_dt, allowed_imeis)
+    return safe_jsonify(data)
+
+@api_bp.route('/api/reports/rfid-timeline')
+@role_required('user')
+def api_rfid_timeline():
+    from services.report_service import get_period_dates
+    from services.native_report_service import native_report_service
+    
+    imei = request.args.get('imei')
+    period = request.args.get('period', 'Today')
+    start_dt, end_dt = get_period_dates(period)
+    
+    allowed_vehicles = get_filtered_vehicles()
+    allowed_imeis = [str(v.get('unique_id')) for v in allowed_vehicles]
+    
+    if imei and imei not in allowed_imeis:
+         return jsonify({'error': 'access_denied'}), 403
+
+    data = native_report_service.get_rfid_timeline(imei, start_dt, end_dt, allowed_imeis)
+    return safe_jsonify(data)

@@ -126,6 +126,23 @@ def render_report_logic(forced_report_type=None):
             summary_avg_speed = s['average_speed']
             summary_idle_time = s['idle_duration']
 
+    # Aggregate counts for summary cards
+    total_vehicles_count = len(report_data)
+    low_usage_count = len([r for r in report_data if r.get('status') == 'Low Usage'])
+    no_movement_count = len([r for r in report_data if r.get('status') == 'No Movement'])
+    overspeed_count = len([r for r in report_data if r.get('status') == 'Possible Overspeed'])
+
+    # Specific logic for 'Idle' report summary cards
+    idle_summary = []
+    if report_type == 'Idle' and not filter_uid:
+        for r in report_data:
+            if r.get('idle_duration', 0) > 0:
+                idle_summary.append({
+                    'name': r['name'],
+                    'total_idle_time': round(r['idle_duration'] / 60000, 1),
+                    'total_idle_events': 'N/A' # We don't have event count here yet
+                })
+
     return render_template('pre_reg_report.html', 
                           report_data=report_data, 
                           trip_data=trip_data, 
@@ -137,6 +154,11 @@ def render_report_logic(forced_report_type=None):
                           summary_duration=summary_duration,
                           summary_avg_speed=summary_avg_speed,
                           summary_idle_time=summary_idle_time,
+                          total_vehicles_count=total_vehicles_count,
+                          low_usage_count=low_usage_count,
+                          no_movement_count=no_movement_count,
+                          overspeed_count=overspeed_count,
+                          idle_summary=idle_summary,
                           from_date=from_str_display, 
                           to_date=to_str_display, 
                           vehicles=all_vehicles, 

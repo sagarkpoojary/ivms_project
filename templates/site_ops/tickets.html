@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h3 class="fw-bold mb-0 text-dark"><i class="fas fa-ticket-alt text-primary me-2"></i> Service Tickets</h3>
+        <button class="btn btn-primary shadow-sm" data-bs-toggle="modal" data-bs-target="#newTicketModal">
+            <i class="fas fa-plus me-1"></i> New Ticket
+        </button>
+    </div>
+
+    <div class="card border-0 shadow-sm rounded-4">
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead>
+                        <tr>
+                            <th>Ticket #</th>
+                            <th>Vehicle</th>
+                            <th>Issue Type</th>
+                            <th>Priority</th>
+                            <th>Status</th>
+                            <th>Created At</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="ticketsTableBody">
+                        <!-- Loaded via API -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- New Ticket Modal -->
+<div class="modal fade" id="newTicketModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg rounded-4">
+            <div class="modal-header border-0 pb-0">
+                <h5 class="modal-title fw-bold">Create Service Ticket</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="newTicketForm">
+                    <div class="mb-3">
+                        <label class="form-label">Vehicle</label>
+                        <select class="form-select" name="imei" id="vehicleSelect" required>
+                            <option value="">Select Vehicle...</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Issue Type</label>
+                        <select class="form-select" name="issue_type" required>
+                            <option value="Hardware Malfunction">Hardware Malfunction</option>
+                            <option value="Sensor Error">Sensor Error</option>
+                            <option value="GPS Drift">GPS Drift</option>
+                            <option value="SIM/Network Issue">SIM/Network Issue</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Priority</label>
+                        <select class="form-select" name="priority">
+                            <option value="Low">Low</option>
+                            <option value="Medium" selected>Medium</option>
+                            <option value="High">High</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Description</label>
+                        <textarea class="form-control" name="description" rows="3" placeholder="Describe the issue..."></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer border-0 pt-0">
+                <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+                <button type="submit" form="newTicketForm" class="btn btn-primary">Create Ticket</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    async function loadTickets() {
+        const res = await fetch('/api/v2/ops/service-tickets');
+        const tickets = await res.json();
+        const tbody = document.getElementById('ticketsTableBody');
+        
+        if (tickets.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="7" class="text-center py-5 text-muted">No service tickets found.</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = tickets.map(t => `
+            <tr>
+                <td class="fw-bold">#${t.id}</td>
+                <td>${t.vehicle_name || t.imei}</td>
+                <td>${t.issue_type}</td>
+                <td><span class="badge ${t.priority === 'High' ? 'bg-soft-danger' : (t.priority === 'Medium' ? 'bg-soft-warning' : 'bg-soft-info')}">${t.priority}</span></td>
+                <td><span class="badge bg-soft-primary">${t.status}</span></td>
+                <td class="small">${new Date(t.created_at).toLocaleString()}</td>
+                <td>
+                    <button class="btn btn-sm btn-light border" onclick="viewTicket(${t.id})"><i class="fas fa-eye"></i></button>
+                </td>
+            </tr>
+        `).join('');
+    }
+
+    async function loadVehicles() {
+        const res = await fetch('/api/vehicles/list');
+        const vehicles = await res.json();
+        const select = document.getElementById('vehicleSelect');
+        select.innerHTML = '<option value="">Select Vehicle...</option>' + 
+            vehicles.map(v => `<option value="${v.unique_id}">${v.name} (${v.unique_id})</option>`).join('');
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        loadTickets();
+        loadVehicles();
+    });
+</script>
+{% endblock %}

@@ -1260,9 +1260,3 @@ h6 {
     text-align: center;
     margin-right: 8px;
 }
-
-/* Map Markers */
-.custom-marker {
-    background: transparent;
-    border: none;
-}

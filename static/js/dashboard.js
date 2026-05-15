@@ -274,7 +274,7 @@
 
         allDevicesData.forEach(d => {
             // Level 1: Status — trust Traccar's own status field (online/offline/unknown)
-            const isOnline = d.device?.status === 'online';
+            const isOnline = d.device?.status && d.device.status !== 'offline';
 
             if (!isOnline) {
                 stats.offline++;
@@ -478,7 +478,7 @@
                 displayName = d.registered.company_name || "Assigned Company";
             }
 
-            const isOnline = d.device?.status === 'online';
+            const isOnline = d.device?.status && d.device.status !== 'offline';
             const speed = Number(pos.speed ?? pos.attributes?.speed ?? 0);
             const isMoving = speed > 1;
             const color = isOnline && isMoving ? 'green' : isOnline ? 'orange' : 'red';
@@ -492,7 +492,27 @@
             });
 
             const marker = L.marker([lat, lng], { icon }).addTo(markerLayer);
-            marker.bindPopup(`<strong>${displayName}</strong><br>Status: ${isOnline ? 'Online' : 'Offline'}<br>Movement: ${isMoving ? 'Moving' : 'Stopped'} (${speed.toFixed(1)} km/h)`);
+            
+            const driverName = d.device.driver_name || "No Driver";
+            const rfid = d.device.position?.attributes?.rfid || d.device.rfid || "N/A";
+
+            marker.bindPopup(`
+                <div class="popup-content">
+                    <strong class="d-block mb-1">${displayName}</strong>
+                    <div class="small mb-1">
+                        <i class="fas fa-user-circle me-1 text-primary"></i> <strong>Driver:</strong> ${driverName}
+                    </div>
+                    <div class="small mb-1">
+                        <i class="fas fa-id-card me-1 text-secondary"></i> <strong>RFID:</strong> ${rfid}
+                    </div>
+                    <div class="small mb-1">
+                        <i class="fas fa-info-circle me-1"></i> <strong>Status:</strong> ${isOnline ? 'Online' : 'Offline'}
+                    </div>
+                    <div class="small">
+                        <i class="fas fa-tachometer-alt me-1"></i> <strong>Speed:</strong> ${speed.toFixed(1)} km/h
+                    </div>
+                </div>
+            `);
 
             // Critical Fix: Attach unique ID for reliable looking up in focusOnVehicle
             marker.uniqueId = String(d.registered.unique_id);
@@ -522,7 +542,15 @@
             if (role === 'main_admin') {
                 displayName = deviceData.registered.company_name || "Company Asset";
             }
-            return `<div class="device-item" onclick="window.focusOnVehicle('${uniqueId}')">${displayName}</div>`;
+            
+            const driverName = deviceData.device.driver_name || "No Driver";
+            return `
+                <div class="device-item d-flex justify-content-between align-items-center" onclick="window.focusOnVehicle('${uniqueId}')">
+                    <span>${displayName}</span>
+                    <span class="small text-muted" style="font-size: 0.65rem;">
+                        <i class="fas fa-user-circle me-1"></i>${driverName}
+                    </span>
+                </div>`;
         }).join('');
 
         listEl.innerHTML = listHTML;
@@ -555,7 +583,7 @@
         const totalDevices = data.length;
 
         // 1. Calculate Live Status Metrics — trust Traccar's own status field
-        const online = data.filter(d => d.device?.status === 'online').length;
+        const online = data.filter(d => d.device?.status && d.device.status !== 'offline').length;
         const offline = totalDevices - online;
 
         const ignOn = data.filter(d => isVehicleIgnitionOn(d)).length;
@@ -579,8 +607,8 @@
 
         // 4. Update the hover lists for all status categories
         // MOVED UP to fix ReferenceError (TDZ)
-        const onlineDevices = data.filter(d => d.device?.status === 'online');
-        const offlineDevices = data.filter(d => d.device?.status !== 'online');
+        const onlineDevices = data.filter(d => d.device?.status && d.device.status !== 'offline');
+        const offlineDevices = data.filter(d => !d.device?.status || d.device.status === 'offline');
         const stoppedDevices = data.filter(d => {
             if (d.device?.position) {
                 const speed = Number(d.device.position.speed ?? d.device.position.attributes?.speed ?? 0);
@@ -829,7 +857,10 @@
         // Update the 'latest' array which is used for rendering
         latest.forEach(d => {
             if (String(d.registered.unique_id) === imei) {
-                d.device.status = 'online';
+                d.device.status = data.status || 'online';
+                d.device.driver_id = data.driver_id;
+                d.device.driver_name = data.driver_name;
+                d.device.rfid = data.rfid;
                 d.device.position = {
                     deviceId: d.device.id,
                     latitude: data.latitude,
@@ -840,7 +871,8 @@
                     deviceTime: data.timestamp,
                     attributes: {
                         sat: data.satellites,
-                        batteryLevel: parseInt(data.bat_v * 10)
+                        batteryLevel: parseInt(data.bat_v * 10),
+                        rfid: data.rfid
                     }
                 };
                 found = true;

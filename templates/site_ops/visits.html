@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h3 class="fw-bold mb-0 text-dark"><i class="fas fa-truck-pickup text-primary me-2"></i> Site Visits</h3>
+        <div class="d-flex gap-2">
+            <select id="periodFilter" class="form-select border-0 shadow-sm" onchange="loadVisits()">
+                <option value="Today" selected>Today</option>
+                <option value="Yesterday">Yesterday</option>
+                <option value="This Week">This Week</option>
+            </select>
+            <button class="btn btn-primary shadow-sm" onclick="loadVisits()"><i class="fas fa-sync-alt"></i> Refresh</button>
+        </div>
+    </div>
+
+    <div class="card border-0 shadow-sm rounded-4">
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead>
+                        <tr>
+                            <th>Vehicle</th>
+                            <th>Site Name</th>
+                            <th>Arrival Time</th>
+                            <th>Departure Time</th>
+                            <th>Duration</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="visitsTableBody">
+                        <!-- Loaded via API -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    async function loadVisits() {
+        const period = document.getElementById('periodFilter').value;
+        const res = await fetch(`/api/v2/ops/site-visits?period=${period}`);
+        const data = await res.json();
+        const tbody = document.getElementById('visitsTableBody');
+        
+        if (data.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="6" class="text-center py-5 text-muted">No site visits recorded for this period.</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = data.map(v => `
+            <tr>
+                <td class="fw-bold">${v.vehicle_name || v.imei}</td>
+                <td>${v.site_name}</td>
+                <td>${new Date(v.arrival_time).toLocaleString()}</td>
+                <td>${v.departure_time ? new Date(v.departure_time).toLocaleString() : '<span class="text-success fw-bold">Still On-Site</span>'}</td>
+                <td>${v.duration_minutes ? v.duration_minutes + ' min' : 'Active'}</td>
+                <td>
+                    <span class="badge ${v.departure_time ? 'bg-soft-primary' : 'bg-soft-success'}">
+                        ${v.departure_time ? 'Completed' : 'Inside Site'}
+                    </span>
+                </td>
+            </tr>
+        `).join('');
+    }
+
+    document.addEventListener('DOMContentLoaded', loadVisits);
+</script>
+{% endblock %}

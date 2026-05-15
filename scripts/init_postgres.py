@@ -68,7 +68,7 @@ def init_db():
         """)
         
         # 5. Insert default super_admin
-        admin_email = "saga@gmail.com"
+        admin_email = "sagar@conceptgrps.com"
         admin_pass = "admin123"
         hashed_pass = generate_password_hash(admin_pass)
         

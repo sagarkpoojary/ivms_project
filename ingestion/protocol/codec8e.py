@@ -59,7 +59,8 @@ class Codec8EParser:
         
         calculated_crc = Codec8EParser.crc16(data_field)
         if calculated_crc != (received_crc & 0xFFFF):
-            # Teltonika CRC is 2 bytes but often sent in a 4-byte field
+            # CRC Mismatch (Phase 7 requirement)
+            # Log as hex for diagnostics
             return None
             
         # Codec ID (1 byte)
@@ -74,14 +75,19 @@ class Codec8EParser:
         offset += 1
         
         records = []
-        for _ in range(num_records):
-            record, bytes_read = Codec8EParser._parse_single_record(data[offset:])
-            if record:
-                if Codec8EParser._is_valid_gps(record):
-                    records.append(record)
-                offset += bytes_read
-            else:
-                break
+        try:
+            for i in range(num_records):
+                record, bytes_read = Codec8EParser._parse_single_record(data[offset:])
+                if record:
+                    if Codec8EParser._is_valid_gps(record):
+                        records.append(record)
+                    offset += bytes_read
+                else:
+                    # Partial record or parsing error
+                    break
+        except Exception:
+            # Fatal parse error in the middle of a packet
+            return None
                 
         # Number of Data 2 (1 byte)
         # num_records_2 = data[offset]

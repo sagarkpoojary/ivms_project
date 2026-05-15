@@ -49,17 +49,37 @@ def save_module_config(data):
 def load_vehicles():
     try:
         conn = get_conn(); cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-        cur.execute("SELECT data FROM vehicles")
+        cur.execute("""
+            SELECT v.data, ls.current_driver_name, ls.current_driver_id
+            FROM vehicles v
+            LEFT JOIN live_vehicle_status ls ON v.unique_id = ls.imei
+        """)
         rows = cur.fetchall(); cur.close(); conn.close()
-        return [dict(r["data"]) for r in rows]
+        results = []
+        for r in rows:
+            v = dict(r["data"])
+            v["current_driver_name"] = r["current_driver_name"]
+            v["current_driver_id"] = r["current_driver_id"]
+            results.append(v)
+        return results
     except: return []
 
 def get_vehicle_by_uid(unique_id):
     try:
         conn = get_conn(); cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-        cur.execute("SELECT data FROM vehicles WHERE unique_id = %s", (str(unique_id),))
+        cur.execute("""
+            SELECT v.data, ls.current_driver_name, ls.current_driver_id
+            FROM vehicles v
+            LEFT JOIN live_vehicle_status ls ON v.unique_id = ls.imei
+            WHERE v.unique_id = %s
+        """, (str(unique_id),))
         row = cur.fetchone(); cur.close(); conn.close()
-        return dict(row["data"]) if row else None
+        if row:
+            v = dict(row["data"])
+            v["current_driver_name"] = row["current_driver_name"]
+            v["current_driver_id"] = row["current_driver_id"]
+            return v
+        return None
     except: return None
 
 def add_vehicle_db(data):

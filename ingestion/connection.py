@@ -67,6 +67,10 @@ class DeviceSession:
             imei = Codec8EParser.parse_imei(data)
             if not imei or len(imei) < 15:
                 logger.warning(f"Failed authentication from {self.addr}: Invalid IMEI")
+                await self.db_queue.put({
+                    'type': 'alert', 'severity': 'WARNING', 'component': 'Security',
+                    'message': f"Failed authentication from {self.addr}: Invalid IMEI '{imei}'"
+                })
                 self.writer.write(b'\x00')
                 await self.writer.drain()
                 return False
@@ -139,6 +143,11 @@ class DeviceSession:
         else:
             metrics.MALFORMED_PACKETS.inc()
             logger.warning(f"Failed to decode packet from {self.imei}")
+            await self.db_queue.put({
+                'type': 'alert', 'severity': 'ERROR', 'component': 'Parser',
+                'message': f"Failed to decode AVL packet. Raw data: {packet.hex()[:100]}",
+                'imei': self.imei
+            })
 
     async def _listen_for_commands(self):
         """Subscribes to Redis for commands specific to this IMEI."""

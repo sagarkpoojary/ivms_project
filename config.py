@@ -48,6 +48,8 @@ class Config:
     FUEL_PRICE_OMR = float(os.environ.get("FUEL_PRICE_OMR", 0.229))
     IDLE_FUEL_LPH = float(os.environ.get("IDLE_FUEL_LPH", 1.5)) # Liters per hour
     MAX_DATA_GAP_MINUTES = int(os.environ.get("MAX_DATA_GAP_MINUTES", 3))
+    ONLINE_TIMEOUT_SECONDS = int(os.environ.get("ONLINE_TIMEOUT_SECONDS", 120))
+
     IDLE_SPEED_THRESHOLD = float(os.environ.get("IDLE_SPEED_THRESHOLD", 3.0)) # km/h
     
     @classmethod

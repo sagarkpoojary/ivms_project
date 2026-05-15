@@ -1,0 +1,229 @@
+{% extends "base.html" %}
+
+{% block content %}
+<style>
+    .calendar-container {
+        background: #fff;
+        border-radius: 20px;
+        padding: 30px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.05);
+    }
+    .fc-header-toolbar {
+        margin-bottom: 2rem !important;
+    }
+    .fc-button-primary {
+        background-color: #0d6efd !important;
+        border-color: #0d6efd !important;
+        border-radius: 8px !important;
+        padding: 8px 16px !important;
+        font-weight: 600 !important;
+    }
+    .fc-event {
+        border: none !important;
+        padding: 4px 8px !important;
+        border-radius: 6px !important;
+        font-size: 0.85rem !important;
+        cursor: pointer;
+        transition: transform 0.2s;
+    }
+    .fc-event:hover {
+        transform: scale(1.02);
+    }
+    .event-planned { background-color: #3b82f6 !important; }
+    .event-due { background-color: #f59e0b !important; }
+    .event-overdue { background-color: #ef4444 !important; }
+    .event-completed { background-color: #10b981 !important; }
+
+    .maint-stat-card {
+        border: none;
+        border-radius: 16px;
+        padding: 20px;
+        background: #fff;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.03);
+    }
+</style>
+
+<!-- FullCalendar CSS -->
+<link href='https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/main.min.css' rel='stylesheet' />
+
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="fw-bold mb-0">Maintenance Calendar</h2>
+            <p class="text-muted">Schedule and track vehicle service activities</p>
+        </div>
+        <button class="btn btn-primary rounded-pill px-4" data-bs-toggle="modal" data-bs-target="#scheduleModal">
+            <i class="fas fa-plus me-2"></i>Schedule Maintenance
+        </button>
+    </div>
+
+    <div class="row g-4 mb-4">
+        <div class="col-md-3">
+            <div class="maint-stat-card">
+                <div class="text-muted small fw-bold text-uppercase">Total Planned</div>
+                <div class="h3 fw-bold mb-0 mt-1" id="statPlanned">0</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="maint-stat-card">
+                <div class="text-muted small fw-bold text-uppercase text-warning">Upcoming Due</div>
+                <div class="h3 fw-bold mb-0 mt-1" id="statDue">0</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="maint-stat-card">
+                <div class="text-muted small fw-bold text-uppercase text-danger">Overdue</div>
+                <div class="h3 fw-bold mb-0 mt-1" id="statOverdue">0</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="maint-stat-card">
+                <div class="text-muted small fw-bold text-uppercase text-success">Completed (Mo)</div>
+                <div class="h3 fw-bold mb-0 mt-1" id="statCompleted">0</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="calendar-container">
+        <div id='calendar'></div>
+    </div>
+</div>
+
+<!-- Schedule Maintenance Modal -->
+<div class="modal fade" id="scheduleModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content border-0 rounded-4 shadow">
+            <div class="modal-header border-0 pb-0 p-4">
+                <h5 class="modal-title fw-bold">Schedule Maintenance</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form id="maintForm">
+                <div class="modal-body p-4">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label small fw-bold">Vehicle</label>
+                            <select name="imei" id="maintVehicle" class="form-select bg-light border-0" required>
+                                <option value="">Select Vehicle</option>
+                                <!-- Populated via JS -->
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small fw-bold">Service Type</label>
+                            <select name="service_type" class="form-select bg-light border-0" required>
+                                <option value="Oil Change">Oil Change</option>
+                                <option value="Tire Rotation">Tire Rotation</option>
+                                <option value="Brake Inspection">Brake Inspection</option>
+                                <option value="Annual Service">Annual Service</option>
+                                <option value="Engine Repair">Engine Repair</option>
+                                <option value="Other">Other</option>
+                            </select>
+                        </div>
+                        <div class="col-md-12">
+                            <label class="form-label small fw-bold">Description</label>
+                            <textarea name="description" class="form-control bg-light border-0" rows="2" placeholder="Describe the work to be done..."></textarea>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small fw-bold">Target Date</label>
+                            <input type="date" name="target_date" class="form-control bg-light border-0">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small fw-bold">Target Mileage (KM)</label>
+                            <input type="number" name="target_mileage" class="form-control bg-light border-0" placeholder="e.g. 50000">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small fw-bold">Target Engine Hours</label>
+                            <input type="number" name="target_engine_hours" class="form-control bg-light border-0" placeholder="e.g. 2000">
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer border-0 p-4 pt-0">
+                    <button type="button" class="btn btn-light rounded-pill px-4" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary rounded-pill px-4">Schedule Activity</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script src='https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/main.min.js'></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        var calendarEl = document.getElementById('calendar');
+        var calendar = new FullCalendar.Calendar(calendarEl, {
+            initialView: 'dayGridMonth',
+            headerToolbar: {
+                left: 'prev,next today',
+                center: 'title',
+                right: 'dayGridMonth,timeGridWeek,listMonth'
+            },
+            themeSystem: 'bootstrap5',
+            events: '/api/maintenance/schedule',
+            eventDataTransform: function(data) {
+                return {
+                    id: data.id,
+                    title: `${data.vehicle_id}: ${data.service_type}`,
+                    start: data.target_date,
+                    className: `event-${data.status}`,
+                    extendedProps: data
+                };
+            },
+            eventClick: function(info) {
+                alert(`Service: ${info.event.title}\nVehicle: ${info.event.extendedProps.vehicle_id}\nStatus: ${info.event.extendedProps.status}`);
+            }
+        });
+        calendar.render();
+
+        // Populate Vehicles
+        fetch('/api/vehicles/list')
+            .then(res => res.json())
+            .then(vehicles => {
+                const select = document.getElementById('maintVehicle');
+                vehicles.forEach(v => {
+                    const opt = document.createElement('option');
+                    opt.value = v.unique_id;
+                    opt.dataset.name = v.name;
+                    opt.innerText = v.name;
+                    select.appendChild(opt);
+                });
+            });
+
+        // Form Submit
+        document.getElementById('maintForm').onsubmit = async (e) => {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            const data = Object.from_iterable(formData.entries());
+            
+            const vehicleSelect = document.getElementById('maintVehicle');
+            const selectedOpt = vehicleSelect.options[vehicleSelect.selectedIndex];
+            data.vehicle_name = selectedOpt.dataset.name;
+
+            try {
+                const res = await fetch('/api/maintenance/schedule', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(data)
+                });
+                if (res.ok) {
+                    bootstrap.Modal.getInstance(document.getElementById('scheduleModal')).hide();
+                    calendar.refetchEvents();
+                }
+            } catch (err) {
+                alert("Failed to schedule maintenance");
+            }
+        };
+        
+        if (!Object.from_iterable) {
+            Object.from_iterable = function(iterable) {
+                const obj = {};
+                for (const [key, val] of iterable) {
+                    obj[key] = val;
+                }
+                return obj;
+            }
+        }
+    });
+</script>
+{% endblock %}

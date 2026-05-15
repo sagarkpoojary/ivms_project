@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h3 class="fw-bold mb-0 text-dark"><i class="fas fa-id-card text-primary me-2"></i> Driver Behavior Analytics</h3>
+        <div class="d-flex gap-2">
+            <select id="periodFilter" class="form-select border-0 shadow-sm" onchange="loadScores()">
+                <option value="Today">Today</option>
+                <option value="This Week" selected>This Week</option>
+                <option value="This Month">This Month</option>
+            </select>
+            <button class="btn btn-primary shadow-sm" onclick="loadScores()"><i class="fas fa-sync-alt"></i> Refresh</button>
+        </div>
+    </div>
+
+    <!-- Leaderboard -->
+    <div class="row g-4">
+        <div class="col-md-4">
+            <div class="card border-0 shadow-sm rounded-4 h-100">
+                <div class="card-header bg-white border-0 pt-4">
+                    <h6 class="fw-bold mb-0 text-primary"><i class="fas fa-trophy me-2"></i> Performance Leaderboard</h6>
+                </div>
+                <div class="card-body p-0">
+                    <div id="leaderboardList" class="list-group list-group-flush">
+                        <!-- Loaded via API -->
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-8">
+            <div class="card border-0 shadow-sm rounded-4 h-100">
+                <div class="card-header bg-white border-0 pt-4">
+                    <h6 class="fw-bold mb-0">Violation Distribution</h6>
+                </div>
+                <div class="card-body">
+                    <canvas id="violationChart" height="300"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    let violationChart;
+
+    async function loadScores() {
+        const period = document.getElementById('periodFilter').value;
+        const res = await fetch(`/api/v2/analytics/driver-score?period=${period}`);
+        const data = await res.json();
+        
+        const list = document.getElementById('leaderboardList');
+        if (data.scores.length === 0) {
+            list.innerHTML = '<div class="p-4 text-center text-muted">No score data available.</div>';
+            return;
+        }
+
+        list.innerHTML = data.scores.map((s, idx) => `
+            <div class="list-group-item border-0 py-3 d-flex align-items-center justify-content-between">
+                <div class="d-flex align-items-center gap-3">
+                    <div class="fw-bold fs-5 text-muted" style="width: 25px;">${idx + 1}</div>
+                    <div class="rounded-circle bg-light d-flex align-items-center justify-content-center" style="width: 40px; height: 40px;">
+                        <i class="fas fa-user text-secondary"></i>
+                    </div>
+                    <div>
+                        <div class="fw-bold">${s.name}</div>
+                        <div class="x-small text-muted">${s.violations} Violations</div>
+                    </div>
+                </div>
+                <div class="text-end">
+                    <div class="fw-bold text-primary">${s.score}%</div>
+                    <span class="badge ${s.score > 90 ? 'bg-soft-success' : 'bg-soft-warning'}">${s.rank}</span>
+                </div>
+            </div>
+        `).join('');
+
+        updateCharts(data.scores);
+    }
+
+    function updateCharts(scores) {
+        if (violationChart) violationChart.destroy();
+        
+        const labels = scores.map(s => s.name);
+        const data = scores.map(s => s.violations);
+
+        violationChart = new Chart(document.getElementById('violationChart'), {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Total Violations',
+                    data: data,
+                    backgroundColor: 'rgba(37, 99, 235, 0.6)',
+                    borderRadius: 8
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: { y: { beginAtZero: true, grid: { display: false } }, x: { grid: { display: false } } }
+            }
+        });
+    }
+
+    document.addEventListener('DOMContentLoaded', loadScores);
+</script>
+{% endblock %}

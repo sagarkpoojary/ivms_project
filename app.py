@@ -27,6 +27,10 @@ from routes.reports import reports_bp
 from routes.notifications import notifications_bp
 from routes.api import api_bp
 from routes.external_reports import external_reports_bp
+from routes.analytics import analytics_bp
+from routes.maintenance import maintenance_bp
+from routes.drivers import drivers_bp
+from routes.site_ops import site_ops_bp
 
 app.register_blueprint(auth_bp)
 app.register_blueprint(dashboard_bp)
@@ -36,6 +40,10 @@ app.register_blueprint(reports_bp)
 app.register_blueprint(notifications_bp)
 app.register_blueprint(api_bp)
 app.register_blueprint(external_reports_bp)
+app.register_blueprint(analytics_bp)
+app.register_blueprint(maintenance_bp)
+app.register_blueprint(drivers_bp)
+app.register_blueprint(site_ops_bp)
 
 @app.route('/')
 def index():

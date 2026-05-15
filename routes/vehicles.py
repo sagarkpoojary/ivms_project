@@ -238,6 +238,33 @@ def update_vehicle(unique_id):
     else:
         return redirect(url_for('vehicles.vehicle_form', error="Vehicle not found"))
 
+@vehicles_bp.route('/vehicle/profile/<imei>')
+@role_required('user')
+def vehicle_profile(imei):
+    # Security check: Ensure user has access to this IMEI
+    allowed_vehicles = get_filtered_vehicles()
+    v = next((v for v in allowed_vehicles if str(v.get('unique_id')) == str(imei)), None)
+    
+    if not v:
+        return "Access Denied or Vehicle Not Found", 403
+        
+    from models.database import get_conn
+    import psycopg2.extras
+    conn = get_conn()
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    
+    try:
+        # Get Live Status
+        cur.execute("SELECT * FROM live_vehicle_status WHERE imei = %s", (str(imei),))
+        status = cur.fetchone()
+        
+        # Get Recent Events (last 10)
+        cur.execute("SELECT * FROM system_events WHERE imei = %s ORDER BY created_at DESC LIMIT 10", (str(imei),))
+        events = cur.fetchall()
+        
+    finally:
+        cur.close(); conn.close()
+
 @vehicles_bp.route('/vehicle-list-json')
 def vehicle_list_json():
     return {"vehicles": get_filtered_vehicles()}

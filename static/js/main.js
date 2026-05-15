@@ -136,7 +136,9 @@ function renderTable(list) {
 
 // WebSocket Integration
 function initLiveUpdates() {
-    const wsUrl = `ws://${window.location.hostname}:8000/ws/live`;
+    // Connect through Nginx proxy instead of direct port 8000
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsUrl = `${protocol}//${window.location.host}/ws/live`;
     const socket = new WebSocket(wsUrl);
 
     socket.onmessage = (event) => {
@@ -240,3 +242,34 @@ document.addEventListener("DOMContentLoaded", () => {
     refresh();
     initLiveUpdates();
 });
+
+function showMap(lat, lng, name) {
+    const container = document.getElementById('mapContainer');
+    const nameEl = document.getElementById('mapDeviceName');
+    
+    if (!container || !nameEl) return;
+    
+    container.style.display = 'block';
+    nameEl.innerText = name;
+    
+    // Smooth scroll to map
+    container.scrollIntoView({ behavior: 'smooth' });
+
+    if (!map) {
+        map = L.map('reportMap').setView([lat, lng], 15);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap'
+        }).addTo(map);
+        marker = L.marker([lat, lng]).addTo(map);
+    } else {
+        map.setView([lat, lng], 15);
+        marker.setLatLng([lat, lng]);
+    }
+    
+    // Invalidate size to fix Leaflet rendering issues in hidden containers
+    setTimeout(() => { map.invalidateSize(); }, 200);
+}
+
+// Global alias for compatibility with legacy calls or different casing
+window.ShowMap = showMap;
+window.showMap = showMap;

@@ -9,7 +9,7 @@ if not firebase_admin._apps:
     firebase_admin.initialize_app(cred)
 
 db = firestore.client()
-email = "saga@gmail.com"
+email = "sagar@conceptgrps.com"
 
 user_ref = db.collection('users').document(email)
 user_doc = user_ref.get()

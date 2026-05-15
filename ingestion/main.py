@@ -12,6 +12,7 @@ from ingestion.connection import DeviceSession
 from ingestion.registry import SessionRegistry
 from ingestion.db.handler import DBHandler
 from ingestion import metrics
+from config import Config
 import time
 
 load_dotenv()
@@ -42,13 +43,21 @@ class IngestionServer:
                 item = await self.db_queue.get()
                 metrics.DB_QUEUE_SIZE.set(self.db_queue.qsize())
                 
-                imei = item['imei']
-                records = item['records']
-                
-                # Measure latency
-                start_time = time.time()
-                await self.db_handler.save_telemetry(imei, records)
-                metrics.DB_WRITE_LATENCY.observe(time.time() - start_time)
+                if item.get('type') == 'alert':
+                    await self.db_handler.log_alert(
+                        item.get('severity', 'INFO'), 
+                        item.get('component', 'System'), 
+                        item.get('message', ''), 
+                        item.get('imei')
+                    )
+                else:
+                    imei = item['imei']
+                    records = item['records']
+                    
+                    # Measure latency
+                    start_time = time.time()
+                    await self.db_handler.save_telemetry(imei, records)
+                    metrics.DB_WRITE_LATENCY.observe(time.time() - start_time)
                 
                 self.db_queue.task_done()
             except Exception as e:
@@ -75,6 +84,21 @@ class IngestionServer:
                 logger.error(f"Cache Rebuilder Error: {e}")
                 await asyncio.sleep(60)
 
+    async def offline_reconciliation_worker(self):
+        """Periodically checks and marks devices as offline if they exceed the timeout."""
+        logger.info(f"Offline reconciliation worker started (timeout: {Config.ONLINE_TIMEOUT_SECONDS}s)")
+        while self.is_running:
+            try:
+                count = await self.db_handler.reconcile_offline_devices(Config.ONLINE_TIMEOUT_SECONDS)
+                if count > 0:
+                    logger.info(f"Reconciled {count} offline devices")
+                
+                # Check every 30 seconds
+                await asyncio.sleep(30)
+            except Exception as e:
+                logger.error(f"Offline Reconciliation Error: {e}")
+                await asyncio.sleep(30)
+
     async def stats_logger(self):
         while self.is_running:
             metrics = self.registry.get_metrics()
@@ -95,6 +119,7 @@ class IngestionServer:
         worker_task = asyncio.create_task(self.db_worker())
         stats_task = asyncio.create_task(self.stats_logger())
         cache_task = asyncio.create_task(self.cache_rebuilder())
+        reconciliation_task = asyncio.create_task(self.offline_reconciliation_worker())
 
         async with server:
             await server.serve_forever()

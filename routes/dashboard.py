@@ -19,7 +19,7 @@ def dashboard_home():
     return render_template('dashboard.html')
 
 @dashboard_bp.route('/dashboard-config', methods=['GET', 'POST'])
-@role_required('main_admin')
+@role_required('super_admin')
 def dashboard_config():
     modules_config = load_module_config()
     dashboard_modules = [m for m in ALL_SYSTEM_MODULES if m.startswith('dashboard') or m == 'pricing']
@@ -42,7 +42,7 @@ def dashboard_config():
     return render_template('dashboard_config.html', modules_config=modules_config, doc_modules=dashboard_modules, success=request.args.get('success'))
 
 @dashboard_bp.route('/plan-manager', methods=['GET', 'POST'])
-@role_required('main_admin')
+@role_required('super_admin')
 def plan_manager():
     modules_config = load_module_config()
     if request.method == 'POST':
@@ -63,13 +63,13 @@ def plan_manager():
     return render_template('plan_manager.html', modules_config=modules_config, all_modules=ALL_SYSTEM_MODULES, success=request.args.get('success'))
 
 @dashboard_bp.route('/pricing')
-@role_required('main_admin')
+@role_required('super_admin')
 def pricing():
     modules_config = load_module_config()
     return render_template('pricing.html', modules_config=modules_config, all_modules=ALL_SYSTEM_MODULES)
 
 @dashboard_bp.route('/download/apk')
-@role_required('main_admin')
+@role_required('super_admin')
 def download_apk():
     APP_ROOT_PROJECT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     apk_path = os.path.join(APP_ROOT_PROJECT, 'static', 'downloads', 'ivms-app.apk')

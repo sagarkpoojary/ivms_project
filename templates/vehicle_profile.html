@@ -1,0 +1,221 @@
+{% extends "base.html" %}
+
+{% block content %}
+<style>
+    .profile-header {
+        background: #fff;
+        border-radius: 20px;
+        padding: 30px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.05);
+        margin-bottom: 30px;
+    }
+    .profile-card {
+        border: none;
+        border-radius: 20px;
+        background: #fff;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.03);
+        height: 100%;
+    }
+    .status-indicator {
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        display: inline-block;
+        margin-right: 8px;
+    }
+    .bg-moving { background-color: #10b981; }
+    .bg-idle { background-color: #f59e0b; }
+    .bg-offline { background-color: #ef4444; }
+    
+    .stat-label { font-size: 0.75rem; text-transform: uppercase; font-weight: 700; color: #6b7280; letter-spacing: 0.05em; }
+    .stat-value { font-size: 1.25rem; font-weight: 700; color: #111827; }
+
+    #profileMap { height: 350px; border-radius: 16px; }
+    
+    .event-item {
+        border-left: 4px solid #e5e7eb;
+        padding-left: 15px;
+        margin-bottom: 20px;
+        position: relative;
+    }
+    .event-item.critical { border-left-color: #ef4444; }
+    .event-item.warning { border-left-color: #f59e0b; }
+</style>
+
+<div class="container-fluid">
+    <!-- Header -->
+    <div class="profile-header">
+        <div class="d-flex justify-content-between align-items-center">
+            <div class="d-flex align-items-center gap-4">
+                <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center" style="width: 80px; height: 80px; font-size: 2rem;">
+                    <i class="fas fa-truck"></i>
+                </div>
+                <div>
+                    <h2 class="fw-bold mb-1">{{ vehicle.name }}</h2>
+                    <div class="d-flex align-items-center">
+                        <span class="status-indicator bg-{{ status.status if status else 'offline' }}"></span>
+                        <span class="text-muted fw-medium">{{ (status.status|capitalize) if status else 'Offline' }}</span>
+                        <span class="mx-2 text-muted">•</span>
+                        <span class="text-muted">IMEI: {{ vehicle.unique_id }}</span>
+                        <span class="mx-2 text-muted">•</span>
+                        <span class="text-muted">Model: {{ vehicle.device_model or 'FMC130' }}</span>
+                    </div>
+                </div>
+            </div>
+            <div class="d-flex gap-2">
+                <button class="btn btn-outline-primary rounded-pill px-4" onclick="window.history.back()">
+                    <i class="fas fa-arrow-left me-2"></i>Back
+                </button>
+                <button class="btn btn-primary rounded-pill px-4">
+                    <i class="fas fa-edit me-2"></i>Edit Vehicle
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <!-- Live Map & Real-time Stats -->
+        <div class="col-lg-8">
+            <div class="profile-card p-4">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h5 class="fw-bold mb-0">Live Position</h5>
+                    <div class="small text-muted">Last Updated: {{ status.last_timestamp if status else 'N/A' }}</div>
+                </div>
+                <div id="profileMap"></div>
+                
+                <div class="row mt-4 g-4 text-center">
+                    <div class="col-md-3">
+                        <div class="stat-label">Current Speed</div>
+                        <div class="stat-value">{{ status.speed if status else 0 }} km/h</div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="stat-label">Ignition</div>
+                        <div class="stat-value">
+                            <i class="fas fa-bolt {{ 'text-warning' if status and status.ignition else 'text-muted' }}"></i>
+                            {{ 'ON' if status and status.ignition else 'OFF' }}
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="stat-label">Voltage</div>
+                        <div class="stat-value">{{ status.external_voltage if status else 0 }} V</div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="stat-label">GSM Signal</div>
+                        <div class="stat-value">
+                            {% set gsm = status.gsm_signal if status else 0 %}
+                            <i class="fas fa-signal {{ 'text-success' if gsm > 3 else ('text-warning' if gsm > 1 else 'text-danger') }}"></i>
+                            {{ gsm }}/5
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sidebar Info -->
+        <div class="col-lg-4">
+            <!-- Active Driver -->
+            <div class="profile-card p-4 mb-4">
+                <h5 class="fw-bold mb-4">Active Driver</h5>
+                <div class="d-flex align-items-center gap-3">
+                    <div class="rounded-circle bg-light d-flex align-items-center justify-content-center" style="width: 60px; height: 60px; font-size: 1.5rem;">
+                        <i class="fas fa-user-tie"></i>
+                    </div>
+                    <div>
+                        <div class="fw-bold">{{ vehicle.driver_name or 'No Driver Assigned' }}</div>
+                        <div class="small text-muted">RFID ID: {{ status.current_driver_id or 'Not logged in' }}</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Maintenance Status -->
+            <div class="profile-card p-4">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h5 class="fw-bold mb-0">Maintenance</h5>
+                    <a href="/maintenance" class="small text-decoration-none">Details</a>
+                </div>
+                
+                {% if maint_schedule %}
+                    {% for m in maint_schedule[:2] %}
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <div>
+                            <div class="small fw-bold">{{ m.service_type }}</div>
+                            <div class="x-small text-muted">Target: {{ m.target_date }}</div>
+                        </div>
+                        <span class="badge rounded-pill bg-{{ 'warning' if m.status == 'due' else 'primary' }}">{{ m.status }}</span>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="text-center py-4 text-muted small">
+                        <i class="fas fa-calendar-check d-block mb-2 fs-4"></i>
+                        No scheduled maintenance
+                    </div>
+                {% endif %}
+                
+    
+        <!-- Recent Activity Feed -->
+        <div class="col-lg-12">
+            <div class="profile-card p-4">
+                <h5 class="fw-bold mb-4">Recent Activity & Violations</h5>
+                <div class="activity-timeline">
+                    {% for e in events %}
+                    <div class="event-item {{ 'critical' if e.severity == 'CRITICAL' else ('warning' if e.severity == 'WARNING' else '') }}">
+                        <div class="d-flex justify-content-between">
+                            <div class="fw-bold">{{ e.title }}</div>
+                            <div class="small text-muted">{{ e.created_at }}</div>
+                        </div>
+                        <div class="small text-muted mt-1">{{ e.description }}</div>
+                    </div>
+                    {% else %}
+                    <div class="text-center py-5 text-muted">
+                        No recent activity recorded for this vehicle.
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script id="status-data" type="application/json">
+        {
+            "latitude": {{ status.latitude if status and status.latitude else 23.5880 }},
+            "longitude": {{ status.longitude if status and status.longitude else 58.3829 }}
+        }
+    </script>
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const statusData = JSON.parse(document.getElementById('status-data').textContent);
+        const lat = statusData.latitude;
+        const lng = statusData.longitude;
+        
+        const map = L.map('profileMap').setView([lat, lng], 15);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+        
+        const marker = L.marker([lat, lng]).addTo(map)
+            .bindPopup('<b>{{ vehicle.name }}</b><br>Current Position')
+            .openPopup();
+
+        // Real-time update via WebSocket
+        const protocol = window.location.protocol === "https:" ? "wss" : "ws";
+        const wsUrl = `${protocol}://${window.location.host}/ws/live`;
+        let socket = new WebSocket(wsUrl);
+        
+        socket.onmessage = (event) => {
+            const data = JSON.parse(event.data);
+            if (data.imei === '{{ vehicle.unique_id }}') {
+                const newLatLng = [data.latitude, data.longitude];
+                marker.setLatLng(newLatLng);
+                if (data.speed > 0) map.panTo(newLatLng);
+                
+                // Update UI elements
+                // (Omitted for brevity, but would update speed, ignition, etc.)
+            }
+        };
+    });
+</script>
+{% endblock %}

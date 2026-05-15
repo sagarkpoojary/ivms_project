@@ -165,20 +165,7 @@
     </div>
     {% endif %}
 
-    {% if traccar_admin_warning %}
-    <div class="alert alert-warning alert-dismissible fade show mb-4 border-0 shadow-sm" role="alert">
-        <div class="d-flex">
-            <i class="fas fa-user-shield fa-2x me-3 text-warning"></i>
-            <div>
-                <h6 class="alert-heading fw-bold">Limited Traccar Permissions</h6>
-                <p class="mb-0 small">You are logged in as a <strong>Super Admin</strong> in IVMS, but your account is
-                    not an <strong>Administrator</strong> in the Traccar backend. You might not see all vehicles or data
-                    until they are explicitly linked to your account in Traccar or your profile is promoted.</p>
-            </div>
-        </div>
-        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-    </div>
-    {% endif %}
+    {# Traccar permission alert removed #}
 
     <div class="card p-4 custom-shadow mb-4 border-0">
         <form method="get" class="row g-2 align-items-center">
@@ -520,10 +507,9 @@
                         {% endif %}
                     </td>
                     <td class="fw-medium">
-                        {% if role == 'main_admin' %}Asset #{{ loop.index }}{% else %}{{ row.name }}{% endif %}
-                        {% if not row.internal_id %}
-                        <i class="fas fa-exclamation-circle text-warning ms-1" title="Not linked to Traccar"></i>
-                        {% endif %}
+                        <a href="/vehicle/profile/{{ row.unique_id }}" class="text-primary text-decoration-none">
+                            {% if role == 'main_admin' %}Asset #{{ loop.index }}{% else %}{{ row.name }}{% endif %}
+                        </a>
                     </td>
                     <td>
                         <span class="d-none">
@@ -611,10 +597,9 @@
                 <tr
                     class="{% if row.status == 'No Movement' %}row-no-movement{% elif row.status == 'Low Usage' %}row-low-usage{% elif row.status == 'Possible Overspeed' %}row-possible-overspeed{% else %}row-normal{% endif %}">
                     <td class="ps-4 fw-medium">
-                        {% if role == 'main_admin' %}Asset #{{ loop.index }}{% else %}{{ row.name }}{% endif %}
-                        {% if not row.internal_id %}
-                        <i class="fas fa-exclamation-circle text-warning ms-1" title="Not linked to Traccar"></i>
-                        {% endif %}
+                        <a href="/vehicle/profile/{{ row.unique_id }}" class="text-primary text-decoration-none">
+                            {% if role == 'main_admin' %}Asset #{{ loop.index }}{% else %}{{ row.name }}{% endif %}
+                        </a>
                     </td>
                     <td>
                         <span class="d-none">
@@ -1735,8 +1720,8 @@
 
     async function fetchAndShowRoute(uid, name, customFrom, customTo) {
         // Use the UTC-aligned strings from the backend if custom ones aren't provided
-        let fromStr = customFrom || "{{ traccar_from }}";
-        let toStr = customTo || "{{ traccar_to }}";
+        let fromStr = customFrom || "{{ from_date }}";
+        let toStr = customTo || "{{ to_date }}";
 
         try {
             const url = `/api/reports/route?unique_id=${uid}&from=${encodeURIComponent(fromStr)}&to=${encodeURIComponent(toStr)}`;

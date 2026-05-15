@@ -3,6 +3,7 @@ import asyncpg
 import os
 from typing import List, Optional
 from pydantic import BaseModel
+from auth.api_utils import get_allowed_imeis
 
 router = APIRouter()
 
@@ -22,34 +23,43 @@ async def get_db():
         await conn.close()
 
 @router.get("")
-async def list_devices(db = Depends(get_db)):
+async def list_devices(
+    allowed_imeis: List[str] = Depends(get_allowed_imeis), 
+    db = Depends(get_db)
+):
     # Join with live_vehicle_status to get current position and status
+    # We use 'vehicles' table as the primary source of truth for registration
     rows = await db.fetch("""
         SELECT 
-            d.imei as "uniqueId",
-            d.name,
-            ls.status,
+            v.unique_id as "uniqueId",
+            v.name,
+            v.status as "reg_status",
+            ls.status as "live_status",
             ls.last_timestamp as "lastUpdate",
             ls.latitude,
             ls.longitude,
             ls.speed,
             ls.ignition,
-            p.name as profile_name
-        FROM devices d
-        LEFT JOIN live_vehicle_status ls ON d.imei = ls.imei
-        LEFT JOIN device_profiles p ON d.profile_id = p.id
+            ls.current_driver_id as "driver_id",
+            ls.current_driver_name as "driver_name"
+        FROM vehicles v
+        LEFT JOIN live_vehicle_status ls ON v.unique_id = ls.imei
+        WHERE v.status = 'active' AND v.unique_id = ANY($1)
         ORDER BY ls.last_timestamp DESC NULLS LAST
-    """)
+    """, allowed_imeis)
     
     devices = []
     for row in rows:
         d = dict(row)
+        # Standardize status field for frontend
+        d['status'] = d.get('live_status') or 'offline'
+        
         # Nest position for frontend compatibility
         d['position'] = {
             'latitude': d.pop('latitude'),
             'longitude': d.pop('longitude'),
-            'speed': d.get('speed'),
-            'ignition': d.get('ignition')
+            'speed': d.get('speed', 0),
+            'ignition': d.get('ignition', False)
         }
         devices.append(d)
     return devices

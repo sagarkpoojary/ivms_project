@@ -1,123 +1,73 @@
 {% extends "base.html" %}
-{% block title %}Server Settings{% endblock %}
+{% block title %}Platform Settings{% endblock %}
 
 {% block content %}
 
-<h3 class="mb-3">Server Manager</h3>
+<h3 class="mb-4 text-primary"><i class="fas fa-cogs me-2"></i>Platform Settings</h3>
 
-<!-- ACTIVE IP PANEL -->
-<div class="d-flex justify-content-between align-items-center mb-3" style="max-width:700px;">
-  <div>
-    <small class="text-muted">Current active server</small>
-    <div class="d-flex align-items-center gap-2 mt-1">
+<div class="row">
+    <div class="col-xl-6 col-lg-8 col-12">
+        <!-- Report Settings -->
+        <div class="card p-4 mb-4 custom-shadow border-0">
+            <div class="d-flex align-items-center mb-4">
+                <div class="icon-box-sm bg-success text-white me-3">
+                    <i class="fas fa-file-alt"></i>
+                </div>
+                <h5 class="m-0">Analytics & Report Logic</h5>
+            </div>
+            
+            <p class="text-muted small mb-4">
+                Configure the thresholds used by the native analytics engine to detect stops, idling, and trips. 
+                These settings directly affect historical report generation and driver behavior scoring.
+            </p>
 
-      <span id="activeIpText" class="fw-semibold" style="color:#0d63f8;">
-        {{ web_ip or config.active_ip }}
-      </span>
+            <form method="post" action="/server-settings">
+                <div class="mb-4">
+                    <label for="stop_threshold" class="form-label fw-bold">Stop Detection Threshold (Minutes)</label>
+                    <div class="input-group">
+                        <span class="input-group-text bg-light border-end-0"><i class="fas fa-clock text-secondary"></i></span>
+                        <input type="number" id="stop_threshold" name="stop_threshold" class="form-control border-start-0"
+                            value="{{ config.get('stop_threshold', 5) }}" min="1">
+                        <span class="input-group-text bg-light">min</span>
+                    </div>
+                    <div class="form-text mt-2">
+                        Minimum stationary duration (with Ignition OFF) to be counted as a 'Stop' event.
+                    </div>
+                </div>
 
-      <button id="copyIpBtn" type="button" class="btn btn-sm btn-outline-secondary" title="Copy IP">
-        Copy
-      </button>
+                <div class="d-grid mt-4">
+                    <button type="submit" class="btn btn-primary shadow-sm py-2">
+                        <i class="fas fa-save me-2"></i>Apply Changes
+                    </button>
+                </div>
+            </form>
+        </div>
 
-      {% if active_ip or config.active_ip %}
-      <a id="openIpBtn" href="{{ active_ip or config.active_ip }}" target="_blank"
-        class="btn btn-sm btn-outline-primary">
-        Open
-      </a>
-      {% endif %}
+        <!-- System Information -->
+        <div class="card p-4 custom-shadow border-0">
+            <div class="d-flex align-items-center mb-4">
+                <div class="icon-box-sm bg-primary text-white me-3">
+                    <i class="fas fa-info-circle"></i>
+                </div>
+                <h5 class="m-0">System Deployment Info</h5>
+            </div>
+            
+            <ul class="list-group list-group-flush small">
+                <li class="list-group-item d-flex justify-content-between px-0">
+                    <span class="text-muted">Platform Mode:</span>
+                    <span class="badge bg-success">Production Native</span>
+                </li>
+                <li class="list-group-item d-flex justify-content-between px-0">
+                    <span class="text-muted">Database Engine:</span>
+                    <span class="fw-bold">TimescaleDB</span>
+                </li>
+                <li class="list-group-item d-flex justify-content-between px-0">
+                    <span class="text-muted">Ingestion Protocol:</span>
+                    <span class="fw-bold">Teltonika Codec 8 Extended</span>
+                </li>
+            </ul>
+        </div>
     </div>
-  </div>
-
-  <div class="text-end">
-    <a href="/server-settings" class="btn btn-sm btn-outline-info">Manage Servers</a>
-  </div>
-</div>
-<!-- END ACTIVE IP PANEL -->
-<script>
-  (function () {
-    const copyBtn = document.getElementById('copyIpBtn');
-    if (!copyBtn) return;
-    copyBtn.addEventListener('click', async () => {
-      const ip = document.getElementById('activeIpText').innerText.trim();
-      try {
-        await navigator.clipboard.writeText(ip);
-        copyBtn.textContent = 'Copied';
-        setTimeout(() => copyBtn.textContent = 'Copy', 1500);
-      } catch (e) {
-        alert('Copy failed: ' + e);
-      }
-    });
-  })();
-</script>
-
-<!-- Add Server -->
-<div class="card p-3 mb-4" style="max-width:700px;">
-  <h5>Add New Server</h5>
-
-  <form method="post" action="/server-settings" class="row g-2 mt-2">
-    <div class="col-md-8">
-      <input name="server_ip" class="form-control" placeholder="example: 172.16.1.26:8082">
-    </div>
-    <div class="col-md-4">
-      <button class="btn btn-primary w-100">Add</button>
-    </div>
-  </form>
-</div>
-
-<!-- Traccar Admin Credentials -->
-<div class="card p-3 mb-4" style="max-width:700px;">
-  <h5>Traccar Admin Credentials</h5>
-  <form method="post" action="/server-settings" class="row g-2 mt-2">
-    <div class="col-md-6">
-      <input name="admin_email" class="form-control" placeholder="Traccar admin email" value="{{ config.get('admin_email', '') }}">
-    </div>
-    <div class="col-md-6">
-      <input name="admin_pass" type="password" class="form-control" placeholder="Traccar admin password" value="">
-    </div>
-    <div class="col-12">
-      <button class="btn btn-success">Save Credentials</button>
-    </div>
-  </form>
-</div>
-
-<!-- Report Settings -->
-<div class="card p-3 mb-4" style="max-width:700px;">
-  <h5>Report Settings</h5>
-  <form method="post" action="/server-settings" class="mt-2">
-    <div class="row g-3 align-items-center">
-      <div class="col-auto">
-        <label for="stop_threshold" class="col-form-label">Stop Threshold (Minutes)</label>
-      </div>
-      <div class="col-sm-3">
-        <input type="number" id="stop_threshold" name="stop_threshold" class="form-control"
-          value="{{ config.get('stop_threshold', 5) }}" min="1">
-      </div>
-      <div class="col-auto">
-        <button type="submit" class="btn btn-success">Update</button>
-      </div>
-    </div>
-  </form>
-</div>
-
-<!-- Server List -->
-<div class="card p-3" style="max-width:700px;">
-  <h5>Available Servers</h5>
-
-  <form method="post" action="/set-active-server" class="mt-2">
-    <div class="list-group">
-      {% for s in config.servers %}
-      <label class="list-group-item d-flex justify-content-between align-items-center">
-        <span>{{ s }}</span>
-        <input type="radio" name="active_ip" value="{{ s }}" {% if s==config.active_ip %}checked{% endif %}
-          onchange="this.form.submit()">
-      </label>
-      {% endfor %}
-    </div>
-  </form>
-
-  <div class="mt-3">
-    <strong>Active IP:</strong> {{ config.active_ip }}
-  </div>
 </div>
 
 {% endblock %}

@@ -45,8 +45,20 @@ async def handle_device_connection(reader, writer):
             return
             
         imei = Codec8EParser.parse_imei(data)
+        
+        db = DBHandler(DB_URL)
+        await db.connect()
+        
         if not imei:
             logger.warning(f"Invalid IMEI packet from {addr}: {data.hex()}")
+            writer.write(b'\x00') # Reject
+            await writer.drain()
+            return
+            
+        # Phase 8: Strict Whitelist Enforcement
+        if not await db.is_imei_registered(imei):
+            logger.warning(f"SECURITY: Unauthorized connection attempt from unregistered IMEI {imei} at {addr}")
+            await db.log_alert('SECURITY', 'Authentication', f"Unauthorized connection attempt from unregistered device {imei}", imei)
             writer.write(b'\x00') # Reject
             await writer.drain()
             return
@@ -62,8 +74,6 @@ async def handle_device_connection(reader, writer):
         await writer.drain()
         
         # Step 2: Receive AVL Data
-        db = DBHandler(DB_URL)
-        await db.connect()
         
         while True:
             # Preamble is 4 bytes, let's read the header first or just wait for data
