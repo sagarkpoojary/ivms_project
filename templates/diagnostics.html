@@ -1,0 +1,232 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="fw-bold mb-0">System Diagnostics</h2>
+            <p class="text-muted">Real-time infrastructure and telemetry health monitoring</p>
+        </div>
+        <div class="d-flex gap-2">
+            <button class="btn btn-outline-primary rounded-pill" onclick="refreshDiagnostics()">
+                <i class="fas fa-sync-alt me-2"></i>Refresh
+            </button>
+        </div>
+    </div>
+
+    <!-- Health Overview -->
+    <div class="row g-4 mb-4">
+        <div class="col-md-3">
+            <div class="card border-0 shadow-sm rounded-4 p-3 h-100">
+                <div class="d-flex align-items-center mb-3">
+                    <div class="bg-soft-success text-success rounded-circle p-2 me-3">
+                        <i class="fas fa-server"></i>
+                    </div>
+                    <h6 class="mb-0 fw-bold">Overall Status</h6>
+                </div>
+                <h3 class="fw-bold" id="overallStatus">---</h3>
+                <div class="small text-muted" id="lastUpdated">Updated just now</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card border-0 shadow-sm rounded-4 p-3 h-100">
+                <div class="d-flex align-items-center mb-3">
+                    <div class="bg-soft-primary text-primary rounded-circle p-2 me-3">
+                        <i class="fas fa-database"></i>
+                    </div>
+                    <h6 class="mb-0 fw-bold">Database Latency</h6>
+                </div>
+                <h3 class="fw-bold" id="dbLatency">-- ms</h3>
+                <div class="progress mt-2" style="height: 6px;">
+                    <div id="dbLatencyBar" class="progress-bar bg-primary" role="progressbar" style="width: 0%"></div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card border-0 shadow-sm rounded-4 p-3 h-100">
+                <div class="d-flex align-items-center mb-3">
+                    <div class="bg-soft-warning text-warning rounded-circle p-2 me-3">
+                        <i class="fas fa-plug"></i>
+                    </div>
+                    <h6 class="mb-0 fw-bold">Redis Connectivity</h6>
+                </div>
+                <h3 class="fw-bold" id="redisStatus">---</h3>
+                <div class="small text-muted">Real-time Cache Active</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card border-0 shadow-sm rounded-4 p-3 h-100">
+                <div class="d-flex align-items-center mb-3">
+                    <div class="bg-soft-info text-info rounded-circle p-2 me-3">
+                        <i class="fas fa-project-diagram"></i>
+                    </div>
+                    <h6 class="mb-0 fw-bold">Active WS Clients</h6>
+                </div>
+                <h3 class="fw-bold" id="activeWs">0</h3>
+                <div class="small text-muted">Real-time Broadcasters</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Components Grid -->
+    <div class="row g-4">
+        <!-- Ingestion Stats -->
+        <div class="col-md-6">
+            <div class="card border-0 shadow-sm rounded-4 overflow-hidden h-100">
+                <div class="card-header bg-white border-0 py-3">
+                    <h6 class="mb-0 fw-bold"><i class="fas fa-microchip me-2"></i>Telemetry Ingestion Pipeline</h6>
+                </div>
+                <div class="card-body">
+                    <div class="list-group list-group-flush">
+                        <div class="list-group-item border-0 d-flex justify-content-between align-items-center px-0">
+                            <div>
+                                <div class="fw-bold">Active Devices</div>
+                                <div class="small text-muted">Devices communicating in last 10m</div>
+                            </div>
+                            <span class="badge bg-soft-success text-success rounded-pill px-3" id="onlineDevices">0</span>
+                        </div>
+                        <div class="list-group-item border-0 d-flex justify-content-between align-items-center px-0">
+                            <div>
+                                <div class="fw-bold">TimescaleDB Hypertable Policies</div>
+                                <div class="small text-muted">Compression and Retention status</div>
+                            </div>
+                            <span class="badge bg-soft-primary text-primary rounded-pill px-3" id="tsPolicies">-- active</span>
+                        </div>
+                        <div class="list-group-item border-0 d-flex justify-content-between align-items-center px-0">
+                            <div>
+                                <div class="fw-bold">Security Audits (24h)</div>
+                                <div class="small text-muted">Successful and failed access attempts</div>
+                            </div>
+                            <span class="badge bg-soft-dark text-dark rounded-pill px-3" id="securityAudits">0</span>
+                        </div>
+                        <div class="list-group-item border-0 d-flex justify-content-between align-items-center px-0">
+                            <div>
+                                <div class="fw-bold">Data Confidence (Avg)</div>
+                                <div class="small text-muted">Average GPS/Sensor signal quality</div>
+                            </div>
+                            <span class="badge bg-soft-info text-info rounded-pill px-3" id="avgConfidence">100%</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- System Alerts Stream -->
+        <div class="col-md-6">
+            <div class="card border-0 shadow-sm rounded-4 overflow-hidden h-100">
+                <div class="card-header bg-white border-0 py-3 d-flex justify-content-between align-items-center">
+                    <h6 class="mb-0 fw-bold"><i class="fas fa-exclamation-circle me-2"></i>Recent System Alerts</h6>
+                    <span class="badge bg-light text-dark">Last 50</span>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive" style="max-height: 400px;">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th class="border-0">Severity</th>
+                                    <th class="border-0">Component</th>
+                                    <th class="border-0">Message</th>
+                                    <th class="border-0">Time</th>
+                                </tr>
+                            </thead>
+                            <tbody id="alertsTable">
+                                <tr>
+                                    <td colspan="4" class="text-center py-4 text-muted">Loading alerts...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .bg-soft-success { background-color: rgba(25, 135, 84, 0.1); }
+    .bg-soft-primary { background-color: rgba(13, 110, 253, 0.1); }
+    .bg-soft-warning { background-color: rgba(255, 193, 7, 0.1); }
+    .bg-soft-info { background-color: rgba(13, 202, 240, 0.1); }
+    .bg-soft-danger { background-color: rgba(220, 53, 69, 0.1); }
+</style>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    async function fetchHealth() {
+        try {
+            const res = await fetch('/api/v2/diagnostics/health');
+            const data = await res.json();
+            
+            document.getElementById('overallStatus').textContent = data.status.toUpperCase();
+            document.getElementById('overallStatus').className = `fw-bold text-${data.status === 'healthy' ? 'success' : 'warning'}`;
+            
+            // Assuming we added latency to health endpoint in api/main.py or similar
+            // If not available yet, we mock or use proxy
+            document.getElementById('redisStatus').textContent = data.components.redis.toUpperCase();
+            document.getElementById('activeWs').textContent = data.components.websocket.active_connections;
+            document.getElementById('tsPolicies').textContent = data.components.timescale_policies;
+            document.getElementById('onlineDevices').textContent = data.components.devices.online + data.components.devices.moving + data.components.devices.idle;
+            
+            const criticalAlerts = data.components.unresolved_alerts.CRITICAL || 0;
+            const errorAlerts = data.components.unresolved_alerts.ERROR || 0;
+            document.getElementById('unresolvedAlerts').textContent = criticalAlerts + errorAlerts;
+            
+            document.getElementById('securityAudits').textContent = data.components.security_audit_24h;
+            document.getElementById('avgConfidence').textContent = (data.components.avg_confidence_1h * 100).toFixed(1) + '%';
+            
+            document.getElementById('lastUpdated').textContent = `Updated: ${new Date().toLocaleTimeString()}`;
+        } catch (err) {
+            console.error("Health Fetch Error", err);
+        }
+    }
+
+    async function fetchAlerts() {
+        try {
+            const res = await fetch('/api/v2/diagnostics/alerts');
+            const alerts = await res.json();
+            const tbody = document.getElementById('alertsTable');
+            
+            if (alerts.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="4" class="text-center py-4 text-muted">No active system alerts</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = alerts.map(a => `
+                <tr>
+                    <td>
+                        <span class="badge bg-soft-${getSeverityClass(a.severity)} text-${getSeverityClass(a.severity)} rounded-pill">
+                            ${a.severity}
+                        </span>
+                    </td>
+                    <td><div class="fw-bold">${a.component}</div></td>
+                    <td><div class="small text-truncate" style="max-width: 250px;">${a.message}</div></td>
+                    <td class="small text-muted">${formatTime(a.timestamp)}</td>
+                </tr>
+            `).join('');
+        } catch (err) {
+            console.error("Alerts Fetch Error", err);
+        }
+    }
+
+    function getSeverityClass(s) {
+        if (s === 'CRITICAL' || s === 'ERROR') return 'danger';
+        if (s === 'WARNING') return 'warning';
+        return 'info';
+    }
+
+    function formatTime(ts) {
+        const d = new Date(ts);
+        return d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+    }
+
+    function refreshDiagnostics() {
+        fetchHealth();
+        fetchAlerts();
+    }
+
+    // Initial load and periodic refresh
+    document.addEventListener('DOMContentLoaded', refreshDiagnostics);
+    setInterval(refreshDiagnostics, 30000);
+</script>
+{% endblock %}

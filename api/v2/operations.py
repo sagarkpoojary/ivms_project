@@ -4,7 +4,7 @@ import os
 from typing import List, Optional
 from pydantic import BaseModel
 from auth.api_utils import get_allowed_imeis, get_current_user
-from services.report_service import get_period_dates
+from services.time_service import get_period_dates
 from datetime import datetime
 
 router = APIRouter(prefix="/api/v2/ops", tags=["Operations"])

@@ -42,6 +42,7 @@
   {% endif %}
 
   <form method="post" action="/vehicle/add">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
 
     <div class="mb-3">
       <label class="form-label">Name</label>
@@ -185,6 +186,7 @@
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <form id="editVehicleForm" method="post">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
         <div class="modal-body">
           <div class="mb-3">
             <label class="form-label">Unique ID (Read-only)</label>

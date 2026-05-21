@@ -28,6 +28,9 @@ class DeviceSession:
         self.command_task = None
         self.cache = LiveCache()
         self._superseded = False
+        from ingestion.filters import TelemetryFilterPipeline
+        self.filter_pipeline = TelemetryFilterPipeline()
+        self.last_record = None
         
     async def run(self):
         try:
@@ -76,7 +79,7 @@ class DeviceSession:
                 return False
             
             self.imei = imei
-            self.registry.register(self)
+            await self.registry.register(self)
             
             # Send Success ACK
             self.writer.write(b'\x01')
@@ -126,22 +129,33 @@ class DeviceSession:
         records = Codec8EParser.decode_avl(packet)
         
         if records:
-            # ACK with record count (4 bytes)
+            # Sort chronologically to ensure pipeline sees records in chronological order
+            records = sorted(records, key=lambda r: r['timestamp'])
+            
+            # Filter records using Phase 2 FilterHandler Pipeline
+            filtered_records = self.filter_pipeline.filter_records(self.imei, records, self.last_record)
+            
+            # ACK with original decoded record count (per Teltonika protocol spec)
             num_records = len(records)
             metrics.RECORDS_RECEIVED.inc(num_records)
             self.writer.write(num_records.to_bytes(4, byteorder='big'))
             await self.writer.drain()
             
-            # Push to DB Queue (Phase 1 requirement)
-            await self.db_queue.put({
-                'imei': self.imei,
-                'records': records,
-                'raw': packet.hex(),
-                'received_at': time.time()
-            })
-            logger.debug(f"Queued {num_records} records from {self.imei}")
+            if filtered_records:
+                self.last_record = filtered_records[-1]
+                
+                # Push to DB Queue (Phase 1 requirement)
+                await self.db_queue.put({
+                    'imei': self.imei,
+                    'records': filtered_records,
+                    'raw': packet.hex(),
+                    'received_at': time.time()
+                })
+                logger.debug(f"Queued {len(filtered_records)} records from {self.imei}")
+            else:
+                logger.info(f"All {num_records} records from {self.imei} were rejected by the FilterHandler Pipeline.")
         else:
-            metrics.MALFORMED_PACKETS.inc()
+            metrics.MALFORMED_PACKETS.labels(error_type="DecodeError").inc()
             logger.warning(f"Failed to decode packet from {self.imei}")
             await self.db_queue.put({
                 'type': 'alert', 'severity': 'ERROR', 'component': 'Parser',
@@ -151,32 +165,37 @@ class DeviceSession:
 
     async def _listen_for_commands(self):
         """Subscribes to Redis for commands specific to this IMEI."""
-        await self.cache.connect()
-        pubsub = self.cache.client.pubsub()
-        await pubsub.subscribe(f"device_commands:{self.imei}")
-        
-        logger.info(f"Command listener started for {self.imei}")
-        
-        while True:
-            try:
+        pubsub = None
+        try:
+            await self.cache.connect()
+            pubsub = self.cache.client.pubsub()
+            await pubsub.subscribe(f"device_commands:{self.imei}")
+            
+            logger.info(f"Command listener started for {self.imei}")
+            
+            while True:
                 message = await pubsub.get_message(ignore_subscribe_messages=True)
                 if message:
                     cmd_data = json.loads(message['data'].decode('utf-8'))
                     logger.info(f"Sending command {cmd_data['type']} to {self.imei}")
-                    
-                    # Teltonika GPRS command format (Codec 12 is common, but let's assume raw string for now)
-                    # Implementation of Codec 12 would go here.
-                    # For demonstration, we send a simple reboot string if requested
                     command_str = cmd_data['payload'] or cmd_data['type']
                     self.writer.write(command_str.encode())
                     await self.writer.drain()
                 
                 await asyncio.sleep(1)
-            except asyncio.CancelledError:
-                break
-            except Exception as e:
-                logger.error(f"Command listener error for {self.imei}: {e}")
-                await asyncio.sleep(5)
+        except asyncio.CancelledError:
+            logger.debug(f"Command listener task cancelled for {self.imei}")
+            raise
+        except Exception as e:
+            logger.error(f"Command listener error for {self.imei}: {e}")
+        finally:
+            if pubsub:
+                try:
+                    await pubsub.unsubscribe(f"device_commands:{self.imei}")
+                    await pubsub.close()
+                    logger.debug(f"Successfully unsubscribed and closed pubsub for {self.imei}")
+                except Exception as e:
+                    logger.warning(f"Error unsubscribing/closing pubsub for {self.imei}: {e}")
 
     async def supersede(self):
         """Forces the session to close because a newer one started."""
@@ -186,7 +205,19 @@ class DeviceSession:
     async def close(self):
         if self.command_task:
             self.command_task.cancel()
+            try:
+                await self.command_task
+            except asyncio.CancelledError:
+                pass
+            except Exception as e:
+                logger.error(f"Error during command task cancellation: {e}")
+            self.command_task = None
         self.registry.unregister(self)
+        try:
+            await self.cache.disconnect()
+            logger.debug(f"Redis cache disconnected for {self.imei}")
+        except Exception as e:
+            logger.warning(f"Error disconnecting Redis cache for {self.imei}: {e}")
         try:
             self.writer.close()
             await self.writer.wait_closed()

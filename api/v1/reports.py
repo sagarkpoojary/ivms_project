@@ -29,7 +29,8 @@ async def get_history(
 ):
     """Fetches raw telemetry history for playback."""
     rows = await db.fetch(
-        """SELECT timestamp, latitude, longitude, speed, angle, ignition 
+        """SELECT timestamp, latitude, longitude, speed, angle, 
+                  (COALESCE(io_elements->>'239', '0') = '1') AS ignition 
            FROM telemetry 
            WHERE imei = $1 AND timestamp BETWEEN $2 AND $3
            ORDER BY timestamp ASC""",
@@ -117,7 +118,7 @@ async def generate_csv_report(imei, start, end, filepath):
     conn = await asyncpg.connect(DB_URL)
     try:
         rows = await conn.fetch(
-            "SELECT timestamp, latitude, longitude, speed, angle, ignition, io_elements FROM telemetry WHERE imei = $1 AND timestamp BETWEEN $2 AND $3 ORDER BY timestamp ASC",
+            "SELECT timestamp, latitude, longitude, speed, angle, (COALESCE(io_elements->>'239', '0') = '1') AS ignition, io_elements FROM telemetry WHERE imei = $1 AND timestamp BETWEEN $2 AND $3 ORDER BY timestamp ASC",
             imei, start, end
         )
         

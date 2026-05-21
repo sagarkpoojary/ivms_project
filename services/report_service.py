@@ -1,42 +1,11 @@
 from datetime import datetime, timedelta
-from services.time_service import get_oman_now, SYSTEM_TZ
+from services.time_service import get_oman_now, SYSTEM_TZ, get_period_dates
 from flask import request, session, render_template, current_app
 from models.database import load_server_config
 from auth.utils import get_filtered_vehicles
 from extensions import cache
 from config import Config
 import json
-
-def get_period_dates(period, from_str=None, to_str=None):
-    now = get_oman_now()
-    start_dt = now
-    end_dt = now
-    
-    if period == 'Yesterday':
-        start_dt = now - timedelta(days=1)
-        start_dt = start_dt.replace(hour=0, minute=0, second=0, microsecond=0)
-        end_dt = start_dt.replace(hour=23, minute=59, second=59, microsecond=999)
-    elif period == 'This Week':
-        start_dt = now - timedelta(days=now.weekday())
-        start_dt = start_dt.replace(hour=0, minute=0, second=0, microsecond=0)
-        end_dt = now
-    elif period == 'This Month':
-        start_dt = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-        end_dt = now
-    elif period == 'Custom' and from_str:
-        try:
-            start_dt = datetime.strptime(from_str, '%Y-%m-%dT%H:%M')
-            start_dt = SYSTEM_TZ.localize(start_dt)
-            if to_str:
-                end_dt = datetime.strptime(to_str, '%Y-%m-%dT%H:%M')
-                end_dt = SYSTEM_TZ.localize(end_dt)
-        except:
-            pass
-    else: # Today
-        start_dt = now.replace(hour=0, minute=0, second=0, microsecond=0)
-        end_dt = now
-        
-    return start_dt, end_dt
 
 def render_report_logic(forced_report_type=None):
     if not session.get('logged_in'):
@@ -61,8 +30,11 @@ def render_report_logic(forced_report_type=None):
     from services.native_report_service import native_report_service
     
     report_data = []
-    if not filter_uid:
-        report_data = native_report_service.get_fleet_summary(vehicles, start_dt, end_dt)
+    if not filter_uid or report_type == 'Summary':
+        target_vehicles = vehicles
+        if filter_uid:
+            target_vehicles = [v for v in vehicles if str(v.get('unique_id')) == str(filter_uid)]
+        report_data = native_report_service.get_fleet_summary(target_vehicles, start_dt, end_dt)
 
     trip_data = []
     stop_data_on = []

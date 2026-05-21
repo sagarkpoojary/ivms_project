@@ -52,6 +52,7 @@
                             <td class="text-end">
                                 <form action="{{ url_for('vehicles.approve_draft', unique_id=v.unique_id) }}"
                                     method="POST" class="d-inline">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                                     <button type="submit" class="btn btn-success btn-sm px-3 shadow-sm">
                                         <i class="fas fa-check-circle me-1"></i> Approve
                                     </button>
@@ -129,6 +130,7 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <form id="declineForm" method="POST">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                 <div class="modal-body">
                     <p>Specify the reason for declining <strong><span id="declineVehicleName"></span></strong>:</p>
                     <div class="outlined-group">

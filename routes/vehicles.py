@@ -112,6 +112,9 @@ def register_vehicle():
         # Initialize vehicle status
         from models.database import get_conn
         conn = get_conn(); cur = conn.cursor()
+        # Ensure device exists in 'devices' table first for foreign key integrity
+        cur.execute("INSERT INTO devices (imei, name, model) VALUES (%s, %s, %s) ON CONFLICT (imei) DO NOTHING",
+                    (unique_id, name, device_model or 'FMC130'))
         cur.execute("INSERT INTO live_vehicle_status (imei, status, last_timestamp) VALUES (%s, %s, %s) ON CONFLICT (imei) DO NOTHING",
                     (unique_id, 'offline', datetime.now()))
         conn.commit(); cur.close(); conn.close()
@@ -157,6 +160,9 @@ def approve_draft(unique_id):
         # Initialize vehicle status
         from models.database import get_conn
         conn = get_conn(); cur = conn.cursor()
+        # Ensure device exists in 'devices' table first for foreign key integrity
+        cur.execute("INSERT INTO devices (imei, name, model) VALUES (%s, %s, %s) ON CONFLICT (imei) DO NOTHING",
+                    (unique_id, v.get('name'), v.get('device_model') or 'FMC130'))
         cur.execute("INSERT INTO live_vehicle_status (imei, status, last_timestamp) VALUES (%s, %s, %s) ON CONFLICT (imei) DO NOTHING",
                     (unique_id, 'offline', datetime.now()))
         conn.commit(); cur.close(); conn.close()
@@ -261,6 +267,12 @@ def vehicle_profile(imei):
         # Get Recent Events (last 10)
         cur.execute("SELECT * FROM system_events WHERE imei = %s ORDER BY created_at DESC LIMIT 10", (str(imei),))
         events = cur.fetchall()
+
+        # Get Maintenance schedules
+        cur.execute("SELECT * FROM maintenance_schedule WHERE imei = %s AND status != 'completed' ORDER BY target_date ASC", (str(imei),))
+        maint_schedule = cur.fetchall()
+
+        return render_template('vehicle_profile.html', vehicle=v, status=status, events=events, maint_schedule=maint_schedule)
         
     finally:
         cur.close(); conn.close()

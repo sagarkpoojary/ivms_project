@@ -25,6 +25,7 @@
                     </div>
                     <div class="card-body">
                         <form method="post">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                             <input type="hidden" name="action" value="update">
                             <input type="hidden" name="plan_name" value="{{ plan_name }}">
 

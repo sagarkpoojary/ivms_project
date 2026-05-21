@@ -2,26 +2,9 @@ from fastapi import APIRouter, Depends, HTTPException
 from typing import List, Optional
 from auth.api_utils import get_allowed_imeis
 from services.analytics_service import analytics_service
-from services.time_service import get_oman_now
-from datetime import timedelta
+from services.time_service import get_oman_now, get_period_dates
 
 router = APIRouter()
-
-def get_period_dates(period: str):
-    now = get_oman_now()
-    if period == 'Yesterday':
-        start_dt = (now - timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
-        end_dt = start_dt.replace(hour=23, minute=59, second=59, microsecond=999)
-    elif period == 'This Week':
-        start_dt = (now - timedelta(days=now.weekday())).replace(hour=0, minute=0, second=0, microsecond=0)
-        end_dt = now
-    elif period == 'This Month':
-        start_dt = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-        end_dt = now
-    else: # Today
-        start_dt = now.replace(hour=0, minute=0, second=0, microsecond=0)
-        end_dt = now
-    return start_dt, end_dt
 
 @router.get("/fleet-efficiency")
 async def fleet_efficiency(period: str = 'This Week', allowed_imeis: List[str] = Depends(get_allowed_imeis)):

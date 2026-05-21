@@ -17,7 +17,7 @@ def get_conn():
 def load_server_config():
     try:
         conn = get_conn(); cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-        cur.execute("SELECT data FROM system_config WHERE doc_id = %s", ("traccar_settings",))
+        cur.execute("SELECT data FROM system_config WHERE doc_id = %s", ("server_settings",))
         row = cur.fetchone(); cur.close(); conn.close()
         return dict(row["data"]) if row else {}
     except: return {}
@@ -26,7 +26,7 @@ def save_server_config(data):
     try:
         conn = get_conn(); cur = conn.cursor()
         cur.execute("INSERT INTO system_config (doc_id, data) VALUES (%s, %s) ON CONFLICT (doc_id) DO UPDATE SET data = EXCLUDED.data",
-            ("traccar_settings", psycopg2.extras.Json(data)))
+            ("server_settings", psycopg2.extras.Json(data)))
         conn.commit(); cur.close(); conn.close()
     except: pass
 

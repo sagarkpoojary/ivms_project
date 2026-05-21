@@ -90,7 +90,7 @@
         const select = document.getElementById('vehicleSelect');
         select.innerHTML = '<option value="">-- Choose Vehicle --</option>';
         data.forEach(v => {
-            select.innerHTML += `<option value="${v.imei}">${v.name || v.imei}</option>`;
+            select.innerHTML += `<option value="${v.uniqueId}">${v.name || v.uniqueId}</option>`;
         });
     }
 

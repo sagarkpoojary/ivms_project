@@ -1,6 +1,10 @@
 Flask>=2.2
 requests>=2.25
 gunicorn>=20.0
+fastapi==0.110.0
+uvicorn==0.27.1
+websockets==12.0
+prometheus_client==0.19.0
 firebase-admin>=6.2.0
 Flask-Caching>=2.0.0
 redis
@@ -8,4 +12,14 @@ psycopg2-binary>=2.9
 pandas
 openpyxl
 python-dotenv
-pytzitsdangerous
+pytz
+itsdangerous
+Flask-WTF
+PyJWT>=2.6.0
+celery>=5.3.0
+flower>=2.0.0
+passlib[bcrypt]>=1.7.4
+python-multipart
+asyncpg
+cryptography
+slowapi

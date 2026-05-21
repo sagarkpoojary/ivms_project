@@ -9,6 +9,7 @@ import psycopg2
 from flask import Blueprint, render_template, request, redirect, url_for, session
 from werkzeug.security import check_password_hash, generate_password_hash
 from models.database import get_user_by_email, load_module_config, DB_CONFIG
+from extensions import cache
 
 auth_bp = Blueprint('auth', __name__)
 
@@ -216,3 +217,46 @@ def reset_password(token):
 
     return render_template('login.html',
                            success="Password reset successfully! You can now log in.")
+
+@auth_bp.route('/auth/token')
+def get_token():
+    from flask import jsonify
+    if not session.get('logged_in'):
+        return jsonify({"error": "unauthorized"}), 401
+    
+    from auth.jwt_manager import auth_manager
+    token_data = {
+        "email": session.get('email'),
+        "role": session.get('role'),
+        "parent_email": session.get('parent_email'),
+        "company_name": session.get('company_name')
+    }
+    token = auth_manager.create_access_token(token_data)
+    refresh_token = auth_manager.create_refresh_token(token_data)
+    return jsonify({
+        "token": token,
+        "refresh_token": refresh_token
+    })
+
+@auth_bp.route('/auth/refresh', methods=['POST'])
+def refresh_token():
+    from flask import jsonify
+    data = request.json
+    refresh_token = data.get('refresh_token')
+    if not refresh_token:
+        return jsonify({"error": "missing_refresh_token"}), 400
+    
+    from auth.jwt_manager import auth_manager
+    payload = auth_manager.decode_token(refresh_token, expected_type="refresh")
+    if not payload:
+        return jsonify({"error": "invalid_refresh_token"}), 401
+    
+    # Generate new access token
+    token_data = {
+        "email": payload.get('email'),
+        "role": payload.get('role'),
+        "parent_email": payload.get('parent_email'),
+        "company_name": payload.get('company_name')
+    }
+    new_token = auth_manager.create_access_token(token_data)
+    return jsonify({"token": new_token})

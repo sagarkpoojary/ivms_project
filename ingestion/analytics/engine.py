@@ -16,7 +16,7 @@ class AnalyticsEngine:
         self.HARSH_BRAKE_THRESHOLD = -15 # km/h change per second
         self.DISTANCE_THRESHOLD_KM = 0.05 # 50 meters
 
-    async def process_telemetry(self, imei, data):
+    async def process_telemetry(self, imei, data, conn=None):
         """Processes a new telemetry point for trips and analytics."""
         try:
             # 1. Fetch previous state from cache
@@ -24,11 +24,16 @@ class AnalyticsEngine:
             prev_state = json.loads(prev_state_raw) if prev_state_raw else {}
             
             # 2. Trip Detection
-            await self._handle_trip_logic(imei, data, prev_state)
+            await self._handle_trip_logic(imei, data, prev_state, conn=conn)
             
             # 3. Violation Detection (Overspeed, Harsh Behavior)
-            await self._handle_violations(imei, data, prev_state)
+            await self._handle_violations(imei, data, prev_state, conn=conn)
             
+            # --- PHASE 5: Trust Hardening (Confidence Scoring) ---
+            confidence = self._calculate_confidence(data)
+            data['confidence'] = confidence
+            # ----------------------------------------------------
+
             # 4. Update state in Redis
             await self.cache.client.set(f"state:{imei}", json.dumps({
                 "last_timestamp": data['timestamp'].isoformat() if isinstance(data['timestamp'], datetime) else data['timestamp'],
@@ -38,13 +43,14 @@ class AnalyticsEngine:
                 "last_lng": data.get('longitude'),
                 "current_driver_id": data.get('driver_id') or prev_state.get('current_driver_id'),
                 "overspeed_start": prev_state.get('overspeed_start'),
-                "idle_start": prev_state.get('idle_start')
+                "idle_start": prev_state.get('idle_start'),
+                "confidence": confidence
             }))
             
         except Exception as e:
             self.logger.error(f"Analytics engine error for {imei}: {e}")
 
-    async def _handle_trip_logic(self, imei, data, prev_state):
+    async def _handle_trip_logic(self, imei, data, prev_state, conn=None):
         current_ign = data.get('ignition', False)
         prev_ign = prev_state.get('last_ignition', False)
         speed = data.get('speed', 0)
@@ -52,16 +58,16 @@ class AnalyticsEngine:
         
         # 1. Trip Start/End Logic
         if current_ign and not prev_ign:
-            await self.db.save_analytics_event(imei, "trip_start", {**data, "driver_id": driver_id})
-            await self.db.save_system_event(imei, 'INFO', 'Movement', 'Ignition ON', "Vehicle engine started.", driver_id=driver_id, latitude=data.get('latitude'), longitude=data.get('longitude'))
+            await self.db.save_analytics_event(imei, "trip_start", {**data, "driver_id": driver_id}, conn=conn)
+            await self.db.save_system_event(imei, 'INFO', 'Movement', 'Ignition ON', "Vehicle engine started.", driver_id=driver_id, latitude=data.get('latitude'), longitude=data.get('longitude'), conn=conn)
             self.logger.info(f"Trip started for {imei} | Driver: {driver_id}")
             
         elif not current_ign and prev_ign:
-            await self.db.save_analytics_event(imei, "trip_end", {**data, "driver_id": driver_id})
-            await self.db.save_system_event(imei, 'INFO', 'Movement', 'Ignition OFF', "Vehicle engine stopped.", driver_id=driver_id, latitude=data.get('latitude'), longitude=data.get('longitude'))
+            await self.db.save_analytics_event(imei, "trip_end", {**data, "driver_id": driver_id}, conn=conn)
+            await self.db.save_system_event(imei, 'INFO', 'Movement', 'Ignition OFF', "Vehicle engine stopped.", driver_id=driver_id, latitude=data.get('latitude'), longitude=data.get('longitude'), conn=conn)
             await self._calculate_trip_summary(imei, driver_id)
             self.logger.info(f"Trip ended for {imei}")
-
+ 
         # 2. Idle Detection (Phase 5)
         # Condition: Ignition ON AND Speed <= 1
         if current_ign and speed <= 1:
@@ -78,7 +84,7 @@ class AnalyticsEngine:
                         **data,
                         "driver_id": driver_id,
                         "value": duration # Store duration in seconds
-                    })
+                    }, conn=conn)
                     # Reset so we only log once per threshold or implement a "heartbeat" for long idle
                     # For now, let's just update the state to prevent spamming
                     # We will log the final idle duration on move or ign off
@@ -89,10 +95,10 @@ class AnalyticsEngine:
                 curr_time = data['timestamp'] if isinstance(data['timestamp'], datetime) else datetime.fromisoformat(data['timestamp'])
                 total_idle = (curr_time - idle_start).total_seconds()
                 if total_idle > 60: # Log if > 1 minute
-                     await self.db.save_analytics_event(imei, "idle_summary", {**data, "value": total_idle})
+                     await self.db.save_analytics_event(imei, "idle_summary", {**data, "value": total_idle}, conn=conn)
                 prev_state['idle_start'] = None
 
-    async def _handle_violations(self, imei, data, prev_state):
+    async def _handle_violations(self, imei, data, prev_state, conn=None):
         speed = data.get('speed', 0)
         driver_id = data.get('driver_id') or prev_state.get('current_driver_id')
         
@@ -112,23 +118,23 @@ class AnalyticsEngine:
                         **data,
                         "driver_id": driver_id,
                         "details": f"Speed {speed} km/h for {int(duration)}s"
-                    })
-                    await self.db.save_system_event(imei, 'WARNING', 'Safety', 'Overspeed', f"Vehicle exceeded {self.OVERSPEED_THRESHOLD} km/h for {int(duration)}s.", driver_id=driver_id, latitude=data.get('latitude'), longitude=data.get('longitude'), raw_payload={"speed": speed, "duration": duration})
+                    }, conn=conn)
+                    await self.db.save_system_event(imei, 'WARNING', 'Safety', 'Overspeed', f"Vehicle exceeded {self.OVERSPEED_THRESHOLD} km/h for {int(duration)}s.", driver_id=driver_id, latitude=data.get('latitude'), longitude=data.get('longitude'), raw_payload={"speed": speed, "duration": duration}, conn=conn)
                     # Reset start time so we don't spam every packet
                     prev_state['overspeed_start'] = None 
         else:
             prev_state['overspeed_start'] = None
-
+ 
         # 2. Harsh Behavior (Accel/Braking)
         if prev_state:
             prev_speed = prev_state.get('last_speed', 0)
             dv = speed - prev_speed
             if dv > self.HARSH_ACCEL_THRESHOLD:
-                await self.db.save_analytics_event(imei, "harsh_accel", {**data, "driver_id": driver_id})
-                await self.db.save_system_event(imei, 'WARNING', 'Safety', 'Harsh Acceleration', f"Sudden acceleration detected: {round(dv, 1)} km/h change.", driver_id=driver_id, latitude=data.get('latitude'), longitude=data.get('longitude'))
+                await self.db.save_analytics_event(imei, "harsh_accel", {**data, "driver_id": driver_id}, conn=conn)
+                await self.db.save_system_event(imei, 'WARNING', 'Safety', 'Harsh Acceleration', f"Sudden acceleration detected: {round(dv, 1)} km/h change.", driver_id=driver_id, latitude=data.get('latitude'), longitude=data.get('longitude'), conn=conn)
             elif dv < self.HARSH_BRAKE_THRESHOLD:
-                await self.db.save_analytics_event(imei, "harsh_brake", {**data, "driver_id": driver_id})
-                await self.db.save_system_event(imei, 'WARNING', 'Safety', 'Harsh Braking', f"Sudden braking detected: {round(dv, 1)} km/h change.", driver_id=driver_id, latitude=data.get('latitude'), longitude=data.get('longitude'))
+                await self.db.save_analytics_event(imei, "harsh_brake", {**data, "driver_id": driver_id}, conn=conn)
+                await self.db.save_system_event(imei, 'WARNING', 'Safety', 'Harsh Braking', f"Sudden braking detected: {round(dv, 1)} km/h change.", driver_id=driver_id, latitude=data.get('latitude'), longitude=data.get('longitude'), conn=conn)
 
     async def _calculate_trip_summary(self, imei, driver_id=None):
         """Aggregates the last completed trip metrics."""
@@ -180,3 +186,13 @@ class AnalyticsEngine:
                     imei, driver_id, start_t, end_t, int(duration), max_speed, avg_speed, round(total_dist, 2)
                 )
 
+    def _calculate_confidence(self, data):
+        """
+        Enterprise Confidence Scoring (0.0 to 1.0)
+        Based on satellite count and signal quality.
+        """
+        sats = data.get('satellites', 0)
+        if sats >= 8: return 1.0
+        if sats >= 4: return 0.7
+        if sats > 0: return 0.4
+        return 0.1

@@ -19,9 +19,13 @@ def driver_behavior():
 @analytics_bp.route('/event-center')
 @role_required('user')
 def event_center():
-    return render_template('event_center.html')
+    return render_template('events_center.html')
 
 @analytics_bp.route('/condition-monitoring')
 @role_required('user')
 def condition_monitoring():
     return render_template('condition_monitoring.html')
+@analytics_bp.route('/diagnostics')
+@role_required('super_admin')
+def diagnostics():
+    return render_template('diagnostics.html', title='System Diagnostics', role=session.get('role'))

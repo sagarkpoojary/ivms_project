@@ -39,6 +39,11 @@ class Config:
     
     # Localization
     TIMEZONE = os.environ.get("TIMEZONE", "Asia/Muscat")
+    
+    # Redis
+    REDIS_HOST = os.environ.get("REDIS_HOST", "localhost")
+    REDIS_PORT = int(os.environ.get("REDIS_PORT", 6379))
+    REDIS_DB = int(os.environ.get("REDIS_DB", 0))
 
     # Static / Cache
     CACHE_DIR = os.environ.get("CACHE_DIR", str(BASE_DIR / ".cache" / "flask_cache"))
@@ -49,6 +54,12 @@ class Config:
     IDLE_FUEL_LPH = float(os.environ.get("IDLE_FUEL_LPH", 1.5)) # Liters per hour
     MAX_DATA_GAP_MINUTES = int(os.environ.get("MAX_DATA_GAP_MINUTES", 3))
     ONLINE_TIMEOUT_SECONDS = int(os.environ.get("ONLINE_TIMEOUT_SECONDS", 120))
+    MAX_PAST_DAYS = int(os.environ.get("MAX_PAST_DAYS", 365))
+    
+    # Dynamic Live Status Engine Configurations
+    IGNITION_ON_TIMEOUT_SECONDS = int(os.environ.get("IGNITION_ON_TIMEOUT_SECONDS", 180)) # 3 minutes
+    IGNITION_OFF_TIMEOUT_SECONDS = int(os.environ.get("IGNITION_OFF_TIMEOUT_SECONDS", 1800)) # 30 minutes
+    SPEED_THRESHOLD_KMH = float(os.environ.get("SPEED_THRESHOLD_KMH", 2.0))
 
     IDLE_SPEED_THRESHOLD = float(os.environ.get("IDLE_SPEED_THRESHOLD", 3.0)) # km/h
     

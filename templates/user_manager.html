@@ -72,6 +72,7 @@
                 {% endif %}
             </h5>
             <form method="post" class="row g-3" id="userCreationForm">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                 <input type="hidden" name="action" value="add">
 
                 <div class="col-md-3">
@@ -172,6 +173,7 @@
                                 endif %}
                                 {% if role != 'super_admin' %}
                                 <form method="post" class="d-inline">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                                     <input type="hidden" name="action" value="update_profile">
                                     <input type="hidden" name="email" value="{{ u.email }}">
                                     <input type="text" name="name" value="{{ u.name or '' }}"
@@ -198,6 +200,7 @@
                             <td>
                                 {% if role == 'main_admin' and u.parent_email == session.get('email') %}
                                 <form method="post" class="d-inline">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                                     <input type="hidden" name="action" value="update_profile">
                                     <input type="hidden" name="email" value="{{ u.email }}">
                                     <input type="text" name="company_name" value="{{ u.company_name or '' }}"
@@ -220,6 +223,7 @@
                             {% endif %}
                             <td class="text-center">
                                 <form method="post" class="d-inline">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                                     <input type="hidden" name="action" value="update_profile">
                                     <input type="hidden" name="email" value="{{ u.email }}">
                                     <input type="number" name="vehicle_limit" value="{{ u.vehicle_limit or 0 }}"
@@ -229,6 +233,7 @@
                             </td>
                             <td class="text-center">
                                 <form method="post" class="d-inline">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                                     <input type="hidden" name="action" value="update_profile">
                                     <input type="hidden" name="email" value="{{ u.email }}">
                                     <input type="number" name="user_limit" value="{{ u.user_limit or 0 }}"
@@ -239,6 +244,7 @@
                             <td class="text-end">
                                 {% if role != 'user' %}
                                 <form method="post" class="d-inline">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                                     <input type="hidden" name="action" value="delete">
                                     <input type="hidden" name="email" value="{{ u.email }}">
                                     <button type="submit" class="btn btn-outline-danger btn-sm border-0"

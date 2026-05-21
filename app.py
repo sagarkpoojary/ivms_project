@@ -1,7 +1,9 @@
 from config import Config
 Config.validate()
 
-from flask import Flask, session, request, redirect, url_for
+from flask import Flask, render_template, request, redirect, url_for, session, jsonify, send_from_directory
+from flask_wtf.csrf import CSRFProtect
+import os
 from models.database import load_server_config
 from auth.utils import get_current_user_data
 
@@ -13,6 +15,12 @@ app = Flask(__name__, static_folder='static', template_folder='templates')
 app.secret_key = Config.SECRET_KEY
 
 # Cache Config
+app.config['SECRET_KEY'] = os.getenv('FLASK_SECRET', 'ivms_secure_secret_2026')
+app.config['SESSION_COOKIE_SECURE'] = True
+app.config['SESSION_COOKIE_HTTPONLY'] = True
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+
+csrf = CSRFProtect(app)
 app.config['CACHE_TYPE'] = 'FileSystemCache'
 app.config['CACHE_DIR'] = Config.CACHE_DIR
 app.config['CACHE_DEFAULT_TIMEOUT'] = 300
@@ -44,6 +52,10 @@ app.register_blueprint(analytics_bp)
 app.register_blueprint(maintenance_bp)
 app.register_blueprint(drivers_bp)
 app.register_blueprint(site_ops_bp)
+
+@app.route('/health')
+def health():
+    return {"status": "ok"}, 200
 
 @app.route('/')
 def index():

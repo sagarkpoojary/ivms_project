@@ -72,3 +72,27 @@ def api_create_schedule():
         return jsonify({"error": str(e)}), 500
     finally:
         cur.close(); conn.close()
+
+@maintenance_bp.route('/api/maintenance/history')
+@role_required('user')
+def api_get_history():
+    email = session.get('email')
+    parent_email = session.get('parent_email')
+    role = session.get('role')
+    tenant_id = email if role == 'main_admin' else parent_email
+    if role == 'super_admin': tenant_id = None
+
+    conn = get_conn()
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    try:
+        query = "SELECT * FROM maintenance_schedule WHERE status = 'completed' ORDER BY updated_at DESC LIMIT 100"
+        params = []
+        if tenant_id:
+            query = "SELECT * FROM maintenance_schedule WHERE status = 'completed' AND tenant_id = %s ORDER BY updated_at DESC LIMIT 100"
+            params.append(tenant_id)
+
+        cur.execute(query, tuple(params))
+        history = [dict(r) for r in cur.fetchall()]
+        return jsonify(history)
+    finally:
+        cur.close(); conn.close()

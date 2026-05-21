@@ -1,110 +1,67 @@
-# IVMS (In-Vehicle Monitoring System) Project
+# IVMS (In-Vehicle Monitoring System) — Enterprise Edition
 
-**Version:** 2.0 (Cloud Native)
-**Tech Stack:** Python (Flask), Traccar (Backend), Google Firestore (NoSQL DB), Bootstrap 5
+**Version:** 3.0 (Hardened Production Release)
+**Architecture:** Distributed Microservices
+**Core Stack:** Python (Flask/FastAPI), TimescaleDB (Time-series SQL), Redis, Celery, Nginx, Prometheus.
 
 ---
 
 ## 🚀 Overview
-IVMS is a professional Fleet Management System designed for B2B logistics and tracking operations. It serves as a powerful frontend application integrated with a **Traccar** GPS tracking backend.
+IVMS Enterprise is a professional, high-scale Fleet Management and Telemetry Operations platform. Designed for 24/7 reliability, it handles native telemetry ingestion directly from hardware (Teltonika, etc.) and provides real-time analytics with deep observability.
 
-Unlike a standard Traccar web UI, this IVMS offers:
-*   **Multi-Tier Hierarchy:** Super Admin -> Main Admin -> Company Admin -> User.
-*   **Subscription Management:** Control features (limits, dashboard widgets, reports) based on plans (Normal, Silver, Gold, Premium).
-*   **Advanced Reporting:** Custom logic for trip merging, stop thresholds (idling vs. parked), and combined route history.
-*   **PWA Support:** Installable on mobile devices with native-like feel.
-
----
-key for postgree 
- sudo -u postgres psql << 'EOF'
-CREATE USER ivmsuser WITH PASSWORD 'ivms_secure_2026';
-CREATE DATABASE ivmsdb OWNER ivmsuser;
-GRANT ALL PRIVILEGES ON DATABASE ivmsdb TO ivmsuser;
-\q
-EOF
-## 🔑 Key Features
-1.  **Dashboard:** Live fleet status (Online/Offline/Moving), embedded maps, and big data visualization.
-2.  **Reports:**
-    *   **Trips:** Detailed trip logs with custom stop threshold merging.
-    *   **Stops:** Analysis of parking vs. idling duration.
-    *   **Combined:** Visual route mapping overlayed with events.
-3.  **User Manager:** Hierarchical User creating with limit enforcement (e.g., "Max 10 vehicles").
-4.  **Notifications:** Rule engine for Overspeed, Geofence, and Ignition alerts (Web & Email).
-5.  **Cloud Database:** Fully migrated to **Google Firestore** for infinite scalability.
+### 💎 Enterprise Features
+- **Native Telemetry Pipeline:** High-performance TCP ingestion server (Teltonika Codec 8/8E supported).
+- **Hardened Security:** JWT-based unified authentication, CSRF protection, and HSTS/SSL enforcement.
+- **TimescaleDB Optimization:** Hypertable-based storage with automated retention and compression policies.
+- **Distributed Jobs:** Celery background workers for reports, maintenance, and heavy analytics.
+- **Enterprise Observability:** Full Prometheus/Grafana stack with custom telemetry lag and throughput metrics.
+- **Multi-Tenant RBAC:** Isolated data environments for Super Admin, Main Admin, and Company Users.
+- **Audit Trails:** Comprehensive security auditing and brute-force protection.
 
 ---
 
-## 🛠️ Installation & Setup
+## 🏗️ Architecture
 
-### 1. Prerequisites
-*   Python 3.10+
-*   Google Firebase Project
-*   Traccar Server (Self-hosted or Cloud)
+- **Web Portal (Flask):** The enterprise frontend and management console.
+- **API Engine (FastAPI):** High-performance telemetry API and live WebSocket gateway.
+- **Ingestion Server:** Low-latency TCP server for device communication.
+- **Database (TimescaleDB):** Optimized PostgreSQL for time-series telemetry and relational metadata.
+- **Background Workers (Celery):** Scalable workers for non-blocking operations.
+- **Reverse Proxy (Nginx):** SSL termination and security header enforcement.
 
-### 2. Environment Setup
+---
+
+## 🛠️ Deployment
+
+The system is fully containerized and managed via Docker Compose.
+
 ```bash
-# Clone repository
-git clone <your-repo-url>
-cd ivms_project
+# 1. Configure environment
+cp .env.example .env
 
-# Create Virtual Environment
-python3 -m venv venv
-source venv/bin/activate
+# 2. Build and start the stack
+docker compose up -d --build
 
-# Install Dependencies
-pip install -r requirements.txt
+# 3. Initialize Database
+docker exec -i ivms-db psql -U ivmsuser -d ivmsdb < sql/hardening.sql
 ```
 
-### 3. Firebase Configuration
-1.  Create a project on [Firebase Console](https://console.firebase.google.com).
-2.  Enable **Firestore Database** (Native Mode).
-3.  Generate a **Service Account Key** (JSON) from Project Settings -> Service Accounts.
-4.  Save it as `serviceAccountKey.json` in the project root.
-
-### 4. Running the App
-```bash
-python3 app.py
-```
-Access the application at: `http://localhost:5000`
+### 🔑 Authentication
+The system uses a **Unified Auth Authority**.
+- **Web:** Secure Session Cookies.
+- **API/WS:** JWT (obtained via `/auth/token`).
 
 ---
 
-## 🗄️ Database Structure (Firestore)
+## 📊 Monitoring & Observability
 
-| Collection | Doc ID | Description |
-| :--- | :--- | :--- |
-| **users** | `email` | User profile, role, hierarchy (parent_email), and plan details. |
-| **vehicles** | `unique_id` (IMEI) | Vehicle metadata, driver info, and owner mapping. |
-| **system_config** | `settings`, `plans` | Global server configs and Pricing Plan definitions. |
-
----
-
-## 👥 User Roles & Hierarchy
-
-| Role | Access Level |
-| :--- | :--- |
-| **Super Admin** | **God Mode.** Can manage all companies, plans, and server settings. |
-| **Main Admin** | **Reseller / Large Corp.** Can create sub-admins and users. Subject to plan limits. |
-| **Admin** | **Company Manager.** Can add vehicles and drivers. Only sees their own assets. |
-| **User** | **Viewer.** Read-only access to assigned vehicles. |
-
----
-
-## 📞 API Integration
-The system communicates with Traccar via REST API.
-*   **Authorization:** Session-based (Cookies) managed by `app.py`.
-*   **Endpoints:** Proxies requests to Traccar for raw data (`/api/devices`, `/api/reports/*`) but allows post-processing logic in Python.
-
-**Note:** To enable proxying and automatic admin commands, configure master Traccar admin credentials in Firestore under `system_config` → `traccar_settings` with keys `admin_email` and `admin_pass`, or set environment variables `TRACCAR_ADMIN_EMAIL` and `TRACCAR_ADMIN_PASS`. Also set `active_ip` to your Traccar host (e.g., `172.16.1.26:8082`).
-
-## 🐞 Debugging Tips
-- Use the debug endpoints to verify configuration and connectivity:
-  - `GET /api/debug/traccar` — returns `traccar_host`, whether master credentials exist, and a quick login/session check (admin only).
-  - `GET /api/debug/device/<uid>` — fetches raw device and position data from Traccar via the proxy.
-- Check server-side logs (Flask `current_app.logger`) for detailed errors when Traccar is unreachable or auth fails.
+Access the diagnostic suite:
+- **Prometheus:** `http://localhost:9090`
+- **Grafana:** `http://localhost:3000` (Default: admin/admin)
+- **Diagnostics Center:** Internal `/diagnostics` route (Super Admin only).
 
 ---
 
 ## 📄 License
 Private Proprietary Software.
-Copyright © 2025 Concept Groups.
+Copyright © 2026 Concept Groups. All rights reserved.

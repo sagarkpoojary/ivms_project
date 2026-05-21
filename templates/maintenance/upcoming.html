@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+
+{% block content %}
+<style>
+    .upcoming-card {
+        background: #fff;
+        border-radius: 16px;
+        padding: 24px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.04);
+        margin-bottom: 16px;
+        border-left: 4px solid #3b82f6;
+        transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .upcoming-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 25px rgba(0,0,0,0.08);
+    }
+    .upcoming-card.due-soon {
+        border-left-color: #f59e0b;
+    }
+    .upcoming-card.overdue {
+        border-left-color: #ef4444;
+    }
+    .svc-badge {
+        display: inline-block;
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-size: 0.75rem;
+        font-weight: 600;
+    }
+    .svc-badge.planned { background: #dbeafe; color: #2563eb; }
+    .svc-badge.due { background: #fef3c7; color: #d97706; }
+    .svc-badge.overdue { background: #fee2e2; color: #dc2626; }
+    .empty-state {
+        text-align: center;
+        padding: 80px 20px;
+        color: #94a3b8;
+    }
+    .empty-state i { font-size: 4rem; margin-bottom: 16px; }
+</style>
+
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="fw-bold mb-0">Upcoming Maintenance</h2>
+            <p class="text-muted">Scheduled services that are pending or approaching due date</p>
+        </div>
+        <a href="/maintenance" class="btn btn-outline-primary rounded-pill px-4">
+            <i class="fas fa-calendar me-2"></i>Calendar View
+        </a>
+    </div>
+
+    <div id="upcomingList">
+        <div class="empty-state">
+            <i class="fas fa-spinner fa-spin"></i>
+            <p>Loading scheduled maintenance...</p>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    fetch('/api/maintenance/schedule')
+        .then(res => res.json())
+        .then(data => {
+            const container = document.getElementById('upcomingList');
+
+            // Filter: only non-completed
+            const items = (data || []).filter(d => d.status !== 'completed');
+
+            if (!items.length) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <i class="fas fa-check-circle text-success"></i>
+                        <h5 class="mt-3">All Clear!</h5>
+                        <p>No upcoming maintenance scheduled. Your fleet is up to date.</p>
+                    </div>`;
+                return;
+            }
+
+            // Sort by target_date ascending
+            items.sort((a, b) => new Date(a.target_date) - new Date(b.target_date));
+
+            const now = new Date();
+            let html = '';
+            items.forEach(item => {
+                const target = new Date(item.target_date);
+                const daysLeft = Math.ceil((target - now) / (1000 * 60 * 60 * 24));
+
+                let statusClass = 'planned';
+                let statusLabel = 'Planned';
+                let cardClass = '';
+                if (daysLeft < 0) {
+                    statusClass = 'overdue'; statusLabel = `Overdue (${Math.abs(daysLeft)}d)`;
+                    cardClass = 'overdue';
+                } else if (daysLeft <= 7) {
+                    statusClass = 'due'; statusLabel = `Due in ${daysLeft}d`;
+                    cardClass = 'due-soon';
+                } else {
+                    statusLabel = `In ${daysLeft} days`;
+                }
+
+                html += `
+                <div class="upcoming-card ${cardClass}">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <h6 class="fw-bold mb-1">${item.vehicle_id || 'Vehicle'} — ${item.service_type}</h6>
+                            <p class="text-muted small mb-2">${item.description || 'No description'}</p>
+                            <div class="d-flex gap-3 small text-muted">
+                                <span><i class="fas fa-calendar-alt me-1"></i>${item.target_date || '—'}</span>
+                                ${item.target_mileage ? `<span><i class="fas fa-road me-1"></i>${Number(item.target_mileage).toLocaleString()} km</span>` : ''}
+                                ${item.target_engine_hours ? `<span><i class="fas fa-clock me-1"></i>${item.target_engine_hours} hrs</span>` : ''}
+                            </div>
+                        </div>
+                        <span class="svc-badge ${statusClass}">${statusLabel}</span>
+                    </div>
+                </div>`;
+            });
+            container.innerHTML = html;
+        })
+        .catch(() => {
+            document.getElementById('upcomingList').innerHTML = `
+                <div class="empty-state">
+                    <i class="fas fa-exclamation-triangle text-warning"></i>
+                    <p>Failed to load maintenance schedule.</p>
+                </div>`;
+        });
+});
+</script>
+{% endblock %}
