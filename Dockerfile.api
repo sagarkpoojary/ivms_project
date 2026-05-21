@@ -15,7 +15,9 @@ COPY core/ ./core/
 COPY services/ ./services/
 COPY models/ ./models/
 COPY auth/ ./auth/
+COPY tasks/ ./tasks/
 COPY static/ ./static/
+COPY celery_app.py .
 COPY config.py .
 COPY .env .
 

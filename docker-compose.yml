@@ -172,6 +172,8 @@ services:
     depends_on:
       redis:
         condition: service_healthy
+    volumes:
+      - .:/app
     restart: unless-stopped
     logging: *default-logging
 
