@@ -200,22 +200,88 @@
             .bindPopup('<b>{{ vehicle.name }}</b><br>Current Position')
             .openPopup();
 
-        // Real-time update via WebSocket
+        const imei = '{{ vehicle.unique_id }}';
+
+        function applyLiveUpdate(data) {
+            if (!data || String(data.imei) !== String(imei)) return;
+            if (data.latitude == null || data.longitude == null) return;
+            const newLatLng = [data.latitude, data.longitude];
+            marker.setLatLng(newLatLng);
+            if ((data.speed || 0) > 0) map.panTo(newLatLng);
+        }
+
+        // Poll fallback (works even if WebSocket isn't available in the current deployment)
+        let pollTimer = null;
+        async function pollOnce() {
+            try {
+                const res = await fetch(`/api/devices?uid=${encodeURIComponent(imei)}`, { credentials: 'same-origin' });
+                const arr = await res.json().catch(() => []);
+                const d = Array.isArray(arr) ? arr[0] : null;
+                const pos = d && d.position ? { ...d.position, imei: d.uniqueId || d.id } : null;
+                applyLiveUpdate(pos);
+            } catch (_) {}
+        }
+        function startPolling() {
+            if (pollTimer) return;
+            pollOnce();
+            pollTimer = setInterval(pollOnce, 10000);
+        }
+        function stopPolling() {
+            if (pollTimer) clearInterval(pollTimer);
+            pollTimer = null;
+        }
+
+        // Real-time update via WebSocket (preferred)
         const protocol = window.location.protocol === "https:" ? "wss" : "ws";
-        const wsUrl = `${protocol}://${window.location.host}/ws/live`;
-        let socket = new WebSocket(wsUrl);
-        
-        socket.onmessage = (event) => {
-            const data = JSON.parse(event.data);
-            if (data.imei === '{{ vehicle.unique_id }}') {
-                const newLatLng = [data.latitude, data.longitude];
-                marker.setLatLng(newLatLng);
-                if (data.speed > 0) map.panTo(newLatLng);
-                
-                // Update UI elements
-                // (Omitted for brevity, but would update speed, ignition, etc.)
+        const wsBase = `${protocol}://${window.location.host}/ws/live`;
+        let socket = null;
+        let pingTimer = null;
+
+        async function connectWebSocket() {
+            try {
+                // Obtain JWT for websocket auth (matches dashboard behavior)
+                const tokenRes = await fetch('/auth/token', { credentials: 'same-origin' });
+                const tokenJson = await tokenRes.json().catch(() => ({}));
+                const token = tokenJson.token;
+
+                const wsUrl = token ? `${wsBase}?token=${encodeURIComponent(token)}` : wsBase;
+                socket = new WebSocket(wsUrl);
+
+                socket.onopen = () => {
+                    stopPolling();
+                    if (pingTimer) clearInterval(pingTimer);
+                    // Server waits on receive_text(); send pings to keep it healthy.
+                    pingTimer = setInterval(() => {
+                        try { socket && socket.readyState === 1 && socket.send("ping"); } catch (_) {}
+                    }, 25000);
+                };
+
+                socket.onmessage = (event) => {
+                    try {
+                        const data = JSON.parse(event.data);
+                        applyLiveUpdate(data);
+                    } catch (_) {}
+                };
+
+                socket.onclose = () => {
+                    if (pingTimer) clearInterval(pingTimer);
+                    pingTimer = null;
+                    startPolling();
+                    setTimeout(connectWebSocket, 5000);
+                };
+
+                socket.onerror = () => {
+                    try { socket && socket.close(); } catch (_) {}
+                };
+            } catch (_) {
+                startPolling();
+                setTimeout(connectWebSocket, 5000);
             }
-        };
+        }
+
+        // Start live updates
+        connectWebSocket();
+        startPolling();
     });
 </script>
 {% endblock %}

@@ -203,10 +203,26 @@
                 date: document.getElementById('filterDate').value
             });
 
-            const res = await fetch(`/api/events-center?${params.toString()}`);
-            const data = await res.json();
-            
-            if (data.events.length === 0 && currentPage === 1) {
+            const queryString = params.toString();
+            const fetchOpts = { credentials: 'same-origin' };
+            let res = await fetch(`/api/events-center?${queryString}`, fetchOpts);
+            // Older deployments only registered /api/events_center (underscore).
+            if (res.status === 404) {
+                res = await fetch(`/api/events_center?${queryString}`, fetchOpts);
+            }
+            const data = await res.json().catch(() => ({}));
+
+            if (!res.ok) {
+                if (res.status === 401) {
+                    window.location.href = '/login';
+                    return;
+                }
+                throw new Error(data.error || `Request failed (${res.status})`);
+            }
+
+            const events = Array.isArray(data.events) ? data.events : [];
+
+            if (events.length === 0 && currentPage === 1) {
                 stream.innerHTML = `
                     <div class="empty-state">
                         <i class="fas fa-calendar-times fa-4x text-muted mb-4"></i>
@@ -216,7 +232,7 @@
                 `;
                 document.getElementById('loadMoreContainer').style.display = 'none';
             } else {
-                data.events.forEach(event => {
+                events.forEach(event => {
                     const card = createEventCard(event);
                     stream.appendChild(card);
                 });
@@ -363,7 +379,12 @@
 
     async function acknowledgeEvent(id) {
         try {
-            await fetch(`/api/events/acknowledge/${id}`, { method: 'POST' });
+            await fetch(`/api/events/acknowledge/${id}`, { 
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                }
+            });
         } catch (err) {
             console.error("Failed to acknowledge event", err);
         }
@@ -372,7 +393,12 @@
     async function acknowledgeAll() {
         if (!confirm("Are you sure you want to acknowledge all visible events?")) return;
         try {
-            await fetch(`/api/events/acknowledge-all`, { method: 'POST' });
+            await fetch('/api/events/acknowledge-all', { 
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                }
+            });
             loadEvents(true);
         } catch (err) {
             console.error("Failed to acknowledge all events", err);
@@ -405,12 +431,49 @@
     });
 
     // WebSocket implementation (Phase 2 integration)
-    // socket.on('new_event', (event) => {
-    //     if (document.getElementById('filterSearch').value === '' && currentPage === 2) { // only if on first page
-    //         const stream = document.getElementById('eventStream');
-    //         const card = createEventCard(event);
-    //         stream.prepend(card);
-    //     }
-    // });
+    function connectWebSocket() {
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const wsUrl = `${protocol}//${window.location.host}/ws/live`;
+        const socket = new WebSocket(wsUrl);
+
+        socket.onmessage = (event) => {
+            const data = JSON.parse(event.data);
+            if (data.type === 'notification') {
+                // If we are on the first page and no search/filter is active, prepend the new event
+                const isFirstPage = currentPage === 2; // currentPage is incremented after load
+                const noFilters = document.getElementById('filterSearch').value === '' &&
+                                  document.getElementById('filterSeverity').value === '' &&
+                                  document.getElementById('filterCategory').value === '' &&
+                                  document.getElementById('filterVehicle').value === '';
+
+                if (isFirstPage && noFilters) {
+                    const stream = document.getElementById('eventStream');
+                    const emptyState = stream.querySelector('.empty-state');
+                    if (emptyState) stream.innerHTML = '';
+                    
+                    const card = createEventCard(data);
+                    card.classList.add('animate__animated', 'animate__fadeInDown');
+                    stream.prepend(card);
+                }
+            }
+        };
+
+        socket.onclose = () => {
+            console.log("WebSocket closed. Reconnecting...");
+            setTimeout(connectWebSocket, 5000);
+        };
+
+        socket.onerror = (err) => {
+            console.error("WebSocket error", err);
+            socket.close();
+        };
+    }
+
+    // Initial load
+    document.addEventListener('DOMContentLoaded', () => {
+        loadVehicles();
+        loadEvents();
+        connectWebSocket();
+    });
 </script>
 {% endblock %}

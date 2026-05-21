@@ -36,6 +36,7 @@
     let isRefreshing = false;
     let cachedCombinedReport = null;
     let cachedCombinedReportKey = null;
+    let pinnedDeviceId = localStorage.getItem('dashboardPinnedDeviceId') || "";
 
     const filterDevice = $('filterDevice');
     const filterPeriod = $('filterPeriod');
@@ -483,12 +484,31 @@
             const isMoving = speed > 1;
             const color = isOnline && isMoving ? 'green' : isOnline ? 'orange' : 'red';
 
+            // --- PHASE 5: Trust Hardening (Confidence) ---
+            const confidence = d.device.confidence || d.confidence || (pos.attributes?.satellites >= 8 ? 1.0 : (pos.attributes?.satellites >= 4 ? 0.7 : 0.4));
+            const confColor = confidence >= 0.9 ? 'text-success' : (confidence >= 0.6 ? 'text-warning' : 'text-danger');
+            const confLabel = confidence >= 0.9 ? 'High' : (confidence >= 0.6 ? 'Medium' : 'Low');
+            // ---------------------------------------------
+
             // Custom marker icon based on status
             const icon = L.divIcon({
                 className: 'custom-marker',
-                html: `<div style="background-color:${color};width:12px;height:12px;border-radius:50%;border:2px solid white;box-shadow:0 0 4px black;"></div>`,
-                iconSize: [16, 16],
-                iconAnchor: [8, 8]
+                html: `
+                    <div style="
+                        width:18px;
+                        height:18px;
+                        border-radius:50%;
+                        background:#fff;
+                        border:1px solid rgba(0,0,0,0.2);
+                        box-shadow:0 1px 4px rgba(0,0,0,0.35);
+                        display:flex;
+                        align-items:center;
+                        justify-content:center;">
+                        <i class="fas fa-car-side" style="font-size:10px;color:${color};"></i>
+                    </div>
+                `,
+                iconSize: [18, 18],
+                iconAnchor: [9, 9]
             });
 
             const marker = L.marker([lat, lng], { icon }).addTo(markerLayer);
@@ -508,8 +528,11 @@
                     <div class="small mb-1">
                         <i class="fas fa-info-circle me-1"></i> <strong>Status:</strong> ${isOnline ? 'Online' : 'Offline'}
                     </div>
-                    <div class="small">
+                    <div class="small mb-1">
                         <i class="fas fa-tachometer-alt me-1"></i> <strong>Speed:</strong> ${speed.toFixed(1)} km/h
+                    </div>
+                    <div class="small mt-1 pt-1 border-top">
+                        <i class="fas fa-shield-alt me-1 ${confColor}"></i> <strong class="${confColor}">Confidence:</strong> ${confLabel} (${(confidence * 100).toFixed(0)}%)
                     </div>
                 </div>
             `);
@@ -558,25 +581,34 @@
 
     // Expose focusOnVehicle globally for onclick handlers
     window.focusOnVehicle = (uniqueId) => {
-        if (!markerLayer || !map) return;
         const targetId = String(uniqueId);
-        let found = false;
 
-        markerLayer.eachLayer(layer => {
-            if (layer.uniqueId === targetId) {
-                map.setView(layer.getLatLng(), 16);
-                layer.openPopup();
-                found = true;
-
-                // Scroll to map
-                const mapEl = $('vehicleMap');
-                if (mapEl) mapEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            }
-        });
-
-        if (!found) {
-            alert(`Unable to locate this vehicle on the map. It may not have reported a valid location yet.`);
+        // Persist selection so subsequent refreshes/websocket updates keep map scoped.
+        pinnedDeviceId = targetId;
+        localStorage.setItem('dashboardPinnedDeviceId', pinnedDeviceId);
+        if (filterDevice) {
+            filterDevice.value = targetId;
         }
+
+        // Immediate focus if marker exists in current layer.
+        if (markerLayer && map) {
+            markerLayer.eachLayer(layer => {
+                if (layer.uniqueId === targetId) {
+                    map.setView(layer.getLatLng(), 16);
+                    layer.openPopup();
+                }
+            });
+        }
+
+        // Trigger normal refresh flow (same as manual device filter change).
+        if (filterDevice) {
+            filterDevice.dispatchEvent(new Event('change'));
+        } else {
+            refreshAll();
+        }
+
+        const mapEl = $('vehicleMap');
+        if (mapEl) mapEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
     };
 
     function updateCounts(data) {
@@ -752,7 +784,7 @@
 
             // Populate filter if needed
             if (filterDevice && filterDevice.options.length <= 1) {
-                const currentVal = filterDevice.value;
+                const currentVal = pinnedDeviceId || filterDevice.value;
                 filterDevice.innerHTML = '<option value="">All Devices</option>';
                 registered.forEach(v => {
                     const opt = new Option(v.name || v.unique_id, v.unique_id);
@@ -762,7 +794,7 @@
             }
 
             const selectedPeriod = filterPeriod?.value || 'Today';
-            const selectedDeviceId = filterDevice?.value;
+            const selectedDeviceId = pinnedDeviceId || filterDevice?.value || "";
 
             // USE BULK SYNC INSTEAD OF N+1 CALLS
             const bulkData = await getBulkSync(selectedPeriod);
@@ -773,11 +805,42 @@
 
             // Map bulk results to our required format
             const allDevicesData = bulkData.devices.map(d => {
-                const reg = registered.find(v => String(v.unique_id) === String(d.uniqueId)) || { unique_id: d.uniqueId, name: d.name };
-                const summary = bulkData.summaries[d.id] || { distance: 0, engineHours: 0, fuelLiters: 0, fuelCost: 0 };
+                const uid = d.uniqueId || d.imei;
+                const name = d.name || d.vehicle_name || "Unknown Vehicle";
+                const reg = registered.find(v => String(v.unique_id) === String(uid)) || { unique_id: uid, name: name };
+                const summary = bulkData.summaries[uid] || { distance: 0, engineHours: 0, fuelLiters: 0, fuelCost: 0 };
+                
+                // Add safe driver name fallback
+                if (!d.driver_name || d.driver_name === 'None') {
+                    d.driver_name = 'No Driver Assigned';
+                }
+                
+                // Construct a Traccar-compatible device schema for the frontend
+                const normalizedDevice = {
+                    id: uid,
+                    uniqueId: uid,
+                    name: name,
+                    status: d.status || 'offline',
+                    lastUpdate: d.timestamp,
+                    driver_name: d.driver_name,
+                    rfid: d.rfid,
+                    confidence: d.confidence || 1.0,
+                    position: {
+                        latitude: d.latitude,
+                        longitude: d.longitude,
+                        speed: d.speed || 0,
+                        attributes: {
+                            ignition: d.ignition,
+                            satellites: 8,
+                            batteryLevel: d.bat_v ? parseInt(d.bat_v * 10) : 0,
+                            rfid: d.rfid
+                        }
+                    }
+                };
+                
                 return { 
                     registered: reg, 
-                    device: d, 
+                    device: normalizedDevice, 
                     distance: summary.distance || 0,
                     engineHours: summary.engineHours || 0,
                     fuelLiters: summary.fuelLiters || 0,
@@ -785,7 +848,7 @@
                 };
             });
 
-            // Filter for displayed metrics if a specific device is selected
+            // Filter for displayed data if a specific device is selected
             if (selectedDeviceId) {
                 latest = allDevicesData.filter(d => String(d.registered.unique_id) === String(selectedDeviceId));
             } else {
@@ -794,7 +857,7 @@
 
             updateCounts(allDevicesData);
             updateBigChart(allDevicesData);
-            updateMap(allDevicesData);
+            updateMap(latest);
 
             const totals = latest.reduce((s, d) => {
                 s.distance += (d.distance || 0);
@@ -840,7 +903,12 @@
     // ------------------------
     btnShow?.addEventListener('click', () => { cachedCombinedReport = null; refreshAll(); });
     btnRefreshNow?.addEventListener('click', () => { cachedCombinedReport = null; refreshAll(); });
-    filterDevice?.addEventListener('change', () => { cachedCombinedReport = null; refreshAll(); });
+    filterDevice?.addEventListener('change', () => {
+        pinnedDeviceId = filterDevice.value || "";
+        localStorage.setItem('dashboardPinnedDeviceId', pinnedDeviceId);
+        cachedCombinedReport = null;
+        refreshAll();
+    });
     filterPeriod?.addEventListener('change', () => { cachedCombinedReport = null; refreshAll(); });
 
     const startAuto = () => {
@@ -857,32 +925,41 @@
         // Update the 'latest' array which is used for rendering
         latest.forEach(d => {
             if (String(d.registered.unique_id) === imei) {
-                d.device.status = data.status || 'online';
-                d.device.driver_id = data.driver_id;
-                d.device.driver_name = data.driver_name;
-                d.device.rfid = data.rfid;
-                d.device.position = {
-                    deviceId: d.device.id,
-                    latitude: data.latitude,
-                    longitude: data.longitude,
-                    speed: data.speed,
-                    course: data.angle,
-                    altitude: data.altitude,
-                    deviceTime: data.timestamp,
-                    attributes: {
-                        sat: data.satellites,
-                        batteryLevel: parseInt(data.bat_v * 10),
-                        rfid: data.rfid
-                    }
-                };
+                if (data.status !== undefined) d.device.status = data.status;
+                if (data.driver_id !== undefined) d.device.driver_id = data.driver_id;
+                if (data.driver_name !== undefined) d.device.driver_name = data.driver_name;
+                if (data.rfid !== undefined) d.device.rfid = data.rfid;
+                
+                // Only update position if it's a real telemetry packet
+                if (data.latitude !== undefined && data.longitude !== undefined) {
+                    d.device.position = {
+                        deviceId: d.device.id,
+                        latitude: data.latitude,
+                        longitude: data.longitude,
+                        speed: data.speed,
+                        course: data.angle,
+                        altitude: data.altitude,
+                        deviceTime: data.timestamp,
+                        attributes: {
+                            sat: data.satellites,
+                            batteryLevel: data.bat_v ? parseInt(data.bat_v * 10) : 0,
+                            rfid: data.rfid
+                        }
+                    };
+                }
                 found = true;
             }
         });
 
         if (found) {
-            updateCounts(latest);
-            updateBigChart(latest);
-            updateMap(latest);
+            const selectedDeviceId = pinnedDeviceId || (filterDevice?.value ? String(filterDevice.value) : "");
+            const displayed = selectedDeviceId
+                ? latest.filter(d => String(d.registered.unique_id) === selectedDeviceId)
+                : latest;
+
+            updateCounts(displayed);
+            updateBigChart(displayed);
+            updateMap(displayed);
         }
     };
 

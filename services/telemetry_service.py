@@ -2,15 +2,18 @@ import redis
 import json
 import os
 from datetime import datetime, timezone
+from config import Config
 
 class TelemetryService:
     def __init__(self):
-        self.redis_host = os.getenv("REDIS_HOST", "redis")
+        # Prefer localhost by default for non-docker deployments.
+        # Docker-compose typically sets REDIS_HOST=redis explicitly.
+        self.redis_host = os.getenv("REDIS_HOST", "localhost")
         self.redis_port = int(os.getenv("REDIS_PORT", 6379))
         self.redis_client = redis.Redis(host=self.redis_host, port=self.redis_port, decode_responses=True)
 
     def get_live_status(self, imei):
-        """Fetch live status from Redis with authoritative presence check (Phase 4)."""
+        """Fetch live status from Redis with authoritative presence check."""
         try:
             data = self.redis_client.get(f"live:{imei}")
             if data:
@@ -21,9 +24,14 @@ class TelemetryService:
                     try:
                         ts = datetime.fromisoformat(ts_str.replace('Z', '+00:00'))
                         diff = (datetime.now(timezone.utc) - ts).total_seconds()
-                        if diff > 900: # 15 minutes
+                        
+                        ignition = status_dict.get('ignition', False)
+                        is_ign = ignition in [True, 1, '1', 'true', 'True']
+                        timeout = Config.IGNITION_ON_TIMEOUT_SECONDS if is_ign else Config.IGNITION_OFF_TIMEOUT_SECONDS
+                        
+                        if diff > timeout:
                             status_dict['status'] = 'offline'
-                    except:
+                    except Exception:
                         pass
                 return status_dict
         except Exception:
@@ -48,9 +56,16 @@ class TelemetryService:
                         if ts_str:
                             try:
                                 ts = datetime.fromisoformat(ts_str.replace('Z', '+00:00'))
-                                if (now - ts).total_seconds() > 900:
+                                diff = (now - ts).total_seconds()
+                                
+                                ignition = d.get('ignition', False)
+                                is_ign = ignition in [True, 1, '1', 'true', 'True']
+                                timeout = Config.IGNITION_ON_TIMEOUT_SECONDS if is_ign else Config.IGNITION_OFF_TIMEOUT_SECONDS
+                                
+                                if diff > timeout:
                                     d['status'] = 'offline'
-                            except: pass
+                            except Exception:
+                                pass
                         results.append(d)
         return results
 

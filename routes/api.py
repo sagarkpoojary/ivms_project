@@ -395,3 +395,104 @@ def api_rfid_timeline():
 
     data = native_report_service.get_rfid_timeline(imei, start_dt, end_dt, allowed_imeis)
     return safe_jsonify(data)
+@api_bp.route('/api/vehicles/list')
+@role_required('user')
+def api_vehicles_list():
+    from auth.utils import get_filtered_vehicles
+    vehicles = get_filtered_vehicles()
+    return safe_jsonify(vehicles)
+
+@api_bp.route('/api/events-center')
+@api_bp.route('/api/events_center')  # legacy alias for deployed frontends
+@role_required('user')
+def api_events_center():
+    if not session.get('logged_in'):
+        return safe_jsonify({'error': 'unauthorized', 'events': [], 'has_more': False}), 401
+
+    page = int(request.args.get('page', 1))
+    search = request.args.get('search', '').strip()
+    severity = request.args.get('severity', '').strip()
+    category = request.args.get('category', '').strip()
+    imei = request.args.get('imei', '').strip()
+    date_str = request.args.get('date', '').strip()
+    
+    per_page = 20
+    offset = (page - 1) * per_page
+
+    from models.database import get_conn
+    import psycopg2.extras
+    conn = get_conn()
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+
+    try:
+        # Tenant isolation
+        allowed_vehicles = get_filtered_vehicles()
+        allowed_imeis = [str(v.get('unique_id')) for v in allowed_vehicles]
+        
+        sql = "SELECT * FROM system_events WHERE imei = ANY(%s)"
+        params = [allowed_imeis]
+
+        if search:
+            sql += " AND (title ILIKE %s OR description ILIKE %s)"
+            params.extend([f"%{search}%", f"%{search}%"])
+        if severity:
+            sql += " AND severity = %s"
+            params.append(severity)
+        if category:
+            sql += " AND category = %s"
+            params.append(category)
+        if imei:
+            sql += " AND imei = %s"
+            params.append(imei)
+        if date_str:
+            sql += " AND created_at::date = %s"
+            params.append(date_str)
+
+        sql += " ORDER BY created_at DESC LIMIT %s OFFSET %s"
+        params.extend([per_page + 1, offset])
+
+        cur.execute(sql, tuple(params))
+        rows = cur.fetchall()
+        
+        events = [dict(r) for r in rows[:per_page]]
+        has_more = len(rows) > per_page
+
+        return safe_jsonify({
+            "events": events,
+            "has_more": has_more
+        })
+    finally:
+        cur.close(); conn.close()
+
+@api_bp.route('/api/events/acknowledge/<int:event_id>', methods=['POST'])
+@role_required('admin')
+def api_acknowledge_event(event_id):
+    from models.database import get_conn
+    conn = get_conn(); cur = conn.cursor()
+    try:
+        # Ensure user owns this event
+        allowed_vehicles = get_filtered_vehicles()
+        allowed_imeis = [str(v.get('unique_id')) for v in allowed_vehicles]
+        
+        cur.execute("UPDATE system_events SET acknowledged = TRUE, acknowledged_by = %s WHERE id = %s AND imei = ANY(%s)",
+                    (session.get('email'), event_id, allowed_imeis))
+        conn.commit()
+        return jsonify({"status": "success"})
+    finally:
+        cur.close(); conn.close()
+
+@api_bp.route('/api/events/acknowledge-all', methods=['POST'])
+@role_required('admin')
+def api_acknowledge_all():
+    from models.database import get_conn
+    conn = get_conn(); cur = conn.cursor()
+    try:
+        allowed_vehicles = get_filtered_vehicles()
+        allowed_imeis = [str(v.get('unique_id')) for v in allowed_vehicles]
+        
+        cur.execute("UPDATE system_events SET acknowledged = TRUE, acknowledged_by = %s WHERE acknowledged = FALSE AND imei = ANY(%s)",
+                    (session.get('email'), allowed_imeis))
+        conn.commit()
+        return jsonify({"status": "success"})
+    finally:
+        cur.close(); conn.close()

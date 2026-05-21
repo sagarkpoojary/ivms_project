@@ -485,35 +485,58 @@ h6 {
 
 /* Hover List for Online Devices */
 .hover-list-panel {
-    background: #fff;
-    border: 1px solid var(--border-color);
+    background: var(--bg-card, #fff);
+    border: 1px solid var(--border-color, #e2e8f0);
     border-radius: 12px;
-    box-shadow: var(--shadow-lg);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15); /* Sleek modern shadow */
     padding: 0.5rem;
-    z-index: 2000;
+    z-index: 2050; /* Higher than Leaflet map and controls */
     position: absolute;
     top: 100%;
     left: 50%;
-    transform: translateX(-50%) translateY(10px);
-    width: 180px;
-    display: none;
+    transform: translateX(-50%) translateY(12px);
+    width: 220px;
+    max-height: 250px;
+    overflow-y: auto;
+    visibility: hidden;
     opacity: 0;
-    transition: all 0.3s ease;
+    transition: opacity 0.25s cubic-bezier(0.4, 0, 0.2, 1), transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), visibility 0.25s;
+    pointer-events: none; /* Prevent mouse events when hidden */
 }
 
 .tile-status:hover .hover-list-panel {
-    display: block;
+    visibility: visible;
     opacity: 1;
-    transform: translateX(-50%) translateY(-5px);
+    transform: translateX(-50%) translateY(6px);
+    pointer-events: auto; /* Enable mouse events when visible */
+}
+
+/* Custom scrollbar for hover list panel */
+.hover-list-panel::-webkit-scrollbar {
+    width: 6px;
+}
+.hover-list-panel::-webkit-scrollbar-track {
+    background: transparent;
+}
+.hover-list-panel::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 4px;
+}
+.hover-list-panel::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
 }
 
 .device-item {
-    padding: 0.5rem 0.75rem;
-    border-bottom: 1px solid var(--border-color);
+    padding: 0.6rem 0.8rem;
+    border-bottom: 1px solid var(--border-color, #e2e8f0);
     font-size: 0.85rem;
     cursor: pointer;
     text-align: left;
-    transition: background 0.2s;
+    transition: all 0.2s ease;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    color: var(--text-main, #0f172a);
 }
 
 .device-item:last-child {
@@ -521,9 +544,16 @@ h6 {
 }
 
 .device-item:hover {
-    background: var(--bg-body);
+    background: rgba(37, 99, 235, 0.08);
     border-radius: 6px;
-    color: var(--primary);
+    color: var(--primary, #2563eb);
+    padding-left: 1rem; /* Premium subtle slide-in micro-animation */
+}
+
+@media (max-width: 576px) {
+    .hover-list-panel {
+        width: 180px;
+    }
 }
 
 /* Alert Feed */

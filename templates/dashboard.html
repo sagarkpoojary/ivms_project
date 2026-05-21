@@ -17,7 +17,7 @@
     </button>
 </div>
 
-<div class="card p-4 mb-4 custom-shadow border-0">
+<div class="card p-4 mb-4 custom-shadow border-0 position-relative" style="z-index: 1010; overflow: visible !important;">
     <h5 class="card-title text-dark mb-4"><i class="fas fa-tachometer-alt me-2 text-primary"></i>Fleet Health & Key
         Metrics</h5>
 
@@ -230,10 +230,16 @@
         const wsUrl = `${protocol}://${window.location.host}/ws/live`;
         let ws;
 
-        function connect() {
-            console.log("Connecting to Live Telemetry Stream...");
-            ws = new WebSocket(wsUrl);
-            ws.onmessage = function(event) {
+        async function connect() {
+            try {
+                // Fetch JWT Token
+                const tokenRes = await fetch('/auth/token');
+                const { token } = await tokenRes.json();
+                
+                console.log("Connecting to Live Telemetry Stream with JWT...");
+                ws = new WebSocket(`${wsUrl}?token=${token}`);
+                
+                ws.onmessage = function(event) {
                 try {
                     const data = JSON.parse(event.data);
                     if (window.updateSingleVehicleLive) {
@@ -250,6 +256,10 @@
             ws.onerror = function(err) {
                 console.error("WS Connection Error:", err);
             };
+            } catch (err) {
+                console.error("Failed to connect to WebSocket:", err);
+                setTimeout(connect, 5000);
+            }
         }
         
         // Wait for dashboard to initialize

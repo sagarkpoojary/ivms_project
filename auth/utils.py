@@ -1,5 +1,6 @@
 from functools import wraps
-from flask import session, redirect, url_for, render_template
+from flask import request, session, redirect, url_for, render_template, jsonify
+from auth.jwt_manager import auth_manager
 from extensions import cache
 from models.database import get_user_by_email, load_users, load_vehicles
 
@@ -10,9 +11,6 @@ def get_current_user_data():
         return None, {}
     
     email = session.get('email')
-    
-    # We no longer cache in the session. We rely on the global @cache.memoize(timeout=600)
-    # on get_user_by_email in models/database.py, which we invalidate in update_user_db.
     user_info = get_user_by_email(email)
     
     current_data = {
@@ -75,6 +73,8 @@ def role_required(required_role):
         @wraps(f)
         def decorated_function(*args, **kwargs):
             if not session.get('logged_in'):
+                if request.path.startswith('/api/'):
+                    return jsonify({'error': 'unauthorized'}), 401
                 return redirect(url_for('auth.login'))
             
             user_role = session.get('role', 'user')
@@ -93,7 +93,9 @@ def role_required(required_role):
                 return f(*args, **kwargs)
 
             if user_level < req_level:
-                    return render_template('login.html', error="Unauthorized access.")
+                if request.path.startswith('/api/'):
+                    return jsonify({'error': 'forbidden'}), 403
+                return render_template('login.html', error="Unauthorized access.")
             
             return f(*args, **kwargs)
         return decorated_function

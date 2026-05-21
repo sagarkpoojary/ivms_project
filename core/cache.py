@@ -10,7 +10,9 @@ class LiveCache:
     Redis-based cache for real-time vehicle status and session management.
     """
     def __init__(self):
-        self.host = os.getenv("REDIS_HOST", "redis")
+        # Prefer localhost by default for non-docker deployments.
+        # Docker-compose typically sets REDIS_HOST=redis explicitly.
+        self.host = os.getenv("REDIS_HOST", "localhost")
         self.port = int(os.getenv("REDIS_PORT", 6379))
         self.client = None
 

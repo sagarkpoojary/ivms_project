@@ -1,10 +1,30 @@
 import psycopg2
 import psycopg2.extras
-from datetime import datetime, timedelta
+from collections import defaultdict
+from math import asin, cos, radians, sin, sqrt
 from config import Config
 from models.database import get_conn
-from services.time_service import get_oman_now, SYSTEM_TZ
-import pytz
+
+# Match ingestion/analytics/engine.py GPS jump filter (km between consecutive fixes)
+_GPS_SEGMENT_MAX_KM = 5.0
+
+
+def _haversine_km(lon1, lat1, lon2, lat2):
+    """Great-circle distance in km; 0 if coordinates missing."""
+    if lon1 is None or lat1 is None or lon2 is None or lat2 is None:
+        return 0.0
+    try:
+        lon1, lat1, lon2, lat2 = map(
+            radians,
+            [float(lon1), float(lat1), float(lon2), float(lat2)],
+        )
+    except (TypeError, ValueError):
+        return 0.0
+    dlon = lon2 - lon1
+    dlat = lat2 - lat1
+    a = sin(dlat / 2) ** 2 + cos(lat1) * cos(lat2) * sin(dlon / 2) ** 2
+    return 2 * asin(sqrt(min(1.0, a))) * 6371
+
 
 class NativeReportService:
     @staticmethod
@@ -79,6 +99,90 @@ class NativeReportService:
             cur.close(); conn.close()
 
     @staticmethod
+    def _telemetry_stats_for_period(imeis, start_dt, end_dt, cur):
+        """
+        Distance / speeds / moving time from raw telemetry in [start_dt, end_dt].
+
+        trip_summary is only written when ignition turns OFF, so open trips and
+        same-day driving otherwise miss from completed-trip rollups alone.
+        """
+        if not imeis:
+            return {}
+        cur.execute(
+            """
+            SELECT imei, timestamp, longitude, latitude, speed
+            FROM telemetry
+            WHERE imei = ANY(%s) AND timestamp BETWEEN %s AND %s
+            ORDER BY imei ASC, timestamp ASC
+            """,
+            (imeis, start_dt, end_dt),
+        )
+        rows = cur.fetchall()
+        by_imei = defaultdict(list)
+        for r in rows:
+            by_imei[str(r["imei"])].append(r)
+
+        speed_thr = float(Config.SPEED_THRESHOLD_KMH)
+        out = {}
+        for imei, pts in by_imei.items():
+            if not pts:
+                continue
+            if len(pts) == 1:
+                sp = float(pts[0].get("speed") or 0)
+                out[imei] = {
+                    "total_distance": 0.0,
+                    "max_speed": sp,
+                    "avg_speed": sp,
+                    "moving_sec": 0,
+                }
+                continue
+
+            total_dist = 0.0
+            max_spd = 0.0
+            speed_samples = []
+            moving_sec = 0
+
+            for i in range(len(pts) - 1):
+                p1, p2 = pts[i], pts[i + 1]
+                sp1 = float(p1.get("speed") or 0)
+                sp2 = float(p2.get("speed") or 0)
+                max_spd = max(max_spd, sp1, sp2)
+                if sp1 > 0:
+                    speed_samples.append(sp1)
+
+                seg_km = _haversine_km(
+                    p1.get("longitude"),
+                    p1.get("latitude"),
+                    p2.get("longitude"),
+                    p2.get("latitude"),
+                )
+                if 0 < seg_km < _GPS_SEGMENT_MAX_KM:
+                    total_dist += seg_km
+
+                dt = (p2["timestamp"] - p1["timestamp"]).total_seconds()
+                if not (0 < dt <= 7200):
+                    continue
+                # Moving: GNSS displacement (~20 m+) or speed above threshold (slow traffic)
+                if seg_km >= 0.02 or sp1 > speed_thr:
+                    moving_sec += int(dt)
+
+            sp_last = float(pts[-1].get("speed") or 0)
+            max_spd = max(max_spd, sp_last)
+            if sp_last > 0:
+                speed_samples.append(sp_last)
+
+            avg_spd = (
+                sum(speed_samples) / len(speed_samples) if speed_samples else 0.0
+            )
+            out[imei] = {
+                "total_distance": round(total_dist, 2),
+                "max_speed": round(max_spd, 2),
+                "avg_speed": round(avg_spd, 2),
+                "moving_sec": moving_sec,
+            }
+        return out
+
+    @staticmethod
     def get_fleet_summary(vehicles, start_dt, end_dt):
         """Generate summary metrics for a list of vehicles in a single query (Phase 10)."""
         if not vehicles: return []
@@ -88,7 +192,7 @@ class NativeReportService:
         try:
             imeis = [str(v.get('unique_id')) for v in vehicles]
             
-            # Single query for trips
+            # Completed trips (ignition-off); used as fallback when telemetry is empty
             cur.execute("""
                 SELECT 
                     imei,
@@ -101,7 +205,11 @@ class NativeReportService:
                 WHERE imei = ANY(%s) AND start_time BETWEEN %s AND %s
                 GROUP BY imei
             """, (imeis, start_dt, end_dt))
-            trip_stats = {r['imei']: r for r in cur.fetchall()}
+            trip_stats = {str(r['imei']): r for r in cur.fetchall()}
+
+            tele_stats = NativeReportService._telemetry_stats_for_period(
+                imeis, start_dt, end_dt, cur
+            )
             
             # Single query for idle time
             cur.execute("""
@@ -110,7 +218,7 @@ class NativeReportService:
                 WHERE imei = ANY(%s) AND event_type = 'idle' AND timestamp BETWEEN %s AND %s
                 GROUP BY imei
             """, (imeis, start_dt, end_dt))
-            idle_stats = {r['imei']: r['total_idle_sec'] for r in cur.fetchall()}
+            idle_stats = {str(r['imei']): r['total_idle_sec'] for r in cur.fetchall()}
             
             total_period_sec = (end_dt - start_dt).total_seconds()
             
@@ -118,13 +226,30 @@ class NativeReportService:
             for v in vehicles:
                 imei = str(v.get('unique_id'))
                 s = trip_stats.get(imei, {})
-                
-                total_dist = round((s.get('total_distance') or 0), 2)
-                max_spd = round((s.get('max_speed') or 0), 2)
-                avg_spd = round((s.get('avg_speed') or 0), 2)
+                t = tele_stats.get(imei, {})
+
+                trip_dist = round(float(s.get("total_distance") or 0), 2)
+                tele_dist = float(t.get("total_distance") or 0)
+                # Telemetry reflects all fixes in the window (in-progress trips). trip_summary
+                # only exists after ignition OFF. Use the larger of the two to limit under-count.
+                total_dist = round(max(tele_dist, trip_dist), 2)
+
+                if tele_dist >= trip_dist:
+                    max_spd = float(t.get("max_speed") or 0)
+                    avg_spd = float(t.get("avg_speed") or 0)
+                else:
+                    max_spd = float(s.get("max_speed") or 0)
+                    avg_spd = float(s.get("avg_speed") or 0)
+
                 total_fuel = round((s.get('total_fuel') or 0), 2)
                 idle_sec = int(idle_stats.get(imei) or 0)
-                moving_sec = int(s.get('total_duration') or 0)
+                moving_sec = int(t.get("moving_sec") or 0)
+                trip_dur = int(s.get("total_duration") or 0)
+                if tele_dist >= trip_dist:
+                    if moving_sec == 0:
+                        moving_sec = trip_dur
+                else:
+                    moving_sec = trip_dur
                 
                 # Off duration is time neither moving nor idling
                 off_sec = max(0, total_period_sec - moving_sec - idle_sec)
@@ -148,10 +273,10 @@ class NativeReportService:
                     "name": v.get('name'),
                     "unique_id": imei,
                     "company_name": v.get('company_name'),
-                    "total_distance": total_dist,
+                    "total_distance": round(float(total_dist), 2),
                     "total_duration": moving_sec,
-                    "max_speed": max_spd,
-                    "average_speed": avg_spd,
+                    "max_speed": round(float(max_spd), 2),
+                    "average_speed": round(float(avg_spd), 2),
                     "idle_duration": idle_sec * 1000, # to ms for template
                     "off_duration": off_sec * 1000, # to ms for template
                     "fuel_liters": total_fuel,
