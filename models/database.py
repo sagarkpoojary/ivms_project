@@ -11,8 +11,22 @@ DB_CONFIG = {
     "port": Config.DB_PORT
 }
 
+_PLACEHOLDER_VALUES = {"", "-", "none", "null", "n/a", "na"}
+
 def get_conn():
     return psycopg2.connect(**DB_CONFIG)
+
+def _is_placeholder(value):
+    return value is None or str(value).strip().lower() in _PLACEHOLDER_VALUES
+
+def is_valid_vehicle_record(vehicle):
+    """
+    Reject empty pre-created slots while keeping real vehicles that have
+    optional fields missing, such as device_model or driver_name.
+    """
+    if not isinstance(vehicle, dict):
+        return False
+    return not _is_placeholder(vehicle.get("unique_id")) and not _is_placeholder(vehicle.get("name"))
 
 def load_server_config():
     try:
@@ -58,6 +72,8 @@ def load_vehicles():
         results = []
         for r in rows:
             v = dict(r["data"])
+            if not is_valid_vehicle_record(v):
+                continue
             v["current_driver_name"] = r["current_driver_name"]
             v["current_driver_id"] = r["current_driver_id"]
             results.append(v)
@@ -185,7 +201,7 @@ def sync_stats():
     try:
         conn = get_conn(); cur = conn.cursor()
         cur.execute("SELECT COUNT(*) FROM users"); uc = cur.fetchone()[0]
-        cur.execute("SELECT COUNT(*) FROM vehicles"); vc = cur.fetchone()[0]
+        vc = len(load_vehicles())
         stats = {"total_users": uc, "total_vehicles": vc, "last_updated": str(get_oman_now())}
         cur.execute("INSERT INTO system_config (doc_id, data) VALUES (%s, %s) ON CONFLICT (doc_id) DO UPDATE SET data = EXCLUDED.data",
             ("stats", psycopg2.extras.Json(stats)))
@@ -202,7 +218,8 @@ def count_users_by_parent(parent_email):
 
 def count_active_vehicles_by_parent(parent_email):
     try:
-        conn = get_conn(); cur = conn.cursor()
-        cur.execute("SELECT COUNT(*) FROM vehicles WHERE parent_email = %s AND status = %s", (parent_email, "active"))
-        count = cur.fetchone()[0]; cur.close(); conn.close(); return count
+        return len([
+            v for v in load_vehicles()
+            if v.get("parent_email") == parent_email and v.get("status") == "active"
+        ])
     except: return 0
