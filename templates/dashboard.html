@@ -239,6 +239,13 @@
                 console.log("Connecting to Live Telemetry Stream with JWT...");
                 ws = new WebSocket(`${wsUrl}?token=${token}`);
                 
+                ws.onopen = function() {
+                    console.log("Live stream connection established. Recovering snapshot...");
+                    if (window.refreshAll) {
+                        window.refreshAll();
+                    }
+                };
+                
                 ws.onmessage = function(event) {
                 try {
                     const data = JSON.parse(event.data);

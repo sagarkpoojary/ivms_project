@@ -26,6 +26,10 @@
     let registered = [];
     let latest = [];
     let fleetStore = {}; // Centralized fleet state store: imei -> normalized vehicle item
+    let markersMap = {}; // Centralized Map Marker registry: unique_id -> Leaflet Marker
+    let updateQueue = []; // Buffered updates queue for WebSocket batching
+    let renderTimeout = null; // Debounce timer for WebSocket atomic render loops
+    let currentRefreshSeq = 0; // Incrementing counter to evict stale refresh requests
     let deviceIdToNameMap = {};
 
     function reconcileFleetState(allDevicesData) {
@@ -54,6 +58,100 @@
                 current.registered = incoming.registered;
             }
         });
+    }
+
+    function processBufferedUpdates() {
+        if (renderTimeout) {
+            clearTimeout(renderTimeout);
+            renderTimeout = null;
+        }
+
+        renderTimeout = setTimeout(() => {
+            const packets = [...updateQueue];
+            updateQueue = [];
+            
+            let stateChanged = false;
+            packets.forEach(packet => {
+                const imei = String(packet.imei);
+                const incomingVersion = parseInt(packet.reconciliation_version || 1, 10);
+                
+                let current = fleetStore[imei];
+                if (!current) return;
+                
+                const currentVersion = parseInt(current.device.reconciliation_version || 0, 10);
+                if (incomingVersion < currentVersion) return;
+                
+                stateChanged = true;
+                
+                const updatedDevice = {
+                    ...current.device,
+                    reconciliation_version: incomingVersion
+                };
+                
+                if (packet.status !== undefined) updatedDevice.status = packet.status;
+                if (packet.driver_id !== undefined) updatedDevice.driver_id = packet.driver_id;
+                if (packet.driver_name !== undefined) updatedDevice.driver_name = packet.driver_name;
+                if (packet.rfid !== undefined) updatedDevice.rfid = packet.rfid;
+                
+                if (packet.latitude !== undefined && packet.longitude !== undefined) {
+                    updatedDevice.position = {
+                        deviceId: current.device.id,
+                        latitude: packet.latitude,
+                        longitude: packet.longitude,
+                        speed: packet.speed,
+                        course: packet.angle,
+                        altitude: packet.altitude,
+                        deviceTime: packet.timestamp,
+                        attributes: {
+                            sat: packet.satellites,
+                            batteryLevel: packet.bat_v ? parseInt(packet.bat_v * 10) : 0,
+                            rfid: packet.rfid,
+                            ignition: packet.ignition
+                        }
+                    };
+                }
+                
+                fleetStore[imei] = {
+                    ...current,
+                    device: updatedDevice
+                };
+            });
+            
+            if (stateChanged) {
+                triggerAtomicUIUpdate();
+            }
+        }, 50);
+    }
+
+    function triggerAtomicUIUpdate() {
+        const allVehicles = Object.values(fleetStore);
+        const selectedDeviceId = pinnedDeviceId || (filterDevice?.value ? String(filterDevice.value) : "");
+        
+        latest = selectedDeviceId
+            ? allVehicles.filter(d => String(d.registered.unique_id) === selectedDeviceId)
+            : allVehicles;
+            
+        updateCounts(allVehicles);
+        updateBigChart(allVehicles);
+        updateMap(latest);
+        
+        const totals = latest.reduce((s, d) => {
+            s.distance += (d.distance || 0);
+            s.engineHours += (d.engineHours || 0);
+            s.fuelLiters += (d.fuelLiters || 0);
+            s.fuelCost += (d.fuelCost || 0);
+            return s;
+        }, { distance: 0, engineHours: 0, fuelLiters: 0, fuelCost: 0 });
+
+        if (sumDistance) {
+            sumDistance.textContent = totals.distance.toFixed(2) + " km";
+        }
+        if (sumEngineHours) {
+            sumEngineHours.textContent = totals.engineHours.toFixed(1) + " h";
+        }
+        if (sumFuel) {
+            sumFuel.textContent = `${totals.fuelLiters.toFixed(1)} L (${totals.fuelCost.toFixed(3)} OMR)`;
+        }
     }
 
     // CHART VARIABLES (UPDATED)
@@ -495,14 +593,25 @@
 
     function updateMap(data) {
         if (!map || !markerLayer) return;
-        markerLayer.clearLayers();
+        
         const bounds = [];
         const role = document.body.dataset.role;
+        const currentKeys = new Set(data.map(d => String(d.registered.unique_id)));
 
+        // 1. Remove markers that are no longer in the active displayed list
+        Object.keys(markersMap).forEach(key => {
+            if (!currentKeys.has(key)) {
+                markerLayer.removeLayer(markersMap[key]);
+                delete markersMap[key];
+            }
+        });
+
+        // 2. Add or update markers in-place
         data.forEach(d => {
             if (!d.device?.position?.latitude || !d.device?.position?.longitude) return;
             const pos = d.device.position;
             const lat = pos.latitude, lng = pos.longitude;
+            const imei = String(d.registered.unique_id);
 
             let displayName = d.registered.name || d.registered.unique_id;
             if (role === 'main_admin') {
@@ -541,11 +650,6 @@
                 iconAnchor: [9, 9]
             });
 
-            const marker = L.marker([lat, lng], { 
-                icon,
-                opacity: isOnline ? 1.0 : 0.6
-            }).addTo(markerLayer);
-            
             const driverName = d.device.driver_name || "No Driver";
             const rfid = d.device.position?.attributes?.rfid || d.device.rfid || "N/A";
 
@@ -563,7 +667,7 @@
                 }
             }
 
-            marker.bindPopup(`
+            const popupHtml = `
                 <div class="popup-content">
                     <strong class="d-block mb-1">${displayName}</strong>
                     <div class="small mb-1">
@@ -582,10 +686,25 @@
                         <i class="fas fa-shield-alt me-1 ${confColor}"></i> <strong class="${confColor}">Confidence:</strong> ${confLabel} (${(confidence * 100).toFixed(0)}%)
                     </div>
                 </div>
-            `);
+            `;
+
+            let marker = markersMap[imei];
+            if (!marker) {
+                marker = L.marker([lat, lng], { 
+                    icon,
+                    opacity: isOnline ? 1.0 : 0.6
+                }).addTo(markerLayer);
+                markersMap[imei] = marker;
+            } else {
+                marker.setLatLng([lat, lng]);
+                marker.setIcon(icon);
+                marker.setOpacity(isOnline ? 1.0 : 0.6);
+            }
+
+            marker.bindPopup(popupHtml);
 
             // Critical Fix: Attach unique ID for reliable looking up in focusOnVehicle
-            marker.uniqueId = String(d.registered.unique_id);
+            marker.uniqueId = imei;
 
             bounds.push([lat, lng]);
         });
@@ -792,7 +911,9 @@
     let isFirstLoad = true;
 
     async function refreshAll() {
-        if (isRefreshing) return;
+        currentRefreshSeq++;
+        const mySeq = currentRefreshSeq;
+        
         isRefreshing = true;
 
         // Visual Feedback for Refresh Button
@@ -802,6 +923,7 @@
 
         try {
             registered = await loadVehicles();
+            if (mySeq !== currentRefreshSeq) return;
 
             if (registered.length === 0) {
                 // Handle empty fleet case
@@ -840,6 +962,7 @@
 
             // USE BULK SYNC INSTEAD OF N+1 CALLS
             const bulkData = await getBulkSync(selectedPeriod);
+            if (mySeq !== currentRefreshSeq) return;
             if (!bulkData || !bulkData.devices) {
                 console.warn("Bulk sync returned empty or error");
                 return;
@@ -931,17 +1054,19 @@
         } catch (err) {
             console.error('Error in refreshAll:', err);
         } finally {
-            isRefreshing = false;
+            if (mySeq === currentRefreshSeq) {
+                isRefreshing = false;
 
-            // Remove Visual Feedback
-            if (btnIcon) btnIcon.classList.remove('fa-spin');
-            if (btnRefreshNow) btnRefreshNow.disabled = false;
+                // Remove Visual Feedback
+                if (btnIcon) btnIcon.classList.remove('fa-spin');
+                if (btnRefreshNow) btnRefreshNow.disabled = false;
 
-            // Hide global loader after first successful attempt
-            if (isFirstLoad) {
-                const loader = $('dashboardLoader');
-                if (loader) loader.classList.add('hidden');
-                isFirstLoad = false;
+                // Hide global loader after first successful attempt
+                if (isFirstLoad) {
+                    const loader = $('dashboardLoader');
+                    if (loader) loader.classList.add('hidden');
+                    isFirstLoad = false;
+                }
             }
         }
     }
@@ -966,79 +1091,8 @@
 
     // Expose for WebSocket integration
     window.updateSingleVehicleLive = (data) => {
-        // data format: {imei, latitude, longitude, speed, reconciliation_version, ...}
-        const imei = String(data.imei);
-        const incomingVersion = parseInt(data.reconciliation_version || 1, 10);
-        
-        let current = fleetStore[imei];
-        if (!current) {
-            console.log(`[WS_STORE] Received websocket update for unknown IMEI ${imei}. Ignoring.`);
-            return;
-        }
-        
-        // AUTHORITATIVE SEQUENCE FILTERING: If incoming update has lower version than current, ignore it
-        const currentVersion = parseInt(current.device.reconciliation_version || 0, 10);
-        if (incomingVersion < currentVersion) {
-            console.log(`[WS_DEREVERB] Stale WebSocket update discarded for IMEI ${imei}: incoming v${incomingVersion} < current v${currentVersion}`);
-            return;
-        }
-        
-        // Atomically update/patch live state in the fleetStore
-        current.device.reconciliation_version = incomingVersion;
-        if (data.status !== undefined) current.device.status = data.status;
-        if (data.driver_id !== undefined) current.device.driver_id = data.driver_id;
-        if (data.driver_name !== undefined) current.device.driver_name = data.driver_name;
-        if (data.rfid !== undefined) current.device.rfid = data.rfid;
-        
-        if (data.latitude !== undefined && data.longitude !== undefined) {
-            current.device.position = {
-                deviceId: current.device.id,
-                latitude: data.latitude,
-                longitude: data.longitude,
-                speed: data.speed,
-                course: data.angle,
-                altitude: data.altitude,
-                deviceTime: data.timestamp,
-                attributes: {
-                    sat: data.satellites,
-                    batteryLevel: data.bat_v ? parseInt(data.bat_v * 10) : 0,
-                    rfid: data.rfid,
-                    ignition: data.ignition
-                }
-            };
-        }
-
-        // Re-calculate subsets and update UI based on the persistent fleet store
-        const allVehicles = Object.values(fleetStore);
-        const selectedDeviceId = pinnedDeviceId || (filterDevice?.value ? String(filterDevice.value) : "");
-        
-        latest = selectedDeviceId
-            ? allVehicles.filter(d => String(d.registered.unique_id) === selectedDeviceId)
-            : allVehicles;
-
-        // AUTHORITATIVE STATE SEPARATION: Counts and big chart always display status of full fleet, avoiding drop to 1 device
-        updateCounts(allVehicles);
-        updateBigChart(allVehicles);
-        updateMap(latest);
-
-        // Re-render top KPI summaries
-        const totals = latest.reduce((s, d) => {
-            s.distance += (d.distance || 0);
-            s.engineHours += (d.engineHours || 0);
-            s.fuelLiters += (d.fuelLiters || 0);
-            s.fuelCost += (d.fuelCost || 0);
-            return s;
-        }, { distance: 0, engineHours: 0, fuelLiters: 0, fuelCost: 0 });
-
-        if (sumDistance) {
-            sumDistance.textContent = totals.distance.toFixed(2) + " km";
-        }
-        if (sumEngineHours) {
-            sumEngineHours.textContent = totals.engineHours.toFixed(1) + " h";
-        }
-        if (sumFuel) {
-            sumFuel.textContent = `${totals.fuelLiters.toFixed(1)} L (${totals.fuelCost.toFixed(3)} OMR)`;
-        }
+        updateQueue.push(data);
+        processBufferedUpdates();
     };
 
     // ------------------------
@@ -1054,4 +1108,6 @@
         setInterval(loadAlerts, 30000);
         loadAlerts();
     });
+
+    window.refreshAll = refreshAll;
 })();
