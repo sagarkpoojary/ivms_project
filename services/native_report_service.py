@@ -241,8 +241,10 @@ class NativeReportService:
                     max_spd = float(s.get("max_speed") or 0)
                     avg_spd = float(s.get("avg_speed") or 0)
 
-                total_fuel = round((s.get('total_fuel') or 0), 2)
                 idle_sec = int(idle_stats.get(imei) or 0)
+                trip_fuel = float(s.get('total_fuel') or 0)
+                calculated_fuel = (total_dist / Config.MILEAGE_KM_PER_LITER) + ((idle_sec / 3600.0) * Config.IDLE_FUEL_LPH)
+                total_fuel = round(max(trip_fuel, calculated_fuel), 2)
                 moving_sec = int(t.get("moving_sec") or 0)
                 trip_dur = int(s.get("total_duration") or 0)
                 if tele_dist >= trip_dist:

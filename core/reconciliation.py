@@ -249,7 +249,7 @@ class LivePositionReconciliationEngine:
                         "is_authoritative": not is_stale,
                         "reconciliation_reason": reason,
                         "reconciliation_version": version,
-                        **{k: v for k, v in extra_fields.items() if k in ['gsm', 'ext_v', 'bat_v', 'rfid', 'driver_id', 'driver_name', 'status']}
+                        **{k: v for k, v in extra_fields.items() if k in ['gsm', 'ext_v', 'bat_v', 'rfid', 'driver_id', 'driver_name', 'status', 'true_fuel']}
                     }
                     
                     redis_key = f"live:{imei}"

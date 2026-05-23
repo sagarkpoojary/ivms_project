@@ -875,9 +875,16 @@
 
             // Simple event display - can be enhanced later if needed
             alertAreaEvents.innerHTML = events.map(ev => {
-                const date = new Date(ev.eventTime).toLocaleString();
-                const type = ev.type === 'deviceOverspeed' ? 'Overspeed' : ev.type;
-                const deviceName = deviceIdToNameMap[ev.uniqueId] || ev.deviceName || 'Unknown Device';
+                const rawDate = ev.timestamp || ev.eventTime;
+                const date = rawDate ? new Date(rawDate).toLocaleString() : 'N/A';
+                
+                const rawType = ev.event_type || ev.type;
+                const type = rawType === 'overspeed' || rawType === 'deviceOverspeed' ? 'Overspeed' : 
+                             (rawType === 'harsh_accel' ? 'Harsh Accel' : 
+                             (rawType === 'harsh_brake' ? 'Harsh Brake' : rawType));
+                
+                const imei = ev.imei || ev.uniqueId;
+                const deviceName = deviceIdToNameMap[imei] || ev.deviceName || 'Unknown Device';
                 return `
                     <div class="alert-item mb-2 pb-2 border-bottom">
                         <div class="d-flex justify-content-between align-items-center mb-1">

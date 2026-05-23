@@ -218,6 +218,22 @@ class DBHandler:
             bat_v = float(io.get(67, 0)) / 1000.0
             rfid = str(io.get(78, '')) # iButton/RFID
             
+            # Parse True Sensor-Derived Fuel (Teltonika CAN or Analog fuel sensors)
+            # IO 84: CAN Fuel Level (%)
+            # IO 85: CAN Fuel Consumed (Liters)
+            # IO 9: Analog Input 1 (mV) - Calibrated to liters
+            can_fuel_pct = float(io.get(84)) if io.get(84) is not None else None
+            can_fuel_consumed = float(io.get(85)) if io.get(85) is not None else None
+            analog_fuel_mv = float(io.get(9)) if io.get(9) is not None else None
+            
+            true_fuel = None
+            if can_fuel_consumed is not None:
+                true_fuel = can_fuel_consumed
+            elif can_fuel_pct is not None:
+                true_fuel = (can_fuel_pct / 100.0) * 60.0
+            elif analog_fuel_mv is not None:
+                true_fuel = (analog_fuel_mv / 10000.0) * 60.0
+            
             # 3. RFID & Driver Mapping (Always done, even for historical packets)
             driver_id = None
             driver_name = None
@@ -306,7 +322,8 @@ class DBHandler:
                     rfid=rfid,
                     driver_id=driver_id,
                     driver_name=driver_name or ("Unknown Tag" if rfid and rfid != '0' else "No Driver"),
-                    status=status
+                    status=status,
+                    true_fuel=true_fuel
                 )
                 
                 if reconcile_result['reconciled']:

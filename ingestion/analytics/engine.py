@@ -186,10 +186,42 @@ class AnalyticsEngine:
                 duration = (end_t - start_t).total_seconds()
                 if duration < 30: return # Ignore ghost trips < 30s
  
+                # Query idle duration from analytics_events for this trip window
+                idle_sec_row = await conn.fetchrow(
+                    "SELECT SUM(value) as idle_sec FROM analytics_events WHERE imei = $1 AND event_type = 'idle' AND timestamp BETWEEN $2 AND $3",
+                    imei, start_t, end_t
+                )
+                idle_sec = int(idle_sec_row['idle_sec'] or 0)
+                
+                # Check for true sensor-derived fuel consumption in the telemetry records (Teltonika CAN I/O 85)
+                # Or compile using Analog calibration
+                true_fuel_row = await conn.fetchrow(
+                    "SELECT MAX((io_elements->>'85')::double precision) as can_consumed, MAX((io_elements->>'9')::double precision) as analog_val "
+                    "FROM telemetry WHERE imei = $1 AND timestamp BETWEEN $2 AND $3",
+                    imei, start_t, end_t
+                )
+                
+                true_fuel = None
+                if true_fuel_row:
+                    if true_fuel_row['can_consumed'] is not None:
+                        true_fuel = float(true_fuel_row['can_consumed'])
+                    elif true_fuel_row['analog_val'] is not None:
+                        # 0-10000 mV maps to 0-60L tank
+                        true_fuel = (float(true_fuel_row['analog_val']) / 10000.0) * 60.0
+                
+                if true_fuel is None:
+                    # Calculate estimated fuel consumed: (distance / mileage) + (idle_hours * idle_burn_rate)
+                    from config import Config
+                    trip_fuel = (total_dist / Config.MILEAGE_KM_PER_LITER) + ((idle_sec / 3600.0) * Config.IDLE_FUEL_LPH)
+                else:
+                    trip_fuel = true_fuel
+                
+                trip_fuel = round(trip_fuel, 2)
+
                 await conn.execute(
-                    """INSERT INTO trip_summary (imei, driver_id, start_time, end_time, duration_sec, max_speed, avg_speed, distance_km)
-                       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)""",
-                    imei, driver_id, start_t, end_t, int(duration), max_speed, avg_speed, round(total_dist, 2)
+                    """INSERT INTO trip_summary (imei, driver_id, start_time, end_time, duration_sec, max_speed, avg_speed, distance_km, idle_duration_sec, fuel_consumed)
+                       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)""",
+                    imei, driver_id, start_t, end_t, int(duration), max_speed, avg_speed, round(total_dist, 2), idle_sec, trip_fuel
                 )
         finally:
             if conn_context is not None:
