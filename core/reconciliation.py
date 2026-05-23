@@ -142,12 +142,13 @@ class LivePositionReconciliationEngine:
                 reconciled = False
                 websocket_notified = False
                 redis_updated = False
+                version = 1  # Authoritative version tracking
             
                 if not is_stale:
                     # Update authoritative position in DB
                     current_timestamp = datetime.now(timezone.utc)
                     try:
-                        await conn.execute(
+                        row = await conn.fetchrow(
                             """
                             INSERT INTO live_vehicle_status (
                                 imei, device_id, last_telemetry_id, last_timestamp, 
@@ -177,6 +178,7 @@ class LivePositionReconciliationEngine:
                                 updated_at = EXCLUDED.updated_at,
                                 reconciliation_flags = EXCLUDED.reconciliation_flags,
                                 live_position_reconciliation_version = live_vehicle_status.live_position_reconciliation_version + 1
+                            RETURNING live_position_reconciliation_version
                             """,
                             imei, 
                             extra_fields.get('device_id'),
@@ -197,7 +199,9 @@ class LivePositionReconciliationEngine:
                             extra_fields.get('driver_name'),
                             json.dumps({"reason": reason, "source": "reconciliation_engine"})
                         )
-                        logger.info(f"✓ DB updated: {imei} now has authoritative position from telemetry_id={telemetry_id}")
+                        if row:
+                            version = row['live_position_reconciliation_version']
+                        logger.info(f"✓ DB updated: {imei} now has authoritative position from telemetry_id={telemetry_id} | Version={version}")
                     except Exception as e:
                         logger.error(f"✗ DB update FAILED for {imei}: {e}")
                         return {
@@ -244,13 +248,14 @@ class LivePositionReconciliationEngine:
                         "movement": movement,
                         "is_authoritative": not is_stale,
                         "reconciliation_reason": reason,
+                        "reconciliation_version": version,
                         **{k: v for k, v in extra_fields.items() if k in ['gsm', 'ext_v', 'bat_v', 'rfid', 'driver_id', 'driver_name', 'status']}
                     }
                     
                     redis_key = f"live:{imei}"
-                    await self.redis.set(redis_key, json.dumps(cache_data))
+                    await self.redis.setex(redis_key, 604800, json.dumps(cache_data))
                     redis_updated = True
-                    logger.debug(f"✓ Redis cache updated for {imei}")
+                    logger.debug(f"✓ Redis cache updated for {imei} | Version={version}")
                 except Exception as e:
                     logger.error(f"✗ Redis cache UPDATE FAILED for {imei}: {e}")
                     redis_updated = False
@@ -267,12 +272,12 @@ class LivePositionReconciliationEngine:
                         "latitude": latitude,
                         "speed": speed,
                         "ignition": ignition,
-                        "reconciliation_version": 1,
+                        "reconciliation_version": version,
                         "reconciliation_reason": reason
                     }
                     await self.redis.publish("live_updates", json.dumps(ws_payload))
                     websocket_notified = True
-                    logger.info(f"✓ Websocket emitted for {imei} position update")
+                    logger.info(f"✓ Websocket emitted for {imei} position update | Version={version}")
                 except Exception as e:
                     logger.error(f"✗ Websocket emit FAILED for {imei}: {e}")
                     websocket_notified = False

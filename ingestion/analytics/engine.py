@@ -65,7 +65,7 @@ class AnalyticsEngine:
         elif not current_ign and prev_ign:
             await self.db.save_analytics_event(imei, "trip_end", {**data, "driver_id": driver_id}, conn=conn)
             await self.db.save_system_event(imei, 'INFO', 'Movement', 'Ignition OFF', "Vehicle engine stopped.", driver_id=driver_id, latitude=data.get('latitude'), longitude=data.get('longitude'), conn=conn)
-            await self._calculate_trip_summary(imei, driver_id)
+            await self._calculate_trip_summary(imei, driver_id, conn=conn)
             self.logger.info(f"Trip ended for {imei}")
  
         # 2. Idle Detection (Phase 5)
@@ -88,6 +88,7 @@ class AnalyticsEngine:
                     # Reset so we only log once per threshold or implement a "heartbeat" for long idle
                     # For now, let's just update the state to prevent spamming
                     # We will log the final idle duration on move or ign off
+                    # For now, let's just update the state to prevent spamming
         else:
             # Vehicle moved or engine turned off - close idle state
             if prev_state.get('idle_start'):
@@ -97,7 +98,7 @@ class AnalyticsEngine:
                 if total_idle > 60: # Log if > 1 minute
                      await self.db.save_analytics_event(imei, "idle_summary", {**data, "value": total_idle}, conn=conn)
                 prev_state['idle_start'] = None
-
+ 
     async def _handle_violations(self, imei, data, prev_state, conn=None):
         speed = data.get('speed', 0)
         driver_id = data.get('driver_id') or prev_state.get('current_driver_id')
@@ -124,7 +125,7 @@ class AnalyticsEngine:
                     prev_state['overspeed_start'] = None 
         else:
             prev_state['overspeed_start'] = None
- 
+  
         # 2. Harsh Behavior (Accel/Braking)
         if prev_state:
             prev_speed = prev_state.get('last_speed', 0)
@@ -135,10 +136,15 @@ class AnalyticsEngine:
             elif dv < self.HARSH_BRAKE_THRESHOLD:
                 await self.db.save_analytics_event(imei, "harsh_brake", {**data, "driver_id": driver_id}, conn=conn)
                 await self.db.save_system_event(imei, 'WARNING', 'Safety', 'Harsh Braking', f"Sudden braking detected: {round(dv, 1)} km/h change.", driver_id=driver_id, latitude=data.get('latitude'), longitude=data.get('longitude'), conn=conn)
-
-    async def _calculate_trip_summary(self, imei, driver_id=None):
+ 
+    async def _calculate_trip_summary(self, imei, driver_id=None, conn=None):
         """Aggregates the last completed trip metrics."""
-        async with self.db.pool.acquire() as conn:
+        conn_context = None
+        if conn is None:
+            conn_context = self.db.pool.acquire()
+            conn = await conn_context.__aenter__()
+            
+        try:
             events = await conn.fetch(
                 "SELECT * FROM analytics_events WHERE imei = $1 AND event_type IN ('trip_start', 'trip_end') ORDER BY timestamp DESC LIMIT 2",
                 imei
@@ -176,15 +182,18 @@ class AnalyticsEngine:
                         max_speed = max(max_speed, p1['speed'])
                     
                     if speeds: avg_speed = sum(speeds) / len(speeds)
-
+ 
                 duration = (end_t - start_t).total_seconds()
                 if duration < 30: return # Ignore ghost trips < 30s
-
+ 
                 await conn.execute(
                     """INSERT INTO trip_summary (imei, driver_id, start_time, end_time, duration_sec, max_speed, avg_speed, distance_km)
                        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)""",
                     imei, driver_id, start_t, end_t, int(duration), max_speed, avg_speed, round(total_dist, 2)
                 )
+        finally:
+            if conn_context is not None:
+                await conn_context.__aexit__(None, None, None)
 
     def _calculate_confidence(self, data):
         """

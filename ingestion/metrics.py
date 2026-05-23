@@ -20,5 +20,9 @@ EVENTS_GENERATED = Counter('ivms_events_total', 'Total system events generated',
 WS_ACTIVE_CLIENTS = Gauge('ivms_ws_active_clients', 'Number of active WebSocket clients')
 WS_MESSAGES_BROADCAST = Counter('ivms_ws_broadcast_total', 'Total messages broadcasted via WS')
 
+# Hardening / Backpressure & Rate Limit Metrics
+BACKPRESSURE_THROTTLING = Counter('ivms_backpressure_throttling_total', 'Total number of backpressure socket throttling events')
+RECONNECT_THROTTLED = Counter('ivms_reconnect_throttled_total', 'Total number of reconnect storm throttled client IPs')
+
 def start_metrics_server(port=9090):
     start_http_server(port)

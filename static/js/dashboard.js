@@ -25,7 +25,36 @@
 
     let registered = [];
     let latest = [];
+    let fleetStore = {}; // Centralized fleet state store: imei -> normalized vehicle item
     let deviceIdToNameMap = {};
+
+    function reconcileFleetState(allDevicesData) {
+        allDevicesData.forEach(incoming => {
+            const imei = String(incoming.registered.unique_id);
+            const current = fleetStore[imei];
+            
+            if (!current) {
+                // New item
+                fleetStore[imei] = incoming;
+            } else {
+                // Determine if we should update the live status based on version sequencing
+                const currentVersion = parseInt(current.device.reconciliation_version || 0, 10);
+                const incomingVersion = parseInt(incoming.device.reconciliation_version || 0, 10);
+                
+                if (incomingVersion >= currentVersion) {
+                    // Update entire live state
+                    current.device = incoming.device;
+                }
+                
+                // ALWAYS update historical summaries since they are calculated from database tables
+                current.distance = incoming.distance;
+                current.engineHours = incoming.engineHours;
+                current.fuelLiters = incoming.fuelLiters;
+                current.fuelCost = incoming.fuelCost;
+                current.registered = incoming.registered;
+            }
+        });
+    }
 
     // CHART VARIABLES (UPDATED)
     let bigChart = null; // Used for Sunburst (or temporary Doughnut for visual replacement)
@@ -228,6 +257,7 @@
     // --- Helper: Robust Ignition Check ---
     function isVehicleIgnitionOn(d) {
         if (!d || !d.device) return false;
+        if (d.device.status === 'offline') return false;
         const pos = d.device.position || {};
         const posAttrs = pos.attributes || {};
         const devAttrs = d.device.attributes || {};
@@ -482,7 +512,7 @@
             const isOnline = d.device?.status && d.device.status !== 'offline';
             const speed = Number(pos.speed ?? pos.attributes?.speed ?? 0);
             const isMoving = speed > 1;
-            const color = isOnline && isMoving ? 'green' : isOnline ? 'orange' : 'red';
+            const color = isOnline && isMoving ? 'green' : isOnline ? 'orange' : 'gray';
 
             // --- PHASE 5: Trust Hardening (Confidence) ---
             const confidence = d.device.confidence || d.confidence || (pos.attributes?.satellites >= 8 ? 1.0 : (pos.attributes?.satellites >= 4 ? 0.7 : 0.4));
@@ -511,10 +541,27 @@
                 iconAnchor: [9, 9]
             });
 
-            const marker = L.marker([lat, lng], { icon }).addTo(markerLayer);
+            const marker = L.marker([lat, lng], { 
+                icon,
+                opacity: isOnline ? 1.0 : 0.6
+            }).addTo(markerLayer);
             
             const driverName = d.device.driver_name || "No Driver";
             const rfid = d.device.position?.attributes?.rfid || d.device.rfid || "N/A";
+
+            let ageString = '';
+            if (d.device?.lastUpdate) {
+                const ageSec = Math.round((new Date() - new Date(d.device.lastUpdate)) / 1000);
+                if (ageSec > 86400) {
+                    ageString = `${Math.round(ageSec / 86400)} days ago`;
+                } else if (ageSec > 3600) {
+                    ageString = `${Math.round(ageSec / 3600)} hrs ago`;
+                } else if (ageSec > 60) {
+                    ageString = `${Math.round(ageSec / 60)} mins ago`;
+                } else {
+                    ageString = `${Math.max(0, ageSec)}s ago`;
+                }
+            }
 
             marker.bindPopup(`
                 <div class="popup-content">
@@ -526,7 +573,7 @@
                         <i class="fas fa-id-card me-1 text-secondary"></i> <strong>RFID:</strong> ${rfid}
                     </div>
                     <div class="small mb-1">
-                        <i class="fas fa-info-circle me-1"></i> <strong>Status:</strong> ${isOnline ? 'Online' : 'Offline'}
+                        <i class="fas fa-info-circle me-1"></i> <strong>Status:</strong> ${isOnline ? 'Online' : 'Offline'} ${ageString ? `(${ageString})` : ''}
                     </div>
                     <div class="small mb-1">
                         <i class="fas fa-tachometer-alt me-1"></i> <strong>Speed:</strong> ${speed.toFixed(1)} km/h
@@ -615,52 +662,47 @@
         const totalDevices = data.length;
 
         // 1. Calculate Live Status Metrics — trust Traccar's own status field
-        const online = data.filter(d => d.device?.status && d.device.status !== 'offline').length;
-        const offline = totalDevices - online;
-
-        const ignOn = data.filter(d => isVehicleIgnitionOn(d)).length;
-        const ignOff = totalDevices - ignOn;
-
-        const stopped = data.filter(d => {
-            // Check for position and speed <= 1
-            if (d.device?.position) {
-                const speed = Number(d.device.position.speed ?? d.device.position.attributes?.speed ?? 0);
-                return speed <= 1;
-            }
-            // Offline/no pos is considered stopped if device is registered
-            return true;
-        }).length;
-
-        const moving = totalDevices - stopped;
-
-        // 2. Update Performance Overview (Top Row)
-        if (sumDevices) sumDevices.textContent = totalDevices;
-        // sumDistance, sumEngineHours, sumFuel are updated in refreshAll() using period data
-
-        // 4. Update the hover lists for all status categories
-        // MOVED UP to fix ReferenceError (TDZ)
         const onlineDevices = data.filter(d => d.device?.status && d.device.status !== 'offline');
         const offlineDevices = data.filter(d => !d.device?.status || d.device.status === 'offline');
+
+        const online = onlineDevices.length;
+        const offline = offlineDevices.length;
+
+        const ignOn = onlineDevices.filter(d => isVehicleIgnitionOn(d)).length;
+        const ignOff = totalDevices - ignOn;
+
+        // Offline devices are considered stopped; online devices are stopped if speed <= 1
         const stoppedDevices = data.filter(d => {
+            const isOffline = !d.device?.status || d.device.status === 'offline';
+            if (isOffline) return true;
             if (d.device?.position) {
                 const speed = Number(d.device.position.speed ?? d.device.position.attributes?.speed ?? 0);
                 return speed <= 1;
             }
             return true;
         });
-        const movingDevices = data.filter(d => {
+
+        const movingDevices = onlineDevices.filter(d => {
             if (d.device?.position) {
                 const speed = Number(d.device.position.speed ?? d.device.position.attributes?.speed ?? 0);
                 return speed > 1;
             }
             return false;
         });
-        const idleDevices = data.filter(d => {
+
+        const idleDevices = onlineDevices.filter(d => {
             if (!d.device?.position) return false;
             const pos = d.device.position;
             const speed = Number(pos.speed ?? pos.attributes?.speed ?? 0);
             return isVehicleIgnitionOn(d) && speed <= 1;
         });
+
+        const stopped = stoppedDevices.length;
+        const moving = movingDevices.length;
+
+        // 2. Update Performance Overview (Top Row)
+        if (sumDevices) sumDevices.textContent = totalDevices;
+        // sumDistance, sumEngineHours, sumFuel are updated in refreshAll() using period data
 
         // 3. Update Status Tiles (Middle Row)
         const metrics = {
@@ -825,6 +867,7 @@
                     driver_name: d.driver_name,
                     rfid: d.rfid,
                     confidence: d.confidence || 1.0,
+                    reconciliation_version: d.reconciliation_version || 1,
                     position: {
                         latitude: d.latitude,
                         longitude: d.longitude,
@@ -848,15 +891,20 @@
                 };
             });
 
+            // Reconcile and merge incoming bulk data atomically with the centralized fleet store
+            reconcileFleetState(allDevicesData);
+            const allVehicles = Object.values(fleetStore);
+
             // Filter for displayed data if a specific device is selected
             if (selectedDeviceId) {
-                latest = allDevicesData.filter(d => String(d.registered.unique_id) === String(selectedDeviceId));
+                latest = allVehicles.filter(d => String(d.registered.unique_id) === String(selectedDeviceId));
             } else {
-                latest = allDevicesData;
+                latest = allVehicles;
             }
 
-            updateCounts(allDevicesData);
-            updateBigChart(allDevicesData);
+            // AUTHORITATIVE STATE SEPARATION: Counts and big chart always display status of full fleet, avoiding drop to 1 device
+            updateCounts(allVehicles);
+            updateBigChart(allVehicles);
             updateMap(latest);
 
             const totals = latest.reduce((s, d) => {
@@ -918,48 +966,78 @@
 
     // Expose for WebSocket integration
     window.updateSingleVehicleLive = (data) => {
-        // data format: {imei, latitude, longitude, speed, ...}
+        // data format: {imei, latitude, longitude, speed, reconciliation_version, ...}
         const imei = String(data.imei);
-        let found = false;
+        const incomingVersion = parseInt(data.reconciliation_version || 1, 10);
         
-        // Update the 'latest' array which is used for rendering
-        latest.forEach(d => {
-            if (String(d.registered.unique_id) === imei) {
-                if (data.status !== undefined) d.device.status = data.status;
-                if (data.driver_id !== undefined) d.device.driver_id = data.driver_id;
-                if (data.driver_name !== undefined) d.device.driver_name = data.driver_name;
-                if (data.rfid !== undefined) d.device.rfid = data.rfid;
-                
-                // Only update position if it's a real telemetry packet
-                if (data.latitude !== undefined && data.longitude !== undefined) {
-                    d.device.position = {
-                        deviceId: d.device.id,
-                        latitude: data.latitude,
-                        longitude: data.longitude,
-                        speed: data.speed,
-                        course: data.angle,
-                        altitude: data.altitude,
-                        deviceTime: data.timestamp,
-                        attributes: {
-                            sat: data.satellites,
-                            batteryLevel: data.bat_v ? parseInt(data.bat_v * 10) : 0,
-                            rfid: data.rfid
-                        }
-                    };
+        let current = fleetStore[imei];
+        if (!current) {
+            console.log(`[WS_STORE] Received websocket update for unknown IMEI ${imei}. Ignoring.`);
+            return;
+        }
+        
+        // AUTHORITATIVE SEQUENCE FILTERING: If incoming update has lower version than current, ignore it
+        const currentVersion = parseInt(current.device.reconciliation_version || 0, 10);
+        if (incomingVersion < currentVersion) {
+            console.log(`[WS_DEREVERB] Stale WebSocket update discarded for IMEI ${imei}: incoming v${incomingVersion} < current v${currentVersion}`);
+            return;
+        }
+        
+        // Atomically update/patch live state in the fleetStore
+        current.device.reconciliation_version = incomingVersion;
+        if (data.status !== undefined) current.device.status = data.status;
+        if (data.driver_id !== undefined) current.device.driver_id = data.driver_id;
+        if (data.driver_name !== undefined) current.device.driver_name = data.driver_name;
+        if (data.rfid !== undefined) current.device.rfid = data.rfid;
+        
+        if (data.latitude !== undefined && data.longitude !== undefined) {
+            current.device.position = {
+                deviceId: current.device.id,
+                latitude: data.latitude,
+                longitude: data.longitude,
+                speed: data.speed,
+                course: data.angle,
+                altitude: data.altitude,
+                deviceTime: data.timestamp,
+                attributes: {
+                    sat: data.satellites,
+                    batteryLevel: data.bat_v ? parseInt(data.bat_v * 10) : 0,
+                    rfid: data.rfid,
+                    ignition: data.ignition
                 }
-                found = true;
-            }
-        });
+            };
+        }
 
-        if (found) {
-            const selectedDeviceId = pinnedDeviceId || (filterDevice?.value ? String(filterDevice.value) : "");
-            const displayed = selectedDeviceId
-                ? latest.filter(d => String(d.registered.unique_id) === selectedDeviceId)
-                : latest;
+        // Re-calculate subsets and update UI based on the persistent fleet store
+        const allVehicles = Object.values(fleetStore);
+        const selectedDeviceId = pinnedDeviceId || (filterDevice?.value ? String(filterDevice.value) : "");
+        
+        latest = selectedDeviceId
+            ? allVehicles.filter(d => String(d.registered.unique_id) === selectedDeviceId)
+            : allVehicles;
 
-            updateCounts(displayed);
-            updateBigChart(displayed);
-            updateMap(displayed);
+        // AUTHORITATIVE STATE SEPARATION: Counts and big chart always display status of full fleet, avoiding drop to 1 device
+        updateCounts(allVehicles);
+        updateBigChart(allVehicles);
+        updateMap(latest);
+
+        // Re-render top KPI summaries
+        const totals = latest.reduce((s, d) => {
+            s.distance += (d.distance || 0);
+            s.engineHours += (d.engineHours || 0);
+            s.fuelLiters += (d.fuelLiters || 0);
+            s.fuelCost += (d.fuelCost || 0);
+            return s;
+        }, { distance: 0, engineHours: 0, fuelLiters: 0, fuelCost: 0 });
+
+        if (sumDistance) {
+            sumDistance.textContent = totals.distance.toFixed(2) + " km";
+        }
+        if (sumEngineHours) {
+            sumEngineHours.textContent = totals.engineHours.toFixed(1) + " h";
+        }
+        if (sumFuel) {
+            sumFuel.textContent = `${totals.fuelLiters.toFixed(1)} L (${totals.fuelCost.toFixed(3)} OMR)`;
         }
     };
 

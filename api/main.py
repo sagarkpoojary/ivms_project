@@ -155,10 +155,38 @@ async def list_devices(
     """, allowed_imeis)
     return [dict(row) for row in rows]
 
+def enforce_cache_freshness(all_live: List[dict]) -> List[dict]:
+    """Helper to dynamically override stale cached states to offline with active status reset."""
+    from config import Config
+    now_utc = datetime.now(timezone.utc)
+    for d in all_live:
+        ts_str = d.get('timestamp')
+        if ts_str:
+            try:
+                ts = datetime.fromisoformat(ts_str.replace('Z', '+00:00'))
+                if ts.tzinfo is None:
+                    ts = ts.replace(tzinfo=timezone.utc)
+                
+                diff = (now_utc - ts).total_seconds()
+                
+                ignition = d.get('ignition', False)
+                is_ign = ignition in [True, 1, '1', 'true', 'True']
+                timeout = Config.IGNITION_ON_TIMEOUT_SECONDS if is_ign else Config.IGNITION_OFF_TIMEOUT_SECONDS
+                
+                if diff > timeout:
+                    d['status'] = 'offline'
+                    d['speed'] = 0
+                    d['ignition'] = False
+                    d['movement'] = False
+            except Exception:
+                pass
+    return all_live
+
 @app.get("/api/v2/live-status")
 async def live_status(allowed_imeis: List[str] = Depends(get_allowed_imeis)):
     """Fetches real-time status from Redis cache, filtered by tenant."""
     all_live = await cache.get_all_live()
+    all_live = enforce_cache_freshness(all_live)
     return [d for d in all_live if str(d.get('imei')) in allowed_imeis]
 
 @app.get("/api/v2/telemetry/{imei}")
@@ -264,14 +292,47 @@ async def get_bulk_sync(request: Request, period: str = 'Today', uid: str = None
     
     # 2. Get Live Status from Redis
     all_live = await cache.get_all_live()
+    all_live = enforce_cache_freshness(all_live)
     live_map = {str(d.get('imei')): d for d in all_live if str(d.get('imei')) in allowed_imeis}
     
     # 3. Get Summaries from Native Service
     summaries_list = native_report_service.get_fleet_summary(vehicles, start_dt, end_dt)
-    summaries_map = {str(s['unique_id']): s for s in summaries_list}
+    summaries_map = {}
+    for s in summaries_list:
+        uid = str(s['unique_id'])
+        summaries_map[uid] = {
+            **s,
+            "distance": s.get('total_distance', 0),
+            "engineHours": s.get('engine_hours', 0),
+            "fuelLiters": s.get('fuel_liters', 0),
+            "fuelCost": s.get('fuel_cost', 0)
+        }
     
+    devices_result = []
+    for v in vehicles:
+        v_uid = str(v['unique_id'])
+        v_name = v['name']
+        d = live_map.get(v_uid)
+        if d:
+            devices_result.append({
+                **d,
+                "uniqueId": v_uid,
+                "name": v_name,
+                "reconciliation_version": int(d.get('reconciliation_version', 1))
+            })
+        else:
+            devices_result.append({
+                "uniqueId": v_uid,
+                "name": v_name,
+                "status": "offline",
+                "speed": 0,
+                "ignition": False,
+                "movement": False,
+                "reconciliation_version": 1
+            })
+            
     return {
-        "devices": [live_map.get(str(v['unique_id']), {"uniqueId": v['unique_id'], "name": v['name'], "status": "offline"}) for v in vehicles],
+        "devices": devices_result,
         "summaries": summaries_map,
         "server_time": datetime.now().isoformat()
     }

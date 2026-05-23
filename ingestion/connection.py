@@ -43,6 +43,14 @@ class DeviceSession:
 
             # 3. Continuous Data Ingestion
             while True:
+                # PAUSE/THROTTLE socket reading if main queue is overloaded (Backpressure Control)
+                q_size = self.db_queue.qsize()
+                if q_size > 8000:
+                    logger.warning(f"Backpressure warning: db_queue size ({q_size}) exceeds threshold (8000). Pausing socket read for {self.imei or self.addr}.")
+                    metrics.BACKPRESSURE_THROTTLING.inc()
+                    await asyncio.sleep(0.5)
+                    continue
+
                 # Read header/preamble or generic data
                 data = await asyncio.wait_for(self.reader.read(4096), timeout=300)
                 if not data:
@@ -50,6 +58,8 @@ class DeviceSession:
                 
                 self.buffer.extend(data)
                 self.last_activity = time.time()
+                # Async update sliding registry heartbeat task to avoid blocking TCP reader
+                asyncio.create_task(self.registry.update_heartbeat(self))
                 
                 # Process buffer (may contain multiple packets or partial packets)
                 await self._process_buffer()
@@ -64,6 +74,27 @@ class DeviceSession:
     async def _authenticate(self):
         """Validates IMEI and sends handshake ACK."""
         try:
+            # Reconnect Storm Rate Limiting based on IP
+            client_ip = self.addr[0] if self.addr else "unknown_ip"
+            rate_key = f"reconnect_rate:{client_ip}"
+            try:
+                await self.cache.connect()
+                current_hits = await self.cache.client.incr(rate_key)
+                if current_hits == 1:
+                    await self.cache.client.expire(rate_key, 10)
+                if current_hits > 5:
+                    logger.warning(f"Reconnect rate limit exceeded for IP {client_ip} ({current_hits} hits in 10s). Dropping connection.")
+                    metrics.RECONNECT_THROTTLED.inc()
+                    await self.db_queue.put({
+                        'type': 'alert', 'severity': 'CRITICAL', 'component': 'Security',
+                        'message': f"Reconnect storm burst detected from IP {client_ip}. Dropping socket connection."
+                    })
+                    self.writer.write(b'\x00')
+                    await self.writer.drain()
+                    return False
+            except Exception as rate_err:
+                logger.warning(f"Rate limiting check failed for IP {client_ip}: {rate_err}")
+
             data = await asyncio.wait_for(self.reader.read(1024), timeout=30)
             if not data: return False
             
@@ -213,6 +244,18 @@ class DeviceSession:
                 logger.error(f"Error during command task cancellation: {e}")
             self.command_task = None
         self.registry.unregister(self)
+        
+        if self.imei:
+            try:
+                await self.db_queue.put({
+                    'type': 'disconnect',
+                    'imei': self.imei,
+                    'timestamp': time.time()
+                })
+                logger.info(f"Queued disconnect event for {self.imei}")
+            except Exception as e:
+                logger.error(f"Failed to queue disconnect event for {self.imei}: {e}")
+
         try:
             await self.cache.disconnect()
             logger.debug(f"Redis cache disconnected for {self.imei}")

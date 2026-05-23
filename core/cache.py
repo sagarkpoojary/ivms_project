@@ -26,7 +26,7 @@ class LiveCache:
         """Updates the live status of a vehicle."""
         await self.connect()
         key = f"live:{imei}"
-        await self.client.set(key, json.dumps(status_data))
+        await self.client.setex(key, 604800, json.dumps(status_data))
         # Publish to a channel for real-time websocket updates
         await self.client.publish("live_updates", json.dumps(status_data))
 

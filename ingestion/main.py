@@ -84,6 +84,15 @@ class IngestionServer:
                     queue.task_done()
                     continue
 
+                if item.get('type') == 'disconnect':
+                    imei = item['imei']
+                    try:
+                        await db_handler.mark_device_offline(imei)
+                    except Exception as err:
+                        logger.error(f"Worker {worker_id} - Failed to mark device {imei} offline: {err}")
+                    queue.task_done()
+                    continue
+
                 imei = item['imei']
                 records = item['records']
                 raw_payload = item.get('raw')

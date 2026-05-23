@@ -411,6 +411,58 @@ class DBHandler:
                 count += 1
             return count
 
+    async def mark_device_offline(self, imei):
+        """Atomically marks a device as offline in database and Redis cache, resetting active states."""
+        if not self.pool: await self.connect()
+        async with self.pool.acquire() as conn:
+            # 1. Update Database
+            await conn.execute(
+                """UPDATE live_vehicle_status 
+                   SET status = 'offline', 
+                       current_status = 'offline',
+                       speed = 0,
+                       ignition = FALSE,
+                       movement = FALSE,
+                       last_update = NOW(),
+                       packet_age_seconds = EXTRACT(EPOCH FROM (NOW() - last_timestamp)),
+                       updated_at = NOW() 
+                   WHERE imei = $1""",
+                str(imei)
+            )
+            
+            # 2. Update Redis status cache
+            existing_cache = await self.cache.get_status(imei)
+            if existing_cache:
+                existing_cache['status'] = 'offline'
+                existing_cache['speed'] = 0
+                existing_cache['ignition'] = False
+                existing_cache['movement'] = False
+                await self.cache.update_status(imei, existing_cache)
+            else:
+                live_status = {
+                    'imei': imei,
+                    'status': 'offline',
+                    'speed': 0,
+                    'ignition': False,
+                    'movement': False
+                }
+                await self.cache.update_status(imei, live_status)
+                
+            # 3. Reset motion hysteresis cache to prevent stale transitions
+            key = f"motion_state:{imei}"
+            try:
+                state_dict = {
+                    "state": "offline",
+                    "pending_state": None,
+                    "pending_since": None
+                }
+                await self.cache.client.setex(key, 604800, json.dumps(state_dict))
+            except Exception as e:
+                logger.warning(f"Failed to reset motion state for {imei}: {e}")
+                
+            logger.info(f"Successfully marked device {imei} as OFFLINE on physical TCP disconnect")
+            await self.log_alert('INFO', 'Connection', f"Device {imei} physically disconnected TCP session", imei, conn=conn)
+
     async def reconcile_offline_devices(self, ignition_on_timeout=180, ignition_off_timeout=1800):
         """Finds devices that haven't sent data within dynamic timeouts and marks them offline."""
         if not self.pool: await self.connect()
@@ -431,18 +483,21 @@ class DBHandler:
             
             if not offline_devices:
                 return 0
-
+ 
             count = 0
             for row in offline_devices:
                 imei = row['imei']
                 is_ign = row['ignition']
                 timeout = ignition_on_timeout if is_ign else ignition_off_timeout
                 
-                # Update DB to offline
+                # Update DB to offline, resetting active parameters
                 await conn.execute(
                     """UPDATE live_vehicle_status 
                        SET status = 'offline', 
                            current_status = 'offline',
+                           speed = 0,
+                           ignition = FALSE,
+                           movement = FALSE,
                            last_update = NOW(),
                            packet_age_seconds = EXTRACT(EPOCH FROM (NOW() - last_timestamp)),
                            updated_at = NOW() 
@@ -450,18 +505,36 @@ class DBHandler:
                     imei
                 )
                 
-                # Update Redis
+                # Update Redis cache
                 existing_cache = await self.cache.get_status(imei)
                 if existing_cache:
                     existing_cache['status'] = 'offline'
+                    existing_cache['speed'] = 0
+                    existing_cache['ignition'] = False
+                    existing_cache['movement'] = False
                     await self.cache.update_status(imei, existing_cache)
                 else:
                     live_status = {
                         'imei': imei,
                         'timestamp': row['last_timestamp'].isoformat() if row['last_timestamp'] else None,
-                        'status': 'offline'
+                        'status': 'offline',
+                        'speed': 0,
+                        'ignition': False,
+                        'movement': False
                     }
                     await self.cache.update_status(imei, live_status)
+                
+                # Reset motion hysteresis cache to prevent stale transitions
+                key = f"motion_state:{imei}"
+                try:
+                    state_dict = {
+                        "state": "offline",
+                        "pending_state": None,
+                        "pending_since": None
+                    }
+                    await self.cache.client.setex(key, 604800, json.dumps(state_dict))
+                except Exception as e:
+                    logger.warning(f"Failed to reset motion state for {imei} in offline reconciliation: {e}")
                 
                 count += 1
                 logger.info(f"Marked device {imei} as OFFLINE (No data for > {timeout}s | Ignition: {is_ign})")
