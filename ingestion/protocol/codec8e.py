@@ -32,6 +32,7 @@ class Codec8EParser:
     def decode_avl(data):
         """
         Decodes a full AVL data packet with CRC validation.
+        Supports both Codec 8 (0x08) and Codec 8 Extended (0x8E).
         Returns a list of records.
         """
         if len(data) < 15:
@@ -48,9 +49,6 @@ class Codec8EParser:
         offset += 4
         
         # CRC Validation
-        # The CRC is calculated over the data field (Codec ID to Number of Data 2)
-        # Length of data field is data_field_len
-        # CRC is the last 4 bytes of the packet
         if len(data) < 8 + data_field_len + 4:
             return None
             
@@ -59,15 +57,14 @@ class Codec8EParser:
         
         calculated_crc = Codec8EParser.crc16(data_field)
         if calculated_crc != (received_crc & 0xFFFF):
-            # CRC Mismatch (Phase 7 requirement)
-            # Log as hex for diagnostics
+            # CRC Mismatch
             return None
             
         # Codec ID (1 byte)
         codec_id = data[offset]
         offset += 1
         
-        if codec_id != 0x8E:
+        if codec_id != 0x8E and codec_id != 0x08:
             return None
             
         # Number of Data 1 (1 byte)
@@ -77,10 +74,10 @@ class Codec8EParser:
         records = []
         try:
             for i in range(num_records):
-                record, bytes_read = Codec8EParser._parse_single_record(data[offset:])
+                record, bytes_read = Codec8EParser._parse_single_record(data[offset:], codec_id)
                 if record:
-                    if Codec8EParser._is_valid_gps(record):
-                        records.append(record)
+                    record['gps_valid'] = Codec8EParser._is_valid_gps(record)
+                    records.append(record)
                     offset += bytes_read
                 else:
                     # Partial record or parsing error
@@ -107,7 +104,7 @@ class Codec8EParser:
         return True
 
     @staticmethod
-    def _parse_single_record(data):
+    def _parse_single_record(data, codec_id=0x8E):
         offset = 0
         try:
             # Timestamp (8 bytes, ms since epoch)
@@ -139,60 +136,110 @@ class Codec8EParser:
             speed = struct.unpack('>H', data[offset:offset+2])[0]
             offset += 2
             
-            # IO Element (Extended)
-            event_id = struct.unpack('>H', data[offset:offset+2])[0]
-            offset += 2
-            total_io = struct.unpack('>H', data[offset:offset+2])[0]
-            offset += 2
-            
             io_dict = {}
             
-            # 1-byte elements
-            cnt1 = struct.unpack('>H', data[offset:offset+2])[0]
-            offset += 2
-            for _ in range(cnt1):
-                id_ = struct.unpack('>H', data[offset:offset+2])[0]
-                val = data[offset+2]
-                io_dict[id_] = val
-                offset += 3
+            # IO Element (Dynamic based on Codec 8 vs Codec 8E)
+            if codec_id == 0x8E:
+                # Codec 8E: 2-byte event_id, 2-byte total_io, and 2-byte counts/IDs
+                event_id = struct.unpack('>H', data[offset:offset+2])[0]
+                offset += 2
+                total_io = struct.unpack('>H', data[offset:offset+2])[0]
+                offset += 2
                 
-            # 2-byte elements
-            cnt2 = struct.unpack('>H', data[offset:offset+2])[0]
-            offset += 2
-            for _ in range(cnt2):
-                id_ = struct.unpack('>H', data[offset:offset+2])[0]
-                val = struct.unpack('>H', data[offset+2:offset+4])[0]
-                io_dict[id_] = val
-                offset += 4
+                # 1-byte elements
+                cnt1 = struct.unpack('>H', data[offset:offset+2])[0]
+                offset += 2
+                for _ in range(cnt1):
+                    id_ = struct.unpack('>H', data[offset:offset+2])[0]
+                    val = data[offset+2]
+                    io_dict[id_] = val
+                    offset += 3
+                    
+                # 2-byte elements
+                cnt2 = struct.unpack('>H', data[offset:offset+2])[0]
+                offset += 2
+                for _ in range(cnt2):
+                    id_ = struct.unpack('>H', data[offset:offset+2])[0]
+                    val = struct.unpack('>H', data[offset+2:offset+4])[0]
+                    io_dict[id_] = val
+                    offset += 4
+                    
+                # 4-byte elements
+                cnt4 = struct.unpack('>H', data[offset:offset+2])[0]
+                offset += 2
+                for _ in range(cnt4):
+                    id_ = struct.unpack('>H', data[offset:offset+2])[0]
+                    val = struct.unpack('>I', data[offset+2:offset+6])[0]
+                    io_dict[id_] = val
+                    offset += 6
+                    
+                # 8-byte elements
+                cnt8 = struct.unpack('>H', data[offset:offset+2])[0]
+                offset += 2
+                for _ in range(cnt8):
+                    id_ = struct.unpack('>H', data[offset:offset+2])[0]
+                    val = struct.unpack('>Q', data[offset+2:offset+10])[0]
+                    io_dict[id_] = val
+                    offset += 10
+                    
+                # Variable length elements
+                cnt_var = struct.unpack('>H', data[offset:offset+2])[0]
+                offset += 2
+                for _ in range(cnt_var):
+                    id_ = struct.unpack('>H', data[offset:offset+2])[0]
+                    v_len = struct.unpack('>H', data[offset+2:offset+4])[0]
+                    val = data[offset+4:offset+4+v_len].hex()
+                    io_dict[id_] = val
+                    offset += 4 + v_len
+            else:
+                # Codec 8: 1-byte event_id, 1-byte total_io, and 1-byte counts/IDs
+                event_id = data[offset]
+                offset += 1
+                total_io = data[offset]
+                offset += 1
                 
-            # 4-byte elements
-            cnt4 = struct.unpack('>H', data[offset:offset+2])[0]
-            offset += 2
-            for _ in range(cnt4):
-                id_ = struct.unpack('>H', data[offset:offset+2])[0]
-                val = struct.unpack('>I', data[offset+2:offset+6])[0]
-                io_dict[id_] = val
-                offset += 6
-                
-            # 8-byte elements
-            cnt8 = struct.unpack('>H', data[offset:offset+2])[0]
-            offset += 2
-            for _ in range(cnt8):
-                id_ = struct.unpack('>H', data[offset:offset+2])[0]
-                val = struct.unpack('>Q', data[offset+2:offset+10])[0]
-                io_dict[id_] = val
-                offset += 10
-                
-            # Variable length elements
-            cnt_var = struct.unpack('>H', data[offset:offset+2])[0]
-            offset += 2
-            for _ in range(cnt_var):
-                id_ = struct.unpack('>H', data[offset:offset+2])[0]
-                v_len = struct.unpack('>H', data[offset+2:offset+4])[0]
-                val = data[offset+4:offset+4+v_len].hex()
-                io_dict[id_] = val
-                offset += 4 + v_len
+                # 1-byte elements
+                cnt1 = data[offset]
+                offset += 1
+                for _ in range(cnt1):
+                    id_ = data[offset]
+                    val = data[offset+1]
+                    io_dict[id_] = val
+                    offset += 2
+                    
+                # 2-byte elements
+                cnt2 = data[offset]
+                offset += 1
+                for _ in range(cnt2):
+                    id_ = data[offset]
+                    val = struct.unpack('>H', data[offset+1:offset+3])[0]
+                    io_dict[id_] = val
+                    offset += 3
+                    
+                # 4-byte elements
+                cnt4 = data[offset]
+                offset += 1
+                for _ in range(cnt4):
+                    id_ = data[offset]
+                    val = struct.unpack('>I', data[offset+1:offset+5])[0]
+                    io_dict[id_] = val
+                    offset += 5
+                    
+                # 8-byte elements
+                cnt8 = data[offset]
+                offset += 1
+                for _ in range(cnt8):
+                    id_ = data[offset]
+                    val = struct.unpack('>Q', data[offset+1:offset+9])[0]
+                    io_dict[id_] = val
+                    offset += 9
 
+            # Normalize classic IO IDs to Extended standard keys (matching DB expects)
+            if 1 in io_dict and 239 not in io_dict:
+                io_dict[239] = io_dict[1] # Map classic DI1 (Ignition) to standard 239
+            if 240 not in io_dict:
+                io_dict[240] = 1 if speed > 2.0 else 0 # Synthesize movement from speed if missing
+            
             record = {
                 'timestamp': ts,
                 'priority': priority,

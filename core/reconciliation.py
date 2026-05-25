@@ -83,6 +83,9 @@ class LivePositionReconciliationEngine:
             
         try:
             async with conn.transaction():
+                # Enforce a strict 2-second lock timeout to prevent queue worker starvation or deadlocks
+                await conn.execute("SET LOCAL lock_timeout = '2000'")
+                
                 # 1. ATOMIC READ-COMPARE-WRITE: Get current live position
                 existing = await conn.fetchrow(
                     """

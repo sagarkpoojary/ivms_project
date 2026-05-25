@@ -265,4 +265,5 @@ class DeviceSession:
             self.writer.close()
             await self.writer.wait_closed()
         except: pass
+        metrics.SOCKET_CHURN.inc()
         logger.info(f"Session closed for {self.imei or self.addr}")

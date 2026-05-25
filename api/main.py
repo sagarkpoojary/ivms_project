@@ -142,6 +142,7 @@ async def startup():
 
 @app.get("/api/v2/devices")
 async def list_devices(
+    environment: str = 'production',
     allowed_imeis: List[str] = Depends(get_allowed_imeis),
     db = Depends(get_db)
 ):
@@ -150,9 +151,9 @@ async def list_devices(
         SELECT v.*, p.name as profile_name 
         FROM vehicles v
         LEFT JOIN device_profiles p ON v.profile_id = p.id
-        WHERE v.unique_id = ANY($1)
+        WHERE v.unique_id = ANY($1) AND v.telemetry_environment = $2
         ORDER BY v.id DESC
-    """, allowed_imeis)
+    """, allowed_imeis, environment)
     return [dict(row) for row in rows]
 
 def enforce_cache_freshness(all_live: List[dict]) -> List[dict]:
@@ -183,11 +184,23 @@ def enforce_cache_freshness(all_live: List[dict]) -> List[dict]:
     return all_live
 
 @app.get("/api/v2/live-status")
-async def live_status(allowed_imeis: List[str] = Depends(get_allowed_imeis)):
-    """Fetches real-time status from Redis cache, filtered by tenant."""
+async def live_status(
+    environment: str = 'production',
+    allowed_imeis: List[str] = Depends(get_allowed_imeis),
+    db = Depends(get_db)
+):
+    """Fetches real-time status from Redis cache, filtered by tenant and environment."""
     all_live = await cache.get_all_live()
     all_live = enforce_cache_freshness(all_live)
-    return [d for d in all_live if str(d.get('imei')) in allowed_imeis]
+    
+    # Query database to filter by environment
+    matched_rows = await db.fetch("""
+        SELECT unique_id FROM vehicles 
+        WHERE unique_id = ANY($1) AND telemetry_environment = $2
+    """, allowed_imeis, environment)
+    matched_imeis = {r['unique_id'] for r in matched_rows}
+    
+    return [d for d in all_live if str(d.get('imei')) in matched_imeis]
 
 @app.get("/api/v2/telemetry/{imei}")
 async def get_telemetry(
@@ -278,7 +291,14 @@ async def system_health(
 
 @app.get("/api/dashboard/bulk-sync")
 @limiter.limit("30/minute")
-async def get_bulk_sync(request: Request, period: str = 'Today', uid: str = None, user = Depends(get_current_user), db = Depends(get_db)):
+async def get_bulk_sync(
+    request: Request, 
+    period: str = 'Today', 
+    uid: str = None, 
+    environment: str = 'production',
+    user = Depends(get_current_user), 
+    db = Depends(get_db)
+):
     """Aggregated dashboard state for high-performance frontend sync."""
     from services.time_service import get_period_dates
     from services.native_report_service import native_report_service
@@ -287,13 +307,20 @@ async def get_bulk_sync(request: Request, period: str = 'Today', uid: str = None
     start_dt, end_dt = get_period_dates(period)
     
     # 1. Get Vehicle Metadata
-    v_rows = await db.fetch("SELECT * FROM vehicles WHERE unique_id = ANY($1)", allowed_imeis)
+    v_rows = await db.fetch("SELECT * FROM vehicles WHERE unique_id = ANY($1) AND telemetry_environment = $2", allowed_imeis, environment)
     vehicles = [dict(r) for r in v_rows]
     
     # 2. Get Live Status from Redis
     all_live = await cache.get_all_live()
     all_live = enforce_cache_freshness(all_live)
     live_map = {str(d.get('imei')): d for d in all_live if str(d.get('imei')) in allowed_imeis}
+    
+    # 2b. Database Live Position Fallback Map
+    status_rows = await db.fetch("""
+        SELECT * FROM live_vehicle_status 
+        WHERE imei = ANY($1)
+    """, allowed_imeis)
+    db_status_map = {str(r['imei']): dict(r) for r in status_rows}
     
     # 3. Get Summaries from Native Service
     summaries_list = native_report_service.get_fleet_summary(vehicles, start_dt, end_dt)
@@ -313,6 +340,8 @@ async def get_bulk_sync(request: Request, period: str = 'Today', uid: str = None
         v_uid = str(v['unique_id'])
         v_name = v['name']
         d = live_map.get(v_uid)
+        db_status = db_status_map.get(v_uid)
+        
         if d:
             devices_result.append({
                 **d,
@@ -320,6 +349,35 @@ async def get_bulk_sync(request: Request, period: str = 'Today', uid: str = None
                 "name": v_name,
                 "reconciliation_version": int(d.get('reconciliation_version', 1))
             })
+        elif db_status:
+            reconstructed = {
+                "status": db_status.get('status') or 'offline',
+                "timestamp": db_status['last_timestamp'].isoformat() if db_status['last_timestamp'] else None,
+                "latitude": float(db_status['latitude']) if db_status['latitude'] else None,
+                "longitude": float(db_status['longitude']) if db_status['longitude'] else None,
+                "speed": db_status['speed'] or 0,
+                "ignition": db_status['ignition'] or False,
+                "movement": db_status['movement'] or False,
+                "gsm": db_status['gsm_signal'],
+                "ext_v": float(db_status['external_voltage']) if db_status['external_voltage'] else None,
+                "bat_v": float(db_status['battery_voltage']) if db_status['battery_voltage'] else None,
+                "driver_id": db_status['current_driver_id'],
+                "driver_name": db_status['current_driver_name'] or 'No Driver Assigned',
+                "reconciliation_version": db_status['live_position_reconciliation_version'] or 1
+            }
+            devices_result.append({
+                **reconstructed,
+                "uniqueId": v_uid,
+                "name": v_name
+            })
+            
+            # Asynchronously heal the Redis cache in the background
+            cache_payload = {
+                "imei": v_uid,
+                **reconstructed
+            }
+            import asyncio
+            asyncio.create_task(cache.update_status(v_uid, cache_payload))
         else:
             devices_result.append({
                 "uniqueId": v_uid,

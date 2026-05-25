@@ -24,5 +24,15 @@ WS_MESSAGES_BROADCAST = Counter('ivms_ws_broadcast_total', 'Total messages broad
 BACKPRESSURE_THROTTLING = Counter('ivms_backpressure_throttling_total', 'Total number of backpressure socket throttling events')
 RECONNECT_THROTTLED = Counter('ivms_reconnect_throttled_total', 'Total number of reconnect storm throttled client IPs')
 
+# Custom Observability Diagnostics Metrics
+CODEC_MISMATCH = Counter('ivms_codec_mismatch_total', 'Total number of codec mismatch failures')
+RECONCILIATION_LAG = Histogram('ivms_reconciliation_lag_seconds', 'Authoritative reconciliation latency')
+WS_RECONNECTS = Counter('ivms_websocket_reconnects_total', 'Total number of WS client reconnects')
+REDIS_LATENCY = Histogram('ivms_redis_latency_seconds', 'Redis cache read/write latency')
+SOCKET_CHURN = Counter('ivms_socket_churn_total', 'Total number of sockets disconnected abruptly')
+ACTIVE_PRODUCTION_DEVICES = Gauge('ivms_active_production_devices', 'Number of active production fleet devices')
+ACTIVE_TESTING_DEVICES = Gauge('ivms_active_testing_devices', 'Number of active testing/simulated devices')
+DEATHS_RECOVERED = Counter('ivms_deaths_recovered_total', 'Supervisor recoveries of dead tasks', ['task_name'])
+
 def start_metrics_server(port=9090):
     start_http_server(port)

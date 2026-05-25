@@ -24,6 +24,7 @@ async def get_db():
 
 @router.get("")
 async def list_devices(
+    environment: str = 'production',
     allowed_imeis: List[str] = Depends(get_allowed_imeis), 
     db = Depends(get_db)
 ):
@@ -44,9 +45,9 @@ async def list_devices(
             ls.current_driver_name as "driver_name"
         FROM vehicles v
         LEFT JOIN live_vehicle_status ls ON v.unique_id = ls.imei
-        WHERE v.status = 'active' AND v.unique_id = ANY($1)
+        WHERE v.status = 'active' AND v.unique_id = ANY($1) AND v.telemetry_environment = $2
         ORDER BY ls.last_timestamp DESC NULLS LAST
-    """, allowed_imeis)
+    """, allowed_imeis, environment)
     
     devices = []
     for row in rows:
