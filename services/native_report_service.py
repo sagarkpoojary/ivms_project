@@ -183,6 +183,58 @@ class NativeReportService:
         return out
 
     @staticmethod
+    def _get_active_trip_start(imei, start_dt, end_dt, cur):
+        """Finds the start time of the current active trip today, if any."""
+        # 1. Check latest trip_start / trip_end events today in analytics_events
+        cur.execute(
+            """
+            SELECT event_type, timestamp FROM analytics_events
+            WHERE imei = %s AND event_type IN ('trip_start', 'trip_end') AND timestamp BETWEEN %s AND %s
+            ORDER BY timestamp DESC LIMIT 1
+            """,
+            (str(imei), start_dt, end_dt)
+        )
+        row = cur.fetchone()
+        if row and row['event_type'] == 'trip_start':
+            return row['timestamp']
+        
+        # 2. Fallback: Check if the last telemetry point today has ignition = True
+        cur.execute(
+            """
+            SELECT timestamp, io_elements FROM telemetry
+            WHERE imei = %s AND timestamp BETWEEN %s AND %s
+            ORDER BY timestamp DESC LIMIT 1
+            """,
+            (str(imei), start_dt, end_dt)
+        )
+        last_t = cur.fetchone()
+        if last_t:
+            io = last_t['io_elements']
+            if isinstance(io, str):
+                import json
+                try: io = json.loads(io)
+                except: io = {}
+            # Teltonika IO codes for ignition: 239 or 1
+            ign = str(io.get('239', io.get('1', '0'))) == '1'
+            if ign:
+                # Find the first consecutive ignition ON point today
+                cur.execute(
+                    """
+                    SELECT timestamp FROM telemetry
+                    WHERE imei = %s AND timestamp BETWEEN %s AND %s AND (
+                        COALESCE(io_elements->>'239', '0') = '1' 
+                        OR COALESCE(io_elements->>'1', '0') = '1'
+                    )
+                    ORDER BY timestamp ASC LIMIT 1
+                    """,
+                    (str(imei), start_dt, last_t['timestamp'])
+                )
+                first_on = cur.fetchone()
+                if first_on:
+                    return first_on['timestamp']
+        return None
+
+    @staticmethod
     def get_fleet_summary(vehicles, start_dt, end_dt):
         """Generate summary metrics for a list of vehicles in a single query (Phase 10)."""
         if not vehicles: return []
@@ -230,31 +282,54 @@ class NativeReportService:
 
                 trip_dist = round(float(s.get("total_distance") or 0), 2)
                 tele_dist = float(t.get("total_distance") or 0)
-                # Telemetry reflects all fixes in the window (in-progress trips). trip_summary
-                # only exists after ignition OFF. Use the larger of the two to limit under-count.
-                total_dist = round(max(tele_dist, trip_dist), 2)
+                
+                # Active trip live integration: sum completed trips + active trip telemetry
+                active_start = NativeReportService._get_active_trip_start(imei, start_dt, end_dt, cur)
+                active_dist = 0.0
+                active_moving = 0
+                active_idle = 0
+                
+                if active_start:
+                    active_t = NativeReportService._telemetry_stats_for_period([imei], active_start, end_dt, cur).get(imei, {})
+                    active_dist = float(active_t.get('total_distance') or 0)
+                    active_moving = int(active_t.get('moving_sec') or 0)
+                    
+                    cur.execute(
+                        "SELECT SUM(value) as active_idle FROM analytics_events WHERE imei = %s AND event_type = 'idle' AND timestamp BETWEEN %s AND %s",
+                        (imei, active_start, end_dt)
+                    )
+                    active_idle_row = cur.fetchone()
+                    active_idle = int(active_idle_row['active_idle'] or 0) if active_idle_row else 0
 
-                if tele_dist >= trip_dist:
+                merged_dist = trip_dist + active_dist
+                # Authoritative merge: use max between telemetry-stats-based cumulative distance
+                # and completed-trips + active-trip distance to resist database pruning or missing summaries.
+                total_dist = round(max(tele_dist, merged_dist), 2)
+
+                if tele_dist >= merged_dist:
                     max_spd = float(t.get("max_speed") or 0)
                     avg_spd = float(t.get("avg_speed") or 0)
                 else:
-                    max_spd = float(s.get("max_speed") or 0)
+                    max_spd = max(float(s.get("max_speed") or 0), float(t.get("max_speed") or 0))
                     avg_spd = float(s.get("avg_speed") or 0)
+                    if avg_spd == 0:
+                        avg_spd = float(t.get("avg_speed") or 0)
 
                 idle_sec = int(idle_stats.get(imei) or 0)
                 trip_fuel = float(s.get('total_fuel') or 0)
+                
+                active_fuel = (active_dist / Config.MILEAGE_KM_PER_LITER) + ((active_idle / 3600.0) * Config.IDLE_FUEL_LPH)
+                merged_fuel = trip_fuel + active_fuel
                 calculated_fuel = (total_dist / Config.MILEAGE_KM_PER_LITER) + ((idle_sec / 3600.0) * Config.IDLE_FUEL_LPH)
-                total_fuel = round(max(trip_fuel, calculated_fuel), 2)
+                total_fuel = round(max(trip_fuel, merged_fuel, calculated_fuel), 2)
+                
                 moving_sec = int(t.get("moving_sec") or 0)
                 trip_dur = int(s.get("total_duration") or 0)
-                if tele_dist >= trip_dist:
-                    if moving_sec == 0:
-                        moving_sec = trip_dur
-                else:
-                    moving_sec = trip_dur
+                merged_moving = trip_dur + active_moving
+                total_moving = max(moving_sec, merged_moving)
                 
                 # Off duration is time neither moving nor idling
-                off_sec = max(0, total_period_sec - moving_sec - idle_sec)
+                off_sec = max(0, total_period_sec - total_moving - idle_sec)
                 
                 # Simple insight logic
                 status = "Active"
@@ -276,14 +351,14 @@ class NativeReportService:
                     "unique_id": imei,
                     "company_name": v.get('company_name'),
                     "total_distance": round(float(total_dist), 2),
-                    "total_duration": moving_sec,
+                    "total_duration": total_moving,
                     "max_speed": round(float(max_spd), 2),
                     "average_speed": round(float(avg_spd), 2),
                     "idle_duration": idle_sec * 1000, # to ms for template
                     "off_duration": off_sec * 1000, # to ms for template
                     "fuel_liters": total_fuel,
                     "fuel_cost": round(total_fuel * Config.FUEL_PRICE_OMR, 3),
-                    "engine_hours": round((moving_sec + idle_sec) / 3600.0, 2),
+                    "engine_hours": round((total_moving + idle_sec) / 3600.0, 2),
                     "status": status,
                     "insight": insight
                 })

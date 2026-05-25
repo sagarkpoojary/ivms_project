@@ -48,13 +48,16 @@
                 if (incomingVersion >= currentVersion) {
                     // Update entire live state
                     current.device = incoming.device;
+                    current.liveState = incoming.liveState;
                 }
                 
-                // ALWAYS update historical summaries since they are calculated from database tables
+                // STRICT SEPARATION: Operational summary is only updated from bulk sync / backend APIs
                 current.distance = incoming.distance;
                 current.engineHours = incoming.engineHours;
                 current.fuelLiters = incoming.fuelLiters;
                 current.fuelCost = incoming.fuelCost;
+                
+                current.operationalSummary = incoming.operationalSummary;
                 current.registered = incoming.registered;
             }
         });
@@ -111,9 +114,11 @@
                     };
                 }
                 
+                // STRICT SEPARATION (PHASE 2): Websocket updates liveState and device ONLY, leaving operationalSummary completely untouched
                 fleetStore[imei] = {
                     ...current,
-                    device: updatedDevice
+                    device: updatedDevice,
+                    liveState: updatedDevice
                 };
             });
             
@@ -135,11 +140,13 @@
         updateBigChart(allVehicles);
         updateMap(latest);
         
-        const totals = latest.reduce((s, d) => {
-            s.distance += (d.distance || 0);
-            s.engineHours += (d.engineHours || 0);
-            s.fuelLiters += (d.fuelLiters || 0);
-            s.fuelCost += (d.fuelCost || 0);
+        // AUTHORITATIVE FLEET-WIDE OPERATIONAL SUMMARIES (PHASE 7): Totals ALWAYS calculate over the entire fleet and NEVER shrink or drop
+        const totals = allVehicles.reduce((s, d) => {
+            const op = d.operationalSummary || d;
+            s.distance += (op.distance || 0);
+            s.engineHours += (op.engineHours || 0);
+            s.fuelLiters += (op.fuelLiters || 0);
+            s.fuelCost += (op.fuelCost || 0);
             return s;
         }, { distance: 0, engineHours: 0, fuelLiters: 0, fuelCost: 0 });
 
@@ -1014,6 +1021,13 @@
                 return { 
                     registered: reg, 
                     device: normalizedDevice, 
+                    liveState: normalizedDevice, // ALIAS FOR PHASE 2
+                    operationalSummary: {
+                        distance: summary.distance || 0,
+                        engineHours: summary.engineHours || 0,
+                        fuelLiters: summary.fuelLiters || 0,
+                        fuelCost: summary.fuelCost || 0
+                    },
                     distance: summary.distance || 0,
                     engineHours: summary.engineHours || 0,
                     fuelLiters: summary.fuelLiters || 0,
@@ -1037,11 +1051,13 @@
             updateBigChart(allVehicles);
             updateMap(latest);
 
-            const totals = latest.reduce((s, d) => {
-                s.distance += (d.distance || 0);
-                s.engineHours += (d.engineHours || 0);
-                s.fuelLiters += (d.fuelLiters || 0);
-                s.fuelCost += (d.fuelCost || 0);
+            // AUTHORITATIVE FLEET-WIDE OPERATIONAL SUMMARIES (PHASE 7): Totals ALWAYS calculate over the entire fleet and NEVER shrink or drop
+            const totals = allVehicles.reduce((s, d) => {
+                const op = d.operationalSummary || d;
+                s.distance += (op.distance || 0);
+                s.engineHours += (op.engineHours || 0);
+                s.fuelLiters += (op.fuelLiters || 0);
+                s.fuelCost += (op.fuelCost || 0);
                 return s;
             }, { distance: 0, engineHours: 0, fuelLiters: 0, fuelCost: 0 });
 
