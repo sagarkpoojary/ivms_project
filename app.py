@@ -53,6 +53,16 @@ app.register_blueprint(maintenance_bp)
 app.register_blueprint(drivers_bp)
 app.register_blueprint(site_ops_bp)
 
+# IVMS ADDITION — Enterprise External API Layer
+from routes.external_api import external_api_bp; app.register_blueprint(external_api_bp)
+
+# IVMS ADDITION — Prometheus metrics exposition endpoint
+from flask import Response as _Response
+from prometheus_client import generate_latest, CONTENT_TYPE_LATEST
+@app.route('/metrics')
+def metrics():
+    return _Response(generate_latest(), mimetype=CONTENT_TYPE_LATEST)
+
 @app.route('/health')
 def health():
     return {"status": "ok"}, 200
