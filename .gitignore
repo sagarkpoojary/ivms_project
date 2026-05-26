@@ -15,3 +15,7 @@ cookies.txt
 
 # Docker
 .dockerignore
+
+# Telemetry Backups
+backups/
+*.gpg

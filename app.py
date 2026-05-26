@@ -26,6 +26,14 @@ app.config['CACHE_DIR'] = Config.CACHE_DIR
 app.config['CACHE_DEFAULT_TIMEOUT'] = 300
 cache.init_app(app)
 
+# Structured JSON Logging & Request Correlation ID Middleware
+from middleware.structured_logging import StructuredLoggingMiddleware
+StructuredLoggingMiddleware(app)
+
+# Redis-Backed Sliding Window Rate Limiter (Defense-in-Depth)
+from middleware.rate_limiter import RedisRateLimiter
+RedisRateLimiter(app, limit=100, period=60)
+
 # Register Blueprints
 from routes.auth import auth_bp
 from routes.dashboard import dashboard_bp
@@ -66,6 +74,29 @@ def metrics():
 @app.route('/health')
 def health():
     return {"status": "ok"}, 200
+
+@app.route('/ready')
+def ready():
+    from models.database import get_conn
+    import redis
+    
+    # 1. Verify TimescaleDB connectivity
+    try:
+        conn = get_conn()
+        cur = conn.cursor()
+        cur.execute("SELECT 1;")
+        cur.close(); conn.close()
+    except Exception as e:
+        return {"status": "unavailable", "reason": f"Database is offline: {e}"}, 503
+        
+    # 2. Verify Redis responsiveness
+    try:
+        r = redis.Redis(host=Config.REDIS_HOST, port=Config.REDIS_PORT, db=Config.REDIS_DB, socket_timeout=1.0)
+        r.ping()
+    except Exception as e:
+        return {"status": "unavailable", "reason": f"Redis cache is offline: {e}"}, 503
+        
+    return {"status": "ready"}, 200
 
 @app.route('/')
 def index():
