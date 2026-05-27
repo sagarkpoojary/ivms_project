@@ -227,8 +227,11 @@ class AIService:
         Strict SQL Enforcer to guarantee database safety.
         Returns (is_valid, sanitized_sql, error_message)
         """
+        # Strip trailing semicolon first to avoid false positives on single statement terminator
+        sql_stripped = sql.strip().rstrip(';')
+        
         # Normalize spaces
-        normalized = re.sub(r'\s+', ' ', sql.strip()).lower()
+        normalized = re.sub(r'\s+', ' ', sql_stripped).lower()
         
         # Block multi-statement queries
         if ';' in normalized:
@@ -260,9 +263,10 @@ class AIService:
                 return False, "", f"Table '{table_name}' is not in the whitelisted access list."
                 
         if "limit" not in normalized:
-            sql = sql.rstrip().rstrip(';') + " LIMIT 100"
+            sql_stripped = sql_stripped + " LIMIT 100"
             
-        return True, sql, ""
+        return True, sql_stripped, ""
+
 
     def run_read_only_query(self, sql):
         """Executes a SQL query in a read-only transaction context."""

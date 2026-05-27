@@ -1,0 +1,135 @@
+Intelligent Vehicle Monitoring System (IVMS) Standard Operating Procedures (SOP) Guidelines
+*Antigravity – IVMS Help Manual*
+
+---
+
+### 1. Installation & Setup
+Hardware Requirements
+Component	Specification
+GPS Module	NMEA 0183 compliant, 5Hz update rate
+Telematics Unit	4G LTE, 802.11ac Wi-Fi, 4GB RAM, 32GB storage
+Sensors	OBD-II interface, temperature/humidity, vibration
+Power Supply	12V DC, 2A fuse, redundant backup
+
+
+Software Configuration
+• Platform: IVMS 2024 (Cloud-based, API v3.2)
+• Integration: Compatible with CAN Bus, OBD-II, and third-party fleet management systems.
+• Steps:
+1. Install hardware in vehicle (secure under dashboard).
+2. Pair GPS module with telematics unit via Bluetooth.
+3. Upload vehicle metadata (VIN, fleet ID, driver ID) to IVMS.
+4. Assign user roles (Admin, Operator, Viewer).
+
+---
+
+### 2. Daily Operation Protocols
+Pre-Operation Checks
+• Verify GPS signal strength (minimum 7 satellites).
+• Confirm telematics unit connectivity (4G/5G signal).
+• Validate sensor calibration (every 72 hours).
+
+Monitoring Workflow
+1. Real-Time Tracking:
+• Use IVMS dashboard to monitor vehicle location, speed, and engine diagnostics.
+• Set geofence alerts for unauthorized zones.
+2. Alerts & Notifications:
+• SMS/email for:
+• Speeding (>80% of limit).
+• Engine faults (OBD-II codes P0XXX).
+• Low battery (<12V for 10+ minutes).
+3. Driver Compliance:
+• Log driver ID via biometric scan or RFID card.
+• Enforce 14-hour duty cycle (FMCSA-compliant).
+
+---
+
+### 3. Maintenance & Updates
+Scheduled Tasks
+Task	Frequency	Responsibility
+Firmware Update	Monthly	Admin
+Sensor Calibration	Quarterly	Technician
+Battery Check	Annually	Maintenance Team
+
+
+Troubleshooting
+• GPS Signal Loss:
+• Rescan satellites via IVMS app.
+• Reinstall module if signal remains weak.
+• Telematics Unit Failure:
+• Replace with spare unit (log issue in IVMS).
+• Submit RMA for repair within 24 hours.
+
+---
+
+### 4. Data Management
+Retention Policy
+• Store raw data for 24 months (regulatory compliance).
+• Anonymize driver data after 12 months.
+
+Reporting
+• Generate weekly reports:
+• Fuel efficiency (liters/km).
+• Maintenance alerts (engine oil, tire pressure).
+• Driver performance (idling time, harsh braking).
+
+---
+
+### 5. Security Protocols
+Access Control
+• Role-based permissions:
+• Admin: Full access (data, hardware, user management).
+• Operator: View-only access to vehicle status.
+• Viewer: Restricted to assigned fleet units.
+
+Encryption Standards
+• Data in transit: TLS 1.3.
+• Data at rest: AES-256.
+• Biometric authentication for admin access.
+
+---
+
+### 6. Compliance & Legal
+Regulatory Adherence
+• EU: GDPR (data privacy), ISO 17025 (calibration).
+• US: FMCSA (hours of service), EPA (emissions).
+• Asia: ISO 14001 (environmental impact).
+
+Audit Requirements
+• Conduct internal audits quarterly.
+• Submit compliance reports to regulatory bodies annually.
+
+---
+
+### 7. Emergency Procedures
+System Failure
+1. Switch to backup power (12V DC).
+2. Use offline mode for 72 hours (data syncs once reconnected).
+
+Data Breach
+• Isolate affected vehicle via IVMS.
+• Notify IT security team within 1 hour.
+• Log incident in audit trail.
+
+Vehicle Incident
+• Trigger emergency alert (GPS location + vehicle ID).
+• Dispatch nearest support unit (IVMS route optimization).
+
+---
+
+### 8. Training & Support
+User Roles
+Role	Training Duration	Certification
+Admin	8 hours	IVMS Level 1
+Operator	4 hours	IVMS Level 2
+Viewer	1 hour	N/A
+
+
+Support Channels
+• 24/7 hotline: +1-800-IVMS-HELP
+• Live chat: [ivms-support.com](http://ivms-support.com)
+• Knowledge base: [ivms-docs.com](http://ivms-docs.com)
+
+---
+*End of SOP Guidelines*
+*Version 3.1 | Updated: 2024-03-15*
