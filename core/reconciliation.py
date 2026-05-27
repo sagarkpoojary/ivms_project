@@ -137,6 +137,16 @@ class LivePositionReconciliationEngine:
                             f"[LIVE_UPDATE] {imei}: New authoritative position from telemetry_id={telemetry_id} "
                             f"timestamp={timestamp.isoformat()}"
                         )
+                elif existing and existing['last_telemetry_id'] is None:
+                    # GUARD: Device has live_vehicle_status record but no valid telemetry_id
+                    # This means last_timestamp was poisoned by a non-telemetry event
+                    # Do NOT update last_timestamp - preserve the stale state
+                    is_stale = True
+                    reason = "no_valid_telemetry_id"
+                    logger.warning(
+                        f"[POISONED_TIMESTAMP] {imei}: live_vehicle_status exists with NULL last_telemetry_id. "
+                        f"Preserving stale state, not updating last_timestamp."
+                    )
                 else:
                     reason = "initial_position"
                     logger.info(f"[INITIAL] {imei}: Creating first authoritative position from telemetry_id={telemetry_id}")

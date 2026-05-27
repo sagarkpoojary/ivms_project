@@ -153,6 +153,19 @@ class AnalyticsEngine:
                 start_t = events[1]['timestamp']
                 end_t = events[0]['timestamp']
                 
+                # GUARD: Verify real telemetry exists for this trip window
+                telemetry_count = await conn.fetchval(
+                    "SELECT COUNT(*) FROM telemetry WHERE imei = $1 AND timestamp BETWEEN $2 AND $3",
+                    imei, start_t, end_t
+                )
+                if telemetry_count == 0:
+                    self.logger.warning(
+                        f"[GHOST TRIP BLOCKED] imei={imei} | "
+                        f"window={start_t} to {end_t} | "
+                        f"No telemetry found. Trip creation skipped."
+                    )
+                    return None
+                
                 # Production Grade Distance Calculation (Phase 11)
                 # We use the native Postgres ST_Distance if available, or a manual sum
                 # Here we calculate from telemetry points for accuracy
@@ -160,6 +173,14 @@ class AnalyticsEngine:
                     "SELECT latitude, longitude, speed FROM telemetry WHERE imei = $1 AND timestamp BETWEEN $2 AND $3 ORDER BY timestamp ASC",
                     imei, start_t, end_t
                 )
+                
+                # GUARD: Block trips with no valid coordinates
+                if telemetry and (not all([telemetry[0]['latitude'], telemetry[0]['longitude']])):
+                    self.logger.warning(
+                        f"[NULL COORDS BLOCKED] imei={imei} | "
+                        f"NULL coordinates detected. Trip creation skipped."
+                    )
+                    return None
                 
                 total_dist = 0.0
                 max_speed = 0.0

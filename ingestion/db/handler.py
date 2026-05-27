@@ -371,6 +371,32 @@ class DBHandler:
 
     async def sync_driver_session(self, conn, imei, driver_id, timestamp, ignition):
         """Manages driver login/logout lifecycle in the database."""
+        # GUARD: Block session creation for offline/stale devices
+        last_telemetry = await conn.fetchrow(
+            "SELECT MAX(timestamp) as last_seen FROM telemetry WHERE imei = $1",
+            str(imei)
+        )
+        last_seen = last_telemetry['last_seen'] if last_telemetry else None
+        stale_threshold = 1800  # 30 minutes in seconds
+        
+        if last_seen is not None:
+            if last_seen.tzinfo is None:
+                last_seen = last_seen.replace(tzinfo=timezone.utc)
+            time_diff = (datetime.now(timezone.utc) - last_seen).total_seconds()
+            if time_diff > stale_threshold:
+                logger.warning(
+                    f"[SESSION BLOCKED] imei={imei} | "
+                    f"last_seen={last_seen} | "
+                    f"Device offline or stale ({int(time_diff)}s ago). Session creation skipped."
+                )
+                return
+        else:
+            logger.warning(
+                f"[SESSION BLOCKED] imei={imei} | "
+                f"No telemetry found. Session creation skipped."
+            )
+            return
+        
         # 1. Check for current active session on this device
         active = await conn.fetchrow(
             "SELECT id, driver_id FROM driver_sessions WHERE imei = $1 AND logout_time IS NULL",
