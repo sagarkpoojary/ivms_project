@@ -33,24 +33,37 @@
                         <div class="mb-3 outlined-group">
                             <input type="text" class="form-control" id="endpointInput" name="endpoint" value="{{ config.endpoint }}" placeholder="https://api.openai.com/v1" required>
                             <label for="endpointInput">API Endpoint URL</label>
+                            <div id="endpointError" class="small mt-1 d-none" style="color: #eab308;"><i class="fas fa-exclamation-triangle me-1"></i>Could not reach endpoint</div>
                         </div>
 
                         <div class="mb-3 outlined-group">
                             <input type="password" class="form-control" id="apiKeyInput" name="api_key" value="{{ config.api_key }}" placeholder="Enter AI API Provider Key">
                             <label for="apiKeyInput">API Secret Key</label>
                             <div class="form-text small mt-1">Stored securely. Leave untouched to preserve existing credentials.</div>
+                            <div id="apiKeyError" class="small mt-1 d-none" style="color: #ef4444;"><i class="fas fa-times-circle me-1"></i>Invalid API key</div>
                         </div>
 
                         <div class="row">
                             <div class="col-md-6 mb-3">
-                                <label for="modelSelect" class="form-label">Model Selector</label>
-                                <select class="form-select" id="modelSelect" name="model">
-                                    <option value="gpt-4o" {% if config.model == 'gpt-4o' %}selected{% endif %}>GPT-4o (Recommended)</option>
-                                    <option value="gpt-4-turbo" {% if config.model == 'gpt-4-turbo' %}selected{% endif %}>GPT-4 Turbo</option>
-                                    <option value="claude-3-5-sonnet" {% if config.model == 'claude-3-5-sonnet' %}selected{% endif %}>Claude 3.5 Sonnet</option>
-                                    <option value="llama3-70b" {% if config.model == 'llama3-70b' %}selected{% endif %}>LLaMA 3 70B (Groq)</option>
-                                    <option value="llama3" {% if config.model == 'llama3' %}selected{% endif %}>LLaMA 3 (Local/Ollama)</option>
-                                </select>
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <label for="modelSelect" class="form-label mb-0">Model Selector</label>
+                                    <div class="d-flex align-items-center gap-2">
+                                        <span id="modelStatus" class="small text-success d-none" style="font-size: 0.85rem;"><i class="fas fa-check-circle me-1"></i>Models loaded</span>
+                                        <button type="button" id="refreshModelsBtn" class="btn btn-sm btn-link p-0 text-decoration-none text-primary" title="Refresh available models">
+                                            <i class="fas fa-sync-alt"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="position-relative">
+                                    <select class="form-select" id="modelSelect" name="model">
+                                        <option value="gpt-4o" {% if config.model == 'gpt-4o' %}selected{% endif %}>GPT-4o (Recommended)</option>
+                                        <option value="gpt-4-turbo" {% if config.model == 'gpt-4-turbo' %}selected{% endif %}>GPT-4 Turbo</option>
+                                        <option value="claude-3-5-sonnet" {% if config.model == 'claude-3-5-sonnet' %}selected{% endif %}>Claude 3.5 Sonnet</option>
+                                        <option value="llama3-70b" {% if config.model == 'llama3-70b' %}selected{% endif %}>LLaMA 3 70B (Groq)</option>
+                                        <option value="llama3" {% if config.model == 'llama3' %}selected{% endif %}>LLaMA 3 (Local/Ollama)</option>
+                                    </select>
+                                    <div id="modelSelectSpinner" class="spinner-border spinner-border-sm text-primary position-absolute d-none" style="right: 2.5rem; top: 50%; transform: translateY(-50%); z-index: 5;" role="status"></div>
+                                </div>
                             </div>
                             <div class="col-md-6 mb-3">
                                 <label for="languageSelect" class="form-label">Response Language</label>
@@ -219,6 +232,150 @@
 document.addEventListener('DOMContentLoaded', () => {
     const csrfToken = document.querySelector('input[name="csrf_token"]').value;
     const alertBox = document.getElementById('settingsAlert');
+
+    const modelSelect = document.getElementById('modelSelect');
+    const endpointInput = document.getElementById('endpointInput');
+    const apiKeyInput = document.getElementById('apiKeyInput');
+    const modelSelectSpinner = document.getElementById('modelSelectSpinner');
+    const modelStatus = document.getElementById('modelStatus');
+    const refreshModelsBtn = document.getElementById('refreshModelsBtn');
+    const endpointError = document.getElementById('endpointError');
+    const apiKeyError = document.getElementById('apiKeyError');
+
+    // Store default manual options for manual fallback
+    const defaultOptions = Array.from(modelSelect.options).map(opt => ({
+        value: opt.value,
+        text: opt.textContent,
+        selected: opt.selected
+    }));
+    
+    let activeModel = modelSelect.value;
+    
+    modelSelect.addEventListener('change', () => {
+        activeModel = modelSelect.value;
+    });
+
+    function resetDropdownToPlaceholder(placeholderText) {
+        modelSelect.replaceChildren();
+        
+        const placeholderOpt = document.createElement('option');
+        placeholderOpt.value = '';
+        placeholderOpt.textContent = placeholderText;
+        placeholderOpt.disabled = true;
+        placeholderOpt.selected = true;
+        modelSelect.appendChild(placeholderOpt);
+        
+        defaultOptions.forEach(optData => {
+            const opt = document.createElement('option');
+            opt.value = optData.value;
+            opt.textContent = optData.text;
+            if (optData.value === activeModel) {
+                opt.selected = true;
+                placeholderOpt.selected = false;
+            }
+            modelSelect.appendChild(opt);
+        });
+    }
+
+    async function fetchAvailableModels() {
+        const endpointVal = endpointInput.value.trim();
+        const apiKeyVal = apiKeyInput.value.trim();
+        
+        modelStatus.classList.add('d-none');
+        endpointError.classList.add('d-none');
+        apiKeyError.classList.add('d-none');
+        
+        if (!endpointVal) return;
+        
+        modelSelectSpinner.classList.remove('d-none');
+        
+        try {
+            const r = await fetch('/ai/config/fetch-models', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-Token': csrfToken
+                },
+                body: JSON.stringify({
+                    endpoint: endpointVal,
+                    api_key: apiKeyVal
+                })
+            });
+            
+            const res = await r.json();
+            
+            if (r.ok) {
+                const models = res.models || [];
+                if (models.length > 0) {
+                    modelSelect.replaceChildren();
+                    
+                    let groupLabel = 'Compatible Models';
+                    const ep = endpointVal.toLowerCase();
+                    if (ep.includes('openai.com')) {
+                        groupLabel = 'OpenAI Models';
+                    } else if (ep.includes('anthropic.com')) {
+                        groupLabel = 'Anthropic Models';
+                    } else if (ep.includes('localhost') || ep.includes('127.0.0.1')) {
+                        groupLabel = 'Local Models (Ollama)';
+                    } else if (ep.includes('groq.com')) {
+                        groupLabel = 'Groq Models';
+                    }
+                    
+                    const optgroup = document.createElement('optgroup');
+                    optgroup.label = groupLabel;
+                    
+                    let modelSelected = false;
+                    models.forEach(model => {
+                        const opt = document.createElement('option');
+                        opt.value = model;
+                        opt.textContent = model;
+                        if (model === activeModel) {
+                            opt.selected = true;
+                            modelSelected = true;
+                        }
+                        optgroup.appendChild(opt);
+                    });
+                    
+                    modelSelect.appendChild(optgroup);
+                    
+                    if (!modelSelected && models.length > 0) {
+                        modelSelect.selectedIndex = 0;
+                        activeModel = modelSelect.value;
+                    }
+                    
+                    modelStatus.classList.remove('d-none');
+                } else {
+                    resetDropdownToPlaceholder('No models found');
+                }
+            } else {
+                if (res.error === 'invalid_key') {
+                    apiKeyError.classList.remove('d-none');
+                    resetDropdownToPlaceholder('Enter key to load models');
+                } else {
+                    endpointError.classList.remove('d-none');
+                    resetDropdownToPlaceholder('Could not reach endpoint');
+                }
+            }
+        } catch (e) {
+            endpointError.classList.remove('d-none');
+            resetDropdownToPlaceholder('Could not reach endpoint');
+        } finally {
+            modelSelectSpinner.classList.add('d-none');
+        }
+    }
+
+    // Attach listeners
+    endpointInput.addEventListener('blur', fetchAvailableModels);
+    apiKeyInput.addEventListener('blur', fetchAvailableModels);
+    refreshModelsBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        fetchAvailableModels();
+    });
+
+    // Auto-fetch on initial page load if configuration is present
+    if (endpointInput.value.trim()) {
+        fetchAvailableModels();
+    }
     
     // Set token progress bar width dynamically
     const usageBar = document.getElementById('tokenUsageBar');

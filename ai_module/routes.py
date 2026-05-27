@@ -139,6 +139,88 @@ def test_config():
         return jsonify({"status": "error", "message": message})
 
 
+@ai_blueprint.route('/config/fetch-models', methods=['POST'])
+@role_required('admin')
+def fetch_models():
+    import requests
+    
+    # Support both JSON and Form-urlencoded request bodies
+    if request.is_json:
+        data = request.get_json() or {}
+    else:
+        data = request.form or {}
+        
+    endpoint = data.get('endpoint', '').strip()
+    api_key = data.get('api_key', '').strip()
+    
+    existing = ai_service.load_config()
+    
+    # Fallback to existing saved credentials if input key is empty or masked
+    if not api_key or '*' in api_key:
+        api_key = existing.get('api_key', '')
+        
+    if not endpoint:
+        endpoint = existing.get('endpoint', 'https://api.openai.com/v1')
+        
+    endpoint = endpoint.rstrip('/')
+    
+    # Provider-specific branching
+    if "anthropic.com" in endpoint.lower():
+        # Curated hardcoded Anthropic fallback list since Anthropic has no /models endpoint
+        models = [
+            "claude-opus-4-5",
+            "claude-sonnet-4-5",
+            "claude-haiku-4-5",
+            "claude-opus-4",
+            "claude-sonnet-4"
+        ]
+        return jsonify({"models": models})
+        
+    elif "localhost" in endpoint.lower() or "127.0.0.1" in endpoint.lower():
+        # Ollama local tags
+        url = f"{endpoint}/api/tags"
+        try:
+            r = requests.get(url, timeout=5.0)
+            if r.status_code in (401, 403):
+                return jsonify({"error": "invalid_key"}), 401
+            r.raise_for_status()
+            res_json = r.json()
+            models_list = res_json.get("models", [])
+            models = [m.get("name") for m in models_list if m.get("name")]
+            return jsonify({"models": models})
+        except requests.exceptions.RequestException as e:
+            if hasattr(e, 'response') and e.response is not None:
+                if e.response.status_code in (401, 403):
+                    return jsonify({"error": "invalid_key"}), 401
+            return jsonify({"error": "connection_failed"}), 400
+        except Exception:
+            return jsonify({"error": "connection_failed"}), 400
+            
+    else:
+        # Standard OpenAI / Groq / Compatible endpoint
+        url = f"{endpoint}/models"
+        headers = {}
+        if api_key:
+            headers["Authorization"] = f"Bearer {api_key}"
+            
+        try:
+            r = requests.get(url, headers=headers, timeout=5.0)
+            if r.status_code in (401, 403):
+                return jsonify({"error": "invalid_key"}), 401
+            r.raise_for_status()
+            res_json = r.json()
+            models_list = res_json.get("data", [])
+            models = [m.get("id") for m in models_list if m.get("id")]
+            return jsonify({"models": models})
+        except requests.exceptions.RequestException as e:
+            if hasattr(e, 'response') and e.response is not None:
+                if e.response.status_code in (401, 403):
+                    return jsonify({"error": "invalid_key"}), 401
+            return jsonify({"error": "connection_failed"}), 400
+        except Exception:
+            return jsonify({"error": "connection_failed"}), 400
+
+
 @ai_blueprint.route('/rag/upload', methods=['POST'])
 @role_required('admin')
 def rag_upload():
