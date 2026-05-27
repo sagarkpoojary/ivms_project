@@ -1,0 +1,68 @@
+<!-- IVMS AI Assistant - Floating Chat Widget Component -->
+<link rel="stylesheet" href="/ai/static/css/ai_styles.css">
+
+<!-- Floating Launcher Bubble -->
+<button class="ai-chat-launcher" id="aiChatLauncher" title="Open AI Assistant">
+    <i class="fas fa-robot"></i>
+</button>
+
+<!-- Collapsible Chat Window -->
+<div class="ai-chat-container" id="aiChatContainer">
+    <!-- Chat Header -->
+    <div class="ai-chat-header">
+        <div class="ai-chat-header-info">
+            <div class="ai-chat-avatar">
+                <i class="fas fa-brain"></i>
+            </div>
+            <div>
+                <h5 class="ai-chat-header-title">IVMS Copilot</h5>
+                <p class="ai-chat-header-subtitle">
+                    <span class="badge bg-success rounded-circle" style="width: 8px; height: 8px; display: inline-block; padding: 0; margin-right: 4px;"> </span>
+                    Powered by aitsun.ai
+                </p>
+            </div>
+        </div>
+        <button class="ai-chat-close-btn" id="aiChatCloseBtn" title="Minimize Chat">
+            <i class="fas fa-times"></i>
+        </button>
+    </div>
+
+    <!-- Message Stream -->
+    <div class="ai-chat-messages" id="aiChatMessages">
+        <div class="ai-msg ai-msg-bot">
+            Hello! I am your <strong>IVMS Intelligent Assistant</strong> powered by <strong>aitsun.ai</strong>. I can query fleet data, run reports, analyze driver behavior, or answer support manual questions. How can I help you today?
+        </div>
+    </div>
+
+    <!-- suggested Quick Actions Pill Slider -->
+    <div class="ai-suggestions-container">
+        <div class="ai-suggestion-pill" data-prompt="Show me active drivers today">
+            <i class="fas fa-user-check me-1"></i> Active Drivers
+        </div>
+        <div class="ai-suggestion-pill" data-prompt="Fleet distance summary last week">
+            <i class="fas fa-chart-line me-1"></i> Fleet Summary
+        </div>
+        <div class="ai-suggestion-pill" data-prompt="Show vehicles with high idle time">
+            <i class="fas fa-hourglass-half me-1"></i> Idle Anomalies
+        </div>
+        <div class="ai-suggestion-pill" data-prompt="Help manual SOP guidelines">
+            <i class="fas fa-book-open me-1"></i> RAG Manuals
+        </div>
+    </div>
+
+    <!-- Input Box Area -->
+    <div class="ai-chat-input-area" style="flex-wrap: wrap; gap: 6px;">
+        <div style="display: flex; width: 100%; gap: 10px; align-items: center;">
+            <input type="text" class="ai-chat-input" id="aiChatInput" placeholder="Ask IVMS Copilot..." autocomplete="off">
+            <button class="ai-send-btn" id="aiChatSendBtn" title="Send Message">
+                <i class="fas fa-paper-plane"></i>
+            </button>
+        </div>
+        <!-- Branding footer -->
+        <div style="width: 100%; text-align: center; font-size: 0.72rem; color: #94a3b8; font-weight: 600; margin-top: 4px;">
+            <i class="fas fa-bolt text-warning me-1"></i>Powered by <span style="color: #0ea5e9;">aitsun.ai</span>
+        </div>
+    </div>
+</div>
+
+<script src="/ai/static/js/ai_chat.js"></script>

@@ -154,6 +154,10 @@
         </div>
         {% endif %}
 
+        {% if session.get('logged_in') %}
+        <a href="/ai/settings" title="AI Agent"><i class="fas fa-robot"></i> <span>AI Agent</span></a>
+        {% endif %}
+
         <div class="sidebar-footer">
           <a href="/logout" class="text-danger"><i class="fas fa-sign-out-alt"></i> <span>Logout</span></a>
         </div>
@@ -304,6 +308,10 @@
     setInterval(fetchNotifications, 30000);
     fetchNotifications();
   </script>
+
+  {% if AI_ENABLED and session.get('logged_in') %}
+    {% include 'ai_chat_widget.html' %}
+  {% endif %}
 
   {% block scripts %}{% endblock %}
 </body>

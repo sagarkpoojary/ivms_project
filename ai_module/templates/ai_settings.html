@@ -1,0 +1,410 @@
+{% extends "base.html" %}
+
+{% block content %}
+<link rel="stylesheet" href="/ai/static/css/ai_styles.css">
+
+<div class="container-fluid py-4">
+    <!-- Page Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="h3 mb-0 fw-bold"><i class="fas fa-robot me-2" style="color: #0ea5e9;"></i>AI Agent — Powered by aitsun.ai</h1>
+            <p class="text-muted">Configure your intelligent fleet assistant, RAG manuals knowledge base, and SQL query filters.</p>
+        </div>
+        <button id="reindexKBBtn" class="btn btn-outline-primary">
+            <i class="fas fa-sync-alt me-1"></i> Re-index Knowledge Base
+        </button>
+    </div>
+
+    <!-- Alert banner notifications -->
+    <div id="settingsAlert" class="alert d-none rounded-4 mb-4 shadow-sm" role="alert"></div>
+
+    <div class="row">
+        <!-- Left Column: API Config & Persona Behavior -->
+        <div class="col-lg-7 mb-4">
+            <!-- 1. AI API Key & Connection Config -->
+            <div class="card ai-settings-card mb-4 border-0 shadow-sm">
+                <div class="card-header bg-white border-bottom">
+                    <h5 class="mb-0 fw-bold"><i class="fas fa-key text-warning me-2"></i>AI Agent API Configuration</h5>
+                </div>
+                <div class="card-body">
+                    <form id="apiConfigForm">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        
+                        <div class="mb-3 outlined-group">
+                            <input type="text" class="form-control" id="endpointInput" name="endpoint" value="{{ config.endpoint }}" placeholder="https://api.openai.com/v1" required>
+                            <label for="endpointInput">API Endpoint URL</label>
+                        </div>
+
+                        <div class="mb-3 outlined-group">
+                            <input type="password" class="form-control" id="apiKeyInput" name="api_key" value="{{ config.api_key }}" placeholder="Enter AI API Provider Key">
+                            <label for="apiKeyInput">API Secret Key</label>
+                            <div class="form-text small mt-1">Stored securely. Leave untouched to preserve existing credentials.</div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="modelSelect" class="form-label">Model Selector</label>
+                                <select class="form-select" id="modelSelect" name="model">
+                                    <option value="gpt-4o" {% if config.model == 'gpt-4o' %}selected{% endif %}>GPT-4o (Recommended)</option>
+                                    <option value="gpt-4-turbo" {% if config.model == 'gpt-4-turbo' %}selected{% endif %}>GPT-4 Turbo</option>
+                                    <option value="claude-3-5-sonnet" {% if config.model == 'claude-3-5-sonnet' %}selected{% endif %}>Claude 3.5 Sonnet</option>
+                                    <option value="llama3-70b" {% if config.model == 'llama3-70b' %}selected{% endif %}>LLaMA 3 70B (Groq)</option>
+                                    <option value="llama3" {% if config.model == 'llama3' %}selected{% endif %}>LLaMA 3 (Local/Ollama)</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="languageSelect" class="form-label">Response Language</label>
+                                <select class="form-select" id="languageSelect" name="language">
+                                    <option value="en" {% if config.language == 'en' %}selected{% endif %}>English (Default)</option>
+                                    <option value="ar" {% if config.language == 'ar' %}selected{% endif %}>Arabic (العربية)</option>
+                                    <option value="es" {% if config.language == 'es' %}selected{% endif %}>Spanish (Español)</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="d-flex gap-2 justify-content-end mt-2">
+                            <button type="button" id="testConnBtn" class="btn btn-outline-secondary">
+                                <span id="testConnSpinner" class="spinner-border spinner-border-sm d-none me-1" role="status"></span>
+                                <i class="fas fa-vial me-1"></i> Test Connection
+                            </button>
+                            <button type="button" id="saveApiBtn" class="btn btn-primary" style="background: linear-gradient(135deg, #0ea5e9, #2563eb); border: none;">
+                                <i class="fas fa-save me-1"></i> Save Configurations
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- 2. Chatbot Behavior Settings -->
+            <div class="card ai-settings-card border-0 shadow-sm">
+                <div class="card-header bg-white border-bottom">
+                    <h5 class="mb-0 fw-bold"><i class="fas fa-sliders-h text-primary me-2"></i>Chatbot Behavior Settings</h5>
+                </div>
+                <div class="card-body">
+                    <form id="behaviorConfigForm">
+                        <div class="mb-4">
+                            <label for="systemPromptText" class="form-label">System Prompt / Agent Persona Customize</label>
+                            <textarea class="form-control" id="systemPromptText" name="system_prompt" rows="5" placeholder="Define the AI agent's instructions, personality, tone, and bounds..." required>{{ config.system_prompt }}</textarea>
+                        </div>
+
+                        <div class="row mb-2">
+                            <div class="col-md-6 mb-3">
+                                <div class="form-check form-switch card p-3 border-light shadow-sm">
+                                    <input class="form-check-input" type="checkbox" id="allowDbToggle" name="allow_db" {% if config.allow_db %}checked{% endif %}>
+                                    <label class="form-check-label fw-bold" for="allowDbToggle">
+                                        <i class="fas fa-database text-success me-1"></i> Allow DB Queries
+                                    </label>
+                                    <div class="form-text small mt-1">Enables Natural Language to whitelisted read-only SQL execution.</div>
+                                </div>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <div class="form-check form-switch card p-3 border-light shadow-sm">
+                                    <input class="form-check-input" type="checkbox" id="ragToggle" name="rag_enabled" {% if config.rag_enabled %}checked{% endif %}>
+                                    <label class="form-check-label fw-bold" for="ragToggle">
+                                        <i class="fas fa-book text-info me-1"></i> Enable RAG
+                                    </label>
+                                    <div class="form-text small mt-1">Queries uploaded support manuals and SOPs for answers.</div>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Column: RAG Document uploads & Usage Tracker logs -->
+        <div class="col-lg-5 mb-4">
+            <!-- 1. RAG Upload Management -->
+            <div class="card ai-settings-card mb-4 border-0 shadow-sm">
+                <div class="card-header bg-white border-bottom">
+                    <h5 class="mb-0 fw-bold"><i class="fas fa-cloud-upload-alt text-info me-2"></i>RAG / Knowledge Base Documents</h5>
+                </div>
+                <div class="card-body">
+                    <!-- Uploader zone -->
+                    <div class="rag-upload-zone" id="ragUploadZone" style="border-color: rgba(14, 165, 233, 0.4); background: rgba(14, 165, 233, 0.02);">
+                        <input type="file" id="ragFileInput" class="d-none" accept=".pdf,.docx,.txt">
+                        <i class="fas fa-cloud-upload-alt rag-upload-icon" style="color: #0ea5e9;"></i>
+                        <h6 class="fw-bold mb-1">Drag and Drop manual here</h6>
+                        <p class="small text-muted mb-0">or click to browse from folders. Supports PDF, DOCX, TXT (Max 5MB)</p>
+                    </div>
+
+                    <!-- File list container -->
+                    <h6 class="fw-bold mt-4 mb-3"><i class="fas fa-file-alt me-1 text-secondary"></i>Uploaded Files ({{ files|length }})</h6>
+                    <div class="rag-files-list" id="ragFilesList" style="max-height: 250px; overflow-y: auto;">
+                        {% if files %}
+                            {% for filename, data in files.items() %}
+                                <div class="rag-file-item" data-filename="{{ filename }}">
+                                    <div>
+                                        <div class="fw-bold text-truncate" style="max-width: 250px;">{{ data.original_name }}</div>
+                                        <div class="small text-muted">{{ (data.size / 1024)|round(1) }} KB | Uploaded {{ data.uploaded_at[:10] }}</div>
+                                    </div>
+                                    <button class="btn btn-link text-danger p-0 delete-rag-btn" data-filename="{{ filename }}">
+                                        <i class="fas fa-trash-alt"></i>
+                                    </button>
+                                </div>
+                            {% endfor %}
+                        {% else: %}
+                            <div class="text-center p-4 text-muted small border rounded-4">No knowledge base documents uploaded.</div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- 2. AI Usage & Token Tracker -->
+            <div class="card ai-settings-card border-0 shadow-sm">
+                <div class="card-header bg-white border-bottom">
+                    <h5 class="mb-0 fw-bold"><i class="fas fa-chart-bar text-success me-2"></i>AI Usage Metrics</h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span class="small fw-bold">Session Token Consumption</span>
+                        <span class="small text-muted fw-bold" id="tokenUsageVal">{{ token_count }} / 100,000</span>
+                    </div>
+                    <div class="token-usage-bar mb-3">
+                        <div class="token-usage-progress" id="tokenUsageBar" data-token-count="{{ token_count }}" style="width: 0%; background: linear-gradient(90deg, #0ea5e9, #10b981);"></div>
+                    </div>
+                    <div class="form-text small"><i class="fas fa-info-circle me-1"></i>Calculated dynamically across user sessions. Reset monthly.</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 3. Usage & Queries Logs Table -->
+    <div class="card ai-settings-card border-0 shadow-sm mt-2">
+        <div class="card-header bg-white border-bottom">
+            <h5 class="mb-0 fw-bold"><i class="fas fa-history text-secondary me-2"></i>Recent Query Logs (Last 20)</h5>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table align-middle">
+                    <thead>
+                        <tr>
+                            <th>Timestamp</th>
+                            <th>Query Prompt</th>
+                            <th>Request Type</th>
+                            <th>Status</th>
+                            <th>Tokens</th>
+                            <th>Details/Errors</th>
+                        </tr>
+                    </thead>
+                    <tbody id="logsTableBody">
+                        {% if logs %}
+                            {% for log in logs %}
+                                <tr>
+                                    <td class="small">{{ log.timestamp[11:19] }} ({{ log.timestamp[:10] }})</td>
+                                    <td class="text-truncate" style="max-width: 250px;" title="{{ log.query }}">{{ log.query }}</td>
+                                    <td><span class="badge bg-light text-dark border">{{ log.type }}</span></td>
+                                    <td>
+                                        <span class="badge bg-soft-{% if log.status == 'Success' %}success text-success{% else %}danger text-danger{% endif %} rounded-pill">
+                                            {{ log.status }}
+                                        </span>
+                                    </td>
+                                    <td>{{ log.tokens }}</td>
+                                    <td class="small text-truncate" style="max-width: 250px;" title="{{ log.error or log.response }}">{{ log.error or log.response }}</td>
+                                </tr>
+                            {% endfor %}
+                        {% else: %}
+                            <tr>
+                                <td colspan="6" class="text-center p-4 text-muted small">No queries logged yet.</td>
+                            </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const csrfToken = document.querySelector('input[name="csrf_token"]').value;
+    const alertBox = document.getElementById('settingsAlert');
+    
+    // Set token progress bar width dynamically
+    const usageBar = document.getElementById('tokenUsageBar');
+    if (usageBar) {
+        const tokenCount = parseInt(usageBar.getAttribute('data-token-count') || '0', 10);
+        const usagePercent = Math.min(100, Math.round((tokenCount / 100000) * 100));
+        usageBar.style.width = usagePercent + '%';
+    }
+    
+    function showAlert(type, message) {
+        alertBox.className = `alert alert-${type} rounded-4 mb-4 shadow-sm`;
+        alertBox.textContent = message;
+        alertBox.classList.remove('d-none');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        setTimeout(() => alertBox.classList.add('d-none'), 5000);
+    }
+
+    // Save configurations
+    document.getElementById('saveApiBtn').addEventListener('click', async () => {
+        const apiForm = new FormData(document.getElementById('apiConfigForm'));
+        const behaviorForm = new FormData(document.getElementById('behaviorConfigForm'));
+        
+        // Merge forms
+        const data = new URLSearchParams();
+        for (const pair of apiForm.entries()) { data.append(pair[0], pair[1]); }
+        for (const pair of behaviorForm.entries()) { data.append(pair[0], pair[1]); }
+        
+        try {
+            const r = await fetch('/ai/config/save', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'X-CSRF-Token': csrfToken
+                },
+                body: data
+            });
+            const res = await r.json();
+            if (r.ok) {
+                showAlert('success', res.message);
+            } else {
+                showAlert('danger', res.message || 'Failed to save configurations.');
+            }
+        } catch (e) {
+            showAlert('danger', 'Failed to connect to the server.');
+        }
+    });
+
+    // Test API connection
+    document.getElementById('testConnBtn').addEventListener('click', async () => {
+        const btn = document.getElementById('testConnBtn');
+        const spinner = document.getElementById('testConnSpinner');
+        
+        btn.disabled = true;
+        spinner.classList.remove('d-none');
+        
+        const form = new FormData(document.getElementById('apiConfigForm'));
+        const data = new URLSearchParams();
+        for (const pair of form.entries()) { data.append(pair[0], pair[1]); }
+        
+        try {
+            const r = await fetch('/ai/config/test', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'X-CSRF-Token': csrfToken
+                },
+                body: data
+            });
+            const res = await r.json();
+            if (res.status === 'success') {
+                showAlert('success', 'API Test Successful! Connection established.');
+            } else {
+                showAlert('danger', 'API Test Failed: ' + res.message);
+            }
+        } catch (e) {
+            showAlert('danger', 'Failed to execute network test request.');
+        } finally {
+            btn.disabled = false;
+            spinner.classList.add('d-none');
+        }
+    });
+
+    // Re-index Knowledge Base
+    document.getElementById('reindexKBBtn').addEventListener('click', async () => {
+        const btn = document.getElementById('reindexKBBtn');
+        btn.disabled = true;
+        
+        try {
+            const r = await fetch('/ai/rag/reindex', {
+                method: 'POST',
+                headers: { 'X-CSRF-Token': csrfToken }
+            });
+            const res = await r.json();
+            if (r.ok) {
+                showAlert('success', 'RAG Knowledge base successfully re-indexed.');
+            } else {
+                showAlert('danger', res.error || 'Failed to re-index documents.');
+            }
+        } catch (e) {
+            showAlert('danger', 'Error calling re-index endpoint.');
+        } finally {
+            btn.disabled = false;
+        }
+    });
+
+    // File Deletion
+    document.getElementById('ragFilesList').addEventListener('click', async (e) => {
+        const deleteBtn = e.target.closest('.delete-rag-btn');
+        if (!deleteBtn) return;
+        
+        const filename = deleteBtn.getAttribute('data-filename');
+        if (!confirm('Are you sure you want to delete this document from the knowledge base?')) return;
+        
+        try {
+            const r = await fetch(`/ai/rag/files/${filename}`, {
+                method: 'DELETE',
+                headers: { 'X-CSRF-Token': csrfToken }
+            });
+            const res = await r.json();
+            if (r.ok) {
+                deleteBtn.closest('.rag-file-item').remove();
+                showAlert('success', 'File deleted successfully.');
+                setTimeout(() => window.location.reload(), 1000);
+            } else {
+                showAlert('danger', res.error || 'Failed to delete file.');
+            }
+        } catch (e) {
+            showAlert('danger', 'Server connection error during deletion.');
+        }
+    });
+
+    // Drag and Drop Uploader
+    const zone = document.getElementById('ragUploadZone');
+    const fileInput = document.getElementById('ragFileInput');
+    
+    zone.addEventListener('click', () => fileInput.click());
+    
+    ['dragenter', 'dragover'].forEach(name => {
+        zone.addEventListener(name, (e) => {
+            e.preventDefault();
+            zone.classList.add('dragover');
+        });
+    });
+    
+    ['dragleave', 'drop'].forEach(name => {
+        zone.addEventListener(name, (e) => {
+            e.preventDefault();
+            zone.classList.remove('dragover');
+        });
+    });
+    
+    zone.addEventListener('drop', (e) => {
+        const files = e.dataTransfer.files;
+        if (files.length > 0) {
+            uploadFile(files[0]);
+        }
+    });
+    
+    fileInput.addEventListener('change', () => {
+        if (fileInput.files.length > 0) {
+            uploadFile(fileInput.files[0]);
+        }
+    });
+
+    async function uploadFile(file) {
+        const formData = new FormData();
+        formData.append('file', file);
+        
+        try {
+            showAlert('info', 'Uploading and indexing document... Please wait.');
+            const r = await fetch('/ai/rag/upload', {
+                method: 'POST',
+                headers: { 'X-CSRF-Token': csrfToken },
+                body: formData
+            });
+            const res = await r.json();
+            if (r.ok) {
+                showAlert('success', 'Document successfully uploaded and parsed into chunks.');
+                setTimeout(() => window.location.reload(), 1000);
+            } else {
+                showAlert('danger', res.error || 'Failed to upload document.');
+            }
+        } catch (e) {
+            showAlert('danger', 'Error connecting to RAG service.');
+        }
+    }
+});
+</script>
+{% endblock %}

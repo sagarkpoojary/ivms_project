@@ -64,6 +64,10 @@ app.register_blueprint(site_ops_bp)
 # IVMS ADDITION — Enterprise External API Layer
 from routes.external_api import external_api_bp; app.register_blueprint(external_api_bp)
 
+# IVMS ADDITION — AI Assistant Additive Feature Layer
+from ai_module import ai_blueprint
+app.register_blueprint(ai_blueprint, url_prefix='/ai')
+
 # IVMS ADDITION — Prometheus metrics exposition endpoint
 from flask import Response as _Response
 from prometheus_client import generate_latest, CONTENT_TYPE_LATEST
@@ -127,7 +131,8 @@ def inject_globals():
         "enabled_modules": current_data.get('enabled_modules', []),
         "can_add_vehicle": current_data.get("can_add_vehicle", False),
         "company_name": current_data.get('company_name') or "No Company",
-        "pending_drafts_count": pending_drafts_count
+        "pending_drafts_count": pending_drafts_count,
+        "AI_ENABLED": os.getenv("AI_ENABLED", "True").lower() == "true"
     }
 
 @app.after_request
