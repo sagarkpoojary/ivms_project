@@ -280,13 +280,15 @@
     outline: none;
     transition: border-color 0.2s;
     background: rgba(248, 250, 252, 0.8);
-    color: inherit;
+    color: #1e293b;
 }
 
 [data-theme="dark"] .ai-chat-input {
     background: #1e293b;
     border-color: rgba(51, 65, 85, 0.8);
+    color: #f8fafc;
 }
+
 
 .ai-chat-input:focus {
     border-color: #0ea5e9;
@@ -388,18 +390,37 @@
     border-radius: 10px;
     margin-bottom: 8px;
     background: #ffffff;
+    color: #1e293b;
     transition: all 0.2s;
+}
+
+.rag-file-item .fw-bold {
+    color: #1e293b;
+}
+
+.rag-file-item .text-muted {
+    color: #64748b !important;
 }
 
 [data-theme="dark"] .rag-file-item {
     background: #1e293b;
     border-color: rgba(51, 65, 85, 0.8);
+    color: #f8fafc;
+}
+
+[data-theme="dark"] .rag-file-item .fw-bold {
+    color: #f8fafc;
+}
+
+[data-theme="dark"] .rag-file-item .text-muted {
+    color: #94a3b8 !important;
 }
 
 .rag-file-item:hover {
     border-color: #0ea5e9;
     box-shadow: 0 4px 12px rgba(0,0,0,0.02);
 }
+
 
 /* Usage tracker metric bar */
 .token-usage-bar {
