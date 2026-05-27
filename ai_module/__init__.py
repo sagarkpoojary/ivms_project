@@ -8,7 +8,7 @@ ai_blueprint = Blueprint(
     __name__,
     template_folder='templates',
     static_folder='static',
-    static_url_path='/ai/static'
+    static_url_path='static'
 )
 
 # Import routes to register endpoints
