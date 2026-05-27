@@ -19,9 +19,8 @@ RESPONSE RULES:
 """
 
 def strip_think_blocks(text: str) -> str:
-    # Remove <think>...</think> blocks (used by reasoning models like DeepSeek, QwQ)
-    text = re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL)
-    return text.strip()
+    """Strip <think> blocks from LLM response."""
+    return re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL).strip()
 
 REPORT_KEYWORDS = [
     'report', 'export', 'pdf', 'download', 'generate report', 
