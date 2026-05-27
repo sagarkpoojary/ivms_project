@@ -96,76 +96,105 @@ document.addEventListener('DOMContentLoaded', () => {
             .replace(/'/g, "&#039;");
     }
 
+    function escapeTextNode(text) {
+        // Escape only raw text node content (not structural HTML we're generating)
+        return text
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+    }
+
     function renderMarkdown(text) {
-        // Strip any think blocks that slipped through
+        // Strip any think blocks that slipped through (server-side should already strip these)
         text = text.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
-        
-        // Escape content safely to prevent XSS
-        text = safeEscape(text);
-        
-        // Check if there are markdown tables and parse them
+
+        // Split into lines for processing
         const lines = text.split('\n');
         let inTable = false;
         let tableHTML = '';
+        let tableRowCount = 0;
         const parsedLines = [];
 
         for (let i = 0; i < lines.length; i++) {
-            const line = lines[i].trim();
-            
-            if (line.startsWith('|') && line.endsWith('|')) {
-                if (!inTable) {
-                    inTable = true;
-                    tableHTML = '<div class="table-responsive"><table class="table table-sm">';
-                }
-                const cells = line.split('|')
-                    .map(c => c.trim())
-                    .filter((c, idx, arr) => idx > 0 && idx < arr.length - 1);
-                
-                if (line.match(/^\|[\s-|-]*\|$/)) {
+            const line = lines[i];
+            const trimmed = line.trim();
+
+            if (trimmed.startsWith('|') && trimmed.endsWith('|')) {
+                // Separator row like |---|---|
+                if (trimmed.match(/^\|[\s\-|:]+\|$/)) {
                     continue;
                 }
-                
-                tableHTML += '<tr>';
-                cells.forEach(cell => {
-                    const tag = (tableHTML.match(/<tr>/g).length === 1) ? 'th' : 'td';
-                    tableHTML += `<${tag}>${cell}</${tag}>`;
-                });
-                tableHTML += '</tr>';
+                if (!inTable) {
+                    inTable = true;
+                    tableRowCount = 0;
+                    tableHTML = '<div class="table-responsive"><table class="table table-sm">';
+                }
+                const cells = trimmed.split('|')
+                    .map(c => c.trim())
+                    .filter((_, idx, arr) => idx > 0 && idx < arr.length - 1);
+
+                const tag = (tableRowCount === 0) ? 'th' : 'td';
+                tableHTML += '<tr>' + cells.map(cell => `<${tag}>${escapeTextNode(cell)}</${tag}>`).join('') + '</tr>';
+                tableRowCount++;
             } else {
                 if (inTable) {
                     inTable = false;
                     tableHTML += '</table></div>';
                     parsedLines.push(tableHTML);
                     tableHTML = '';
+                    tableRowCount = 0;
                 }
                 parsedLines.push(line);
             }
         }
-        
+
         if (inTable) {
             tableHTML += '</table></div>';
             parsedLines.push(tableHTML);
         }
-        
+
+        // Join lines for further processing
         let processedText = parsedLines.join('\n');
-        
-        // Headers
-        processedText = processedText.replace(/^### (.+)$/gm, '<h4>$1</h4>');
-        processedText = processedText.replace(/^## (.+)$/gm, '<h3>$1</h3>');
-        processedText = processedText.replace(/^# (.+)$/gm, '<h2>$1</h2>');
-        
-        // Bold
+
+        // Escape non-structural content — process line by line to skip table HTML
+        processedText = processedText.split('\n').map(line => {
+            // Skip lines that are already HTML (tables)
+            if (line.startsWith('<div class="table-responsive">') || line.startsWith('<table') || 
+                line.startsWith('<tr>') || line.startsWith('<th') || line.startsWith('<td') ||
+                line.startsWith('</')) {
+                return line;
+            }
+            // Escape raw text content
+            return escapeTextNode(line);
+        }).join('\n');
+
+        // Headers (matched after escaping: ### becomes ###)
+        processedText = processedText.replace(/^### (.+)$/gm, '<h4 style="font-size:0.95rem;font-weight:700;margin:8px 0 4px;">$1</h4>');
+        processedText = processedText.replace(/^## (.+)$/gm, '<h3 style="font-size:1rem;font-weight:700;margin:8px 0 4px;">$1</h3>');
+        processedText = processedText.replace(/^# (.+)$/gm, '<h2 style="font-size:1.05rem;font-weight:700;margin:8px 0 4px;">$1</h2>');
+
+        // Bold (**text**)
         processedText = processedText.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
-        
+
+        // Inline code (`code`)
+        processedText = processedText.replace(/`([^`]+)`/g, '<code style="background:rgba(148,163,184,0.15);padding:1px 5px;border-radius:4px;font-size:0.85em;">$1</code>');
+
         // Bullet points
-        processedText = processedText.replace(/^[•\-\*] (.+)$/gm, '<li>$1</li>');
-        processedText = processedText.replace(/(<li>.*<\/li>)/gs, '<ul>$1</ul>');
-        
-        // Line breaks
-        processedText = processedText.replace(/\n\n/g, '</p><p>');
+        processedText = processedText.replace(/^[\*\-•] (.+)$/gm, '<li>$1</li>');
+        processedText = processedText.replace(/(<li>[\s\S]*?<\/li>(\n|$))+/g, match => `<ul style="margin:4px 0;padding-left:1.2em;">${match}</ul>`);
+
+        // Numbered lists
+        processedText = processedText.replace(/^\d+\. (.+)$/gm, '<li>$1</li>');
+
+        // Double line break → paragraph break
+        processedText = processedText.replace(/\n\n/g, '</p><p style="margin:6px 0;">');
+
+        // Single line break
         processedText = processedText.replace(/\n/g, '<br>');
-        
-        return '<p>' + processedText + '</p>';
+
+        return '<p style="margin:0;">' + processedText + '</p>';
     }
 
     function renderReportCard(pdfUrl, filename) {
