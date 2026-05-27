@@ -200,8 +200,10 @@ class AIService:
         if api_key:
             headers["Authorization"] = f"Bearer {api_key}"
 
-        # Setup standard system prompt
-        sys_msg = {"role": "system", "content": config.get("system_prompt", "")}
+        # Setup standard system prompt with dynamic current time context
+        current_time_context = f"\n\nCurrent System Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+        system_prompt = config.get("system_prompt", "") + current_time_context
+        sys_msg = {"role": "system", "content": system_prompt}
         full_messages = [sys_msg] + messages
 
         payload = {
@@ -215,8 +217,14 @@ class AIService:
             if r.status_code == 200:
                 resp_json = r.json()
                 content = resp_json["choices"][0]["message"]["content"]
+                
+                # Post-process to replace any stray placeholders
+                content = content.replace("{{ current_date }}", datetime.now().strftime("%Y-%m-%d"))
+                content = content.replace("{{current_date}}", datetime.now().strftime("%Y-%m-%d"))
+                
                 tokens = resp_json.get("usage", {}).get("total_tokens", 0)
                 return True, content, tokens
+
             else:
                 return False, f"API Error: {r.status_code} - {r.text}", 0
         except Exception as e:
