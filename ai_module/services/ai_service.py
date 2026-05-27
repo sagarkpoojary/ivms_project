@@ -182,6 +182,17 @@ class AIService:
         endpoint = config.get("endpoint", "https://api.openai.com/v1").strip().rstrip('/')
         model = config.get("model", "gpt-4o")
         
+        # Friendly UX check: Intercept missing key for public OpenAI endpoint
+        if not api_key and ("openai.com" in endpoint or endpoint == "https://api.openai.com/v1"):
+            return False, (
+                "**OpenAI API Key Missing**\n\n"
+                "To enable fleet queries and diagnostic analysis, please:\n"
+                "1. Go to the [AI Agent Settings](/ai/settings) panel.\n"
+                "2. Paste your secret key in the **API Secret Key** input field.\n"
+                "3. Click **Save Configurations**.\n\n"
+                "*If you are running a local LLM (e.g. Ollama), update the endpoint URL and select the corresponding model.*"
+            ), 0
+        
         url = f"{endpoint}/chat/completions"
         headers = {
             "Content-Type": "application/json"
