@@ -23,3 +23,5 @@ python-multipart
 asyncpg
 cryptography
 slowapi
+reportlab>=4.0.0
+

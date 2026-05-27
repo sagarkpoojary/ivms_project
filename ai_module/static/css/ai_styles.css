@@ -430,3 +430,81 @@
         height: 520px;
     }
 }
+
+/* ---- AI PDF Report Cards ---- */
+.ai-report-card {
+    align-self: flex-start;
+    background: #1e293b;
+    border: 1px solid rgba(51, 65, 85, 0.8);
+    border-radius: 16px;
+    padding: 1rem 1.15rem;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    width: 95%;
+    box-sizing: border-box;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+    margin: 6px 0;
+}
+
+[data-theme="light"] .ai-report-card {
+    background: #f8fafc;
+    border-color: #e2e8f0;
+    color: #0f172a;
+}
+
+.report-icon {
+    font-size: 2.2rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #ef4444;
+}
+
+.report-info {
+    display: flex;
+    flex-direction: column;
+    flex-grow: 1;
+    gap: 4px;
+}
+
+.report-name {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: #f8fafc;
+    word-break: break-all;
+}
+
+[data-theme="light"] .report-name {
+    color: #1e293b;
+}
+
+.report-meta {
+    font-size: 0.78rem;
+    color: #94a3b8;
+}
+
+[data-theme="light"] .report-meta {
+    color: #64748b;
+}
+
+.report-download-btn {
+    background: linear-gradient(135deg, #0ea5e9, #2563eb);
+    color: #ffffff !important;
+    text-decoration: none !important;
+    font-size: 0.82rem;
+    font-weight: 650;
+    padding: 8px 14px;
+    border-radius: 20px;
+    box-shadow: 0 4px 15px rgba(14, 165, 233, 0.35);
+    transition: all 0.25s ease;
+    white-space: nowrap;
+    display: inline-block;
+}
+
+.report-download-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 20px rgba(14, 165, 233, 0.5);
+    background: linear-gradient(135deg, #0284c7, #1d4ed8);
+}
+

@@ -8,6 +8,31 @@ from datetime import datetime
 from config import Config
 from models.database import get_conn
 
+SYSTEM_PROMPT_ADDON = """
+RESPONSE RULES:
+- For greetings or casual messages (hi, hello, thanks): respond in 1-2 sentences only. No bullet points. No headers.
+- For data/report requests: use tables and bullet points. Be detailed.
+- For how-to questions: use numbered steps.
+- NEVER show your internal reasoning or thinking process.
+- NEVER use placeholder text such as [Date], [Company], [Vehicle ID], [Name], or similar. If real data is unavailable, say "No data found for this query" clearly and directly.
+- Always respond as a confident fleet intelligence assistant. Do not list capabilities unless asked.
+"""
+
+def strip_think_blocks(text: str) -> str:
+    # Remove <think>...</think> blocks (used by reasoning models like DeepSeek, QwQ)
+    text = re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL)
+    return text.strip()
+
+REPORT_KEYWORDS = [
+    'report', 'export', 'pdf', 'download', 'generate report', 
+    'trip report', 'driver report', 'fleet report', 'summary pdf'
+]
+
+def is_report_request(query: str) -> bool:
+    query_lower = query.lower()
+    return any(keyword in query_lower for keyword in REPORT_KEYWORDS)
+
+
 class AIService:
     TABLE_WHITELIST = {
         "vehicles",
@@ -200,9 +225,9 @@ class AIService:
         if api_key:
             headers["Authorization"] = f"Bearer {api_key}"
 
-        # Setup standard system prompt with dynamic current time context
+        # Setup standard system prompt with dynamic current time context and system prompt addon
         current_time_context = f"\n\nCurrent System Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
-        system_prompt = config.get("system_prompt", "") + current_time_context
+        system_prompt = config.get("system_prompt", "") + current_time_context + "\n" + SYSTEM_PROMPT_ADDON
         sys_msg = {"role": "system", "content": system_prompt}
         full_messages = [sys_msg] + messages
 
@@ -218,12 +243,16 @@ class AIService:
                 resp_json = r.json()
                 content = resp_json["choices"][0]["message"]["content"]
                 
+                # Strip internal reasoning/thinking blocks
+                content = strip_think_blocks(content)
+                
                 # Post-process to replace any stray placeholders
                 content = content.replace("{{ current_date }}", datetime.now().strftime("%Y-%m-%d"))
                 content = content.replace("{{current_date}}", datetime.now().strftime("%Y-%m-%d"))
                 
                 tokens = resp_json.get("usage", {}).get("total_tokens", 0)
                 return True, content, tokens
+
 
             else:
                 return False, f"API Error: {r.status_code} - {r.text}", 0

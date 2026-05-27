@@ -96,21 +96,15 @@ document.addEventListener('DOMContentLoaded', () => {
             .replace(/'/g, "&#039;");
     }
 
-    function parseInlineFormatting(text) {
-        // Bold formatting
-        let formatted = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-        // Bullet list markers
-        if (formatted.trim().startsWith('- ') || formatted.trim().startsWith('* ')) {
-            formatted = `&bull; ${formatted.trim().substring(2)}`;
-        }
-        return formatted;
-    }
-
-    function parseMarkdown(text) {
-        // Escape content first to block XSS vector injection from untrusted database or LLM outputs
-        const escaped = safeEscape(text);
-        const lines = escaped.split('\n');
+    function renderMarkdown(text) {
+        // Strip any think blocks that slipped through
+        text = text.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
         
+        // Escape content safely to prevent XSS
+        text = safeEscape(text);
+        
+        // Check if there are markdown tables and parse them
+        const lines = text.split('\n');
         let inTable = false;
         let tableHTML = '';
         const parsedLines = [];
@@ -118,28 +112,23 @@ document.addEventListener('DOMContentLoaded', () => {
         for (let i = 0; i < lines.length; i++) {
             const line = lines[i].trim();
             
-            // Check if line represents a markdown table row (starts and ends with |)
             if (line.startsWith('|') && line.endsWith('|')) {
                 if (!inTable) {
                     inTable = true;
                     tableHTML = '<div class="table-responsive"><table class="table table-sm">';
                 }
-                
-                // Extract cells
                 const cells = line.split('|')
                     .map(c => c.trim())
                     .filter((c, idx, arr) => idx > 0 && idx < arr.length - 1);
                 
-                // Skip separator rows (e.g. |---|---|)
                 if (line.match(/^\|[\s-|-]*\|$/)) {
                     continue;
                 }
                 
                 tableHTML += '<tr>';
                 cells.forEach(cell => {
-                    // Decide if th or td based on if this is the first row inside this table instance
                     const tag = (tableHTML.match(/<tr>/g).length === 1) ? 'th' : 'td';
-                    tableHTML += `<${tag}>${parseInlineFormatting(cell)}</${tag}>`;
+                    tableHTML += `<${tag}>${cell}</${tag}>`;
                 });
                 tableHTML += '</tr>';
             } else {
@@ -149,7 +138,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     parsedLines.push(tableHTML);
                     tableHTML = '';
                 }
-                parsedLines.push(parseInlineFormatting(line));
+                parsedLines.push(line);
             }
         }
         
@@ -157,8 +146,44 @@ document.addEventListener('DOMContentLoaded', () => {
             tableHTML += '</table></div>';
             parsedLines.push(tableHTML);
         }
+        
+        let processedText = parsedLines.join('\n');
+        
+        // Headers
+        processedText = processedText.replace(/^### (.+)$/gm, '<h4>$1</h4>');
+        processedText = processedText.replace(/^## (.+)$/gm, '<h3>$1</h3>');
+        processedText = processedText.replace(/^# (.+)$/gm, '<h2>$1</h2>');
+        
+        // Bold
+        processedText = processedText.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+        
+        // Bullet points
+        processedText = processedText.replace(/^[•\-\*] (.+)$/gm, '<li>$1</li>');
+        processedText = processedText.replace(/(<li>.*<\/li>)/gs, '<ul>$1</ul>');
+        
+        // Line breaks
+        processedText = processedText.replace(/\n\n/g, '</p><p>');
+        processedText = processedText.replace(/\n/g, '<br>');
+        
+        return '<p>' + processedText + '</p>';
+    }
 
-        return parsedLines.join('<br>');
+    function renderReportCard(pdfUrl, filename) {
+        const safeUrl = safeEscape(pdfUrl);
+        const safeFilename = safeEscape(filename);
+        const card = document.createElement('div');
+        card.className = 'ai-report-card';
+        card.innerHTML = `
+            <div class="report-icon">📄</div>
+            <div class="report-info">
+                <span class="report-name">${safeFilename}</span>
+                <span class="report-meta">PDF Report · Ready to download</span>
+            </div>
+            <a href="${safeUrl}" target="_blank" class="report-download-btn">
+                ⬇ Download
+            </a>
+        `;
+        return card;
     }
 
     function appendMessage(text, isUser, isMarkdown = false) {
@@ -170,8 +195,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (isUser) {
             bubble.textContent = text;
         } else {
-            // Safe parsing of markdown strings
-            bubble.innerHTML = parseMarkdown(text);
+            // Use elements innerHTML with the new lightweight renderMarkdown parser
+            bubble.innerHTML = renderMarkdown(text);
         }
         
         messagesView.appendChild(bubble);
@@ -208,6 +233,11 @@ document.addEventListener('DOMContentLoaded', () => {
             if (response.ok) {
                 const data = await response.json();
                 appendMessage(data.response, false, true);
+                if (data.pdf_url && data.filename) {
+                    const card = renderReportCard(data.pdf_url, data.filename);
+                    messagesView.appendChild(card);
+                    scrollToBottom();
+                }
             } else {
                 const data = await response.json();
                 appendMessage(`Sorry, I encountered an error: ${data.error || 'Server error'}`, false);
