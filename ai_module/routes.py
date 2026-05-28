@@ -78,38 +78,14 @@ def chat():
             for c in matched_chunks:
                 context += f"--- (Source: {c['original_name']}) ---\n{c['text']}\n"
 
-    # 2. Check if DB querying is enabled and if the query is DB-related
-    # We will let the LLM decide if it needs to run a DB query or not by looking at keywords,
-    # or by attempting SQL translation first for fleet-related queries.
-    db_keywords = ["fleet", "vehicle", "driver", "trip", "active", "speed", "overspeed", "idle", "rfid", "telemetry"]
-    is_db_query = config.get("allow_db", True) and any(kw in user_message.lower() for kw in db_keywords)
-    
     try:
-        if is_db_query:
-            # Execute database search workflow
-            success, response_text, tokens = ai_service.ask_database_question(user_message, config)
-            r_type = "DB Query"
-        else:
-            # Standard conversational flow or RAG-based context
-            prompt = user_message
-            if context:
-                prompt = (
-                    f"Context documents provided below. Use this information if relevant to answer the user's question.\n"
-                    f"{context}\n"
-                    f"User question: {user_message}"
-                )
-            
-            messages = [{"role": "user", "content": prompt}]
-            success, response_text, tokens = ai_service.ask_ai(messages, config)
-            r_type = "RAG / Conversational" if context else "Conversational"
-            
-        if success:
-            ai_service.add_log(user_message, response_text, r_type, "Success", tokens)
-            return jsonify({"response": response_text, "type": r_type})
-        else:
-            ai_service.add_log(user_message, "Failed request", r_type, "Error", 0, error=response_text)
-            return jsonify({"error": response_text}), 500
-            
+        from services.copilot_service import CopilotService
+        res = CopilotService.process_chat_query(user_message, config, context=context)
+        return jsonify({
+            "response": res["response"],
+            "type": res["type"],
+            "language": res["language"]
+        })
     except Exception as e:
         ai_service.add_log(user_message, "System error", "Error", "Error", 0, error=str(e))
         return jsonify({"error": f"An unexpected system error occurred: {e}"}), 500

@@ -3,7 +3,7 @@
 **Date:** 2026-05-27  
 **System:** ivms.csloman.com  
 **AI Provider:** aitsun.ai  
-**Audited By:** Senior Technical Auditor / Antigravity AI  
+**Audited By:** Senior Technical Auditor / IVMS Copilot  
 **Status:** PASS WITH NOTES  
 
 ---
@@ -96,7 +96,7 @@ AI parameters are stored in the existing `system_config` table under `doc_id = '
   "api_key": "sk-proj-****************",
   "model": "gpt-4o",
   "endpoint": "https://api.openai.com/v1",
-  "system_prompt": "You are Antigravity...",
+  "system_prompt": "You are the IVMS Copilot...",
   "allow_db": true,
   "rag_enabled": true,
   "language": "en"

@@ -545,3 +545,104 @@
     background: linear-gradient(135deg, #0284c7, #1d4ed8);
 }
 
+/* ---- Responsive Table Overflow Fixes ---- */
+.table-responsive {
+    display: block;
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    margin: 8px 0;
+    border-radius: 8px;
+}
+
+.table-responsive table {
+    min-width: 450px; /* Forces scrollbar inside small message bubbles instead of stretching containers */
+    width: 100%;
+    margin: 0 !important;
+}
+
+/* ---- RTL Multilingual Arabic Formatting ---- */
+.ai-msg.rtl {
+    direction: rtl;
+    text-align: right;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+.ai-msg.rtl ul, .ai-msg.rtl ol {
+    padding-right: 1.2em;
+    padding-left: 0;
+}
+
+.ai-msg.rtl li {
+    text-align: right;
+}
+
+.ai-msg.rtl th, .ai-msg.rtl td {
+    text-align: right;
+}
+
+/* ---- Mixed RTL English Alignment Fix ---- */
+.ai-msg.rtl .mixed-content {
+    direction: rtl;
+    unicode-bidi: embed;
+}
+
+.ai-msg.rtl code, .ai-msg.rtl .badge {
+    direction: ltr;
+    text-align: left;
+}
+
+/* ---- Operational Status Badges ---- */
+.status-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.status-online {
+    background: rgba(16, 185, 129, 0.15);
+    color: #10b981;
+}
+
+.status-offline {
+    background: rgba(239, 68, 68, 0.15);
+    color: #ef4444;
+}
+
+.status-idle {
+    background: rgba(245, 158, 11, 0.15);
+    color: #f59e0b;
+}
+
+.status-moving {
+    background: rgba(14, 165, 233, 0.15);
+    color: #0ea5e9;
+}
+
+/* ---- Mobile Responsive Improvements ---- */
+@media (max-width: 480px) {
+    .ai-chat-container {
+        right: 12px;
+        bottom: 80px;
+        width: calc(100vw - 24px);
+        height: 520px;
+    }
+    
+    .ai-msg {
+        max-width: 85%;
+    }
+    
+    .ai-suggestion-pill {
+        font-size: 0.75rem;
+        padding: 4px 10px;
+    }
+}
+
+@media (max-height: 600px) {
+    .ai-chat-container {
+        height: calc(100vh - 100px);
+    }
+}
+

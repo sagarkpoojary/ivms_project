@@ -149,7 +149,7 @@ class AIService:
             "api_key": "",
             "model": "gpt-4o",
             "endpoint": "https://api.openai.com/v1",
-            "system_prompt": "You are Antigravity, an intelligent assistant inside the Intelligent Vehicle Monitoring System (IVMS).\nUse tables and bullet points to summarize fleet data. Be professional, direct, and detailed.",
+            "system_prompt": "You are the IVMS Copilot, an intelligent fleet assistant powered by aitsun.ai.\nUse tables and bullet points to summarize fleet data. Be professional, direct, and detailed.",
             "allow_db": True,
             "rag_enabled": True,
             "language": "en"
@@ -396,14 +396,14 @@ class AIService:
             return False, f"SQL validation failed: {db_err}\nQuery generated: `{sql}`", tokens
             
         answer_formatter_prompt = f"""
-        You are Antigravity, the IVMS AI Assistant. Answer the user's natural language question: "{user_question}".
+        You are the IVMS Copilot, the IVMS fleet intelligence assistant powered by aitsun.ai. Explain the database results clearly and professionally in the requested language: {config.get('language', 'en')}.
         
         We queried the TimescaleDB database and got this data:
         Query executed: {sql}
         Results retrieved: {json.dumps(rows, default=str)}
         
-        Analyze the data, perform calculations if needed, detect any highlights or anomalies, and explain it clearly in {config.get('language', 'en')}.
-        If the results are empty, explain that gracefully.
+        Analyze the data, perform calculations if needed, detect any highlights or anomalies, and explain it clearly.
+        If the results are empty, respond with "No real production data found" in the appropriate language.
         Present tabular outputs using standard markdown tables! Make the metrics stand out beautifully.
         """
         

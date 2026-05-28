@@ -215,11 +215,14 @@ document.addEventListener('DOMContentLoaded', () => {
         return card;
     }
 
-    function appendMessage(text, isUser, isMarkdown = false) {
+    function appendMessage(text, isUser, isMarkdown = false, language = '') {
         if (!messagesView) return;
         
         const bubble = document.createElement('div');
         bubble.className = `ai-msg ${isUser ? 'ai-msg-user' : 'ai-msg-bot'}`;
+        if (language === 'ar') {
+            bubble.classList.add('rtl');
+        }
         
         if (isUser) {
             bubble.textContent = text;
@@ -261,7 +264,7 @@ document.addEventListener('DOMContentLoaded', () => {
             
             if (response.ok) {
                 const data = await response.json();
-                appendMessage(data.response, false, true);
+                appendMessage(data.response, false, true, data.language);
                 if (data.pdf_url && data.filename) {
                     const card = renderReportCard(data.pdf_url, data.filename);
                     messagesView.appendChild(card);
@@ -273,7 +276,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         } catch (err) {
             removeTypingIndicator();
-            appendMessage(`Sorry, I couldn't connect to the AI service. Please check your network connection.`, false);
+            appendMessage(`Sorry, I couldn't connect to the AI service. Please check your network connection.`, false, false, 'en');
         }
     }
 });
