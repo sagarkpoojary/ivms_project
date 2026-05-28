@@ -581,6 +581,50 @@
     text-align: right;
 }
 
+/* ---- Teaser Popup Bubble ---- */
+.ai-teaser-popup {
+    position: fixed;
+    right: 90px;
+    bottom: 32px;
+    background: linear-gradient(135deg, #0ea5e9, #2563eb);
+    color: #ffffff;
+    padding: 12px 16px;
+    border-radius: 12px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    box-shadow: 0 4px 20px rgba(14, 165, 233, 0.4);
+    z-index: 2100;
+    max-width: 240px;
+    opacity: 0;
+    transform: translateX(20px);
+    transition: opacity 0.3s ease, transform 0.3s ease;
+    pointer-events: none;
+}
+
+.ai-teaser-popup.active {
+    opacity: 1;
+    transform: translateX(0);
+}
+
+.ai-teaser-popup::after {
+    content: '';
+    position: absolute;
+    right: -10px;
+    bottom: 16px;
+    border: 10px solid transparent;
+    border-left-color: #0ea5e9;
+}
+
+@media (max-width: 480px) {
+    .ai-teaser-popup {
+        right: 80px;
+        bottom: 24px;
+        max-width: 200px;
+        padding: 10px 14px;
+        font-size: 0.8rem;
+    }
+}
+
 /* ---- Mixed RTL English Alignment Fix ---- */
 .ai-msg.rtl .mixed-content {
     direction: rtl;

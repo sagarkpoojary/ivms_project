@@ -279,4 +279,74 @@ document.addEventListener('DOMContentLoaded', () => {
             appendMessage(`Sorry, I couldn't connect to the AI service. Please check your network connection.`, false, false, 'en');
         }
     }
+
+    // Teaser Popup Logic - Enterprise Operational AI Copilot
+    class TeaserPopup {
+        constructor() {
+            this.popup = null;
+            this.teaserMessages = [
+                "IVMS Copilot is online. Need fleet insights?",
+                "Need help analyzing your fleet operations?",
+                "Ask me about vehicles, alerts, or reports."
+            ];
+        }
+
+        create() {
+            if (this.popup) return;
+            this.popup = document.createElement('div');
+            this.popup.className = 'ai-teaser-popup';
+            this.popup.textContent = this.teaserMessages[Math.floor(Math.random() * this.teaserMessages.length)];
+            document.body.appendChild(this.popup);
+        }
+
+        show() {
+            if (!this.popup) this.create();
+            if (sessionStorage.getItem('ai_teaser_shown')) return;
+            this.popup.classList.add('active');
+            sessionStorage.setItem('ai_teaser_shown', 'true');
+            setTimeout(() => this.hide(), 7000);
+        }
+
+        hide() {
+            if (this.popup) {
+                this.popup.classList.remove('active');
+                setTimeout(() => {
+                    if (this.popup && this.popup.parentNode) {
+                        this.popup.remove();
+                        this.popup = null;
+                    }
+                }, 300);
+            }
+        }
+    }
+
+    // Safe launcher detection for teaser popup
+    const teaser = new TeaserPopup();
+    let launcherCheckAttempts = 0;
+    const maxAttempts = 50;
+
+    const launcherObserver = new MutationObserver(() => {
+        const launcher = document.getElementById('aiChatLauncher');
+        if (launcher) {
+            console.log("[IVMS Copilot] Launcher detected");
+            launcherObserver.disconnect();
+            setTimeout(() => {
+                console.log("[IVMS Copilot] Showing teaser popup");
+                teaser.show();
+            }, 2000);
+        } else if (++launcherCheckAttempts >= maxAttempts) {
+            launcherObserver.disconnect();
+        }
+    });
+
+    launcherObserver.observe(document.body, { childList: true, subtree: true });
+
+    // Fallback: check on DOM ready
+    if (document.getElementById('aiChatLauncher')) {
+        console.log("[IVMS Copilot] Launcher detected (ready)");
+        setTimeout(() => {
+            console.log("[IVMS Copilot] Showing teaser popup (ready)");
+            teaser.show();
+        }, 2000);
+    }
 });
