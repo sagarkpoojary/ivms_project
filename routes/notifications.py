@@ -1,4 +1,3 @@
-import json
 from flask import Blueprint, render_template, request, jsonify, session, current_app
 from auth.utils import role_required
 
@@ -210,67 +209,6 @@ def mark_all_read():
             query += " AND tenant_id = %s"
             params.append(tenant_id)
         cur.execute(query, tuple(params))
-        conn.commit()
-        return jsonify({"success": True})
-    finally:
-        cur.close(); conn.close()
-
-# --- Notification Rules CRUD Endpoints ---
-@notifications_bp.route("/api/notification-rules", methods=["GET"])
-@role_required('user')
-def api_get_rules():
-    from models.database import get_conn
-    import psycopg2.extras
-    email = session.get('email')
-    parent_email = session.get('parent_email')
-    role = session.get('role')
-    tenant_id = email if role == 'main_admin' else parent_email
-    if role == 'super_admin': tenant_id = None
-    
-    conn = get_conn()
-    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-    try:
-        query = "SELECT * FROM notification_rules"
-        params = []
-        if tenant_id:
-            query += " WHERE tenant_id = %s"
-            params.append(tenant_id)
-        query += " ORDER BY type"
-        cur.execute(query, tuple(params))
-        rules = [dict(r) for r in cur.fetchall()]
-        return jsonify(rules)
-    finally:
-        cur.close(); conn.close()
-
-@notifications_bp.route("/api/notification-rules", methods=["POST"])
-@role_required('admin')
-def api_create_rule():
-    from models.database import get_conn
-    data = request.get_json(force=True)
-    email = session.get('email')
-    parent_email = session.get('parent_email')
-    role = session.get('role')
-    tenant_id = email if role == 'main_admin' else parent_email
-    if role == 'super_admin': tenant_id = None
-    
-    conn = get_conn()
-    cur = conn.cursor()
-    try:
-        query = "INSERT INTO notification_rules (tenant_id, type, notificators, description, attributes) VALUES (%s, %s, %s, %s, %s)"
-        cur.execute(query, (tenant_id, data.get('type'), ','.join(data.get('channels', [])), data.get('description'), json.dumps(data.get('attributes', {}))))
-        conn.commit()
-        return jsonify({"status": "success"}), 201
-    finally:
-        cur.close(); conn.close()
-
-@notifications_bp.route("/api/notification-rules/<int:rule_id>", methods=["DELETE"])
-@role_required('admin')
-def api_delete_rule(rule_id):
-    from models.database import get_conn
-    conn = get_conn()
-    cur = conn.cursor()
-    try:
-        cur.execute("DELETE FROM notification_rules WHERE id = %s", (rule_id,))
         conn.commit()
         return jsonify({"success": True})
     finally:

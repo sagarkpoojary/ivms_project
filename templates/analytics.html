@@ -116,7 +116,7 @@
         if(!imei) return;
 
         // Fetch Trips
-        const tripsRes = await fetch(`/api/v1/reports/trips/${imei}?start=${start}T00:00:00Z&end=${end}T23:59:59Z`);
+        const tripsRes = await fetch(`/api/v2/reports/trips/${imei}?start=${start}T00:00:00Z&end=${end}T23:59:59Z`);
         const trips = await tripsRes.json();
         const tripsBody = document.getElementById('tripsBody');
         const tripsMobile = document.getElementById('tripsMobileContainer');
@@ -175,7 +175,7 @@
         }
 
         // Fetch Events
-        const eventsRes = await fetch(`/api/v1/reports/events/${imei}`);
+        const eventsRes = await fetch(`/api/v2/reports/events/${imei}`);
         const events = await eventsRes.json();
         const eventsList = document.getElementById('eventsList');
         eventsList.innerHTML = '';

@@ -167,16 +167,6 @@
         }
     });
 
-    function editSite(siteId) {
-        alert('Edit site: ' + siteId + '. Feature coming soon.');
-    }
-
-    function deleteSite(siteId) {
-        if (!confirm('Delete site ' + siteId + '?')) return;
-        fetch('/api/v2/ops/sites/' + siteId, { method: 'DELETE' })
-            .then(res => { if (res.ok) loadSites(); });
-    }
-
     document.addEventListener('DOMContentLoaded', loadSites);
 </script>
 {% endblock %}
