@@ -153,15 +153,15 @@
             </div>
 
             <!-- Insurance & Registration -->
-            <div class="profile-card p-4">
-                <h5 class="fw-bold mb-4">Insurance & Registration</h5>
+            <div class="card card-premium p-4">
+                <h5 class="fw-bold mb-4"><i class="fas fa-shield-alt text-primary me-2"></i>Insurance & Registration</h5>
                 <div class="mb-3">
                     <div class="stat-label">Insurance Company</div>
                     <div class="fw-bold text-dark">{{ vehicle.insurance_company or 'N/A' }}</div>
                 </div>
                 <div class="mb-3">
                     <div class="stat-label">Policy Number</div>
-                    <div class="fw-bold text-dark">{{ vehicle.insurance_policy_number or 'N/A' }}</div>
+                    <div class="fw-bold text-dark"><code class="small text-muted">{{ vehicle.insurance_policy_number or 'N/A' }}</code></div>
                 </div>
                 <div class="mb-3">
                     <div class="stat-label">Insurance Period</div>
@@ -172,9 +172,12 @@
                 <div class="mb-3">
                     <div class="stat-label">Insurance Status</div>
                     {% set ins_s = vehicle.insurance_status or 'N/A' %}
-                    <span class="badge {% if ins_s == 'Active' %}bg-success{% elif ins_s == 'Expiring Soon' %}bg-warning text-dark{% elif ins_s == 'Expired' %}bg-danger{% else %}bg-secondary{% endif %}">
+                    <span class="badge {% if ins_s == 'Active' %}badge-soft-success{% elif ins_s == 'Expiring Soon' %}badge-soft-warning{% elif ins_s == 'Expired' %}badge-soft-danger{% else %}badge-soft-info{% endif %}">
                         {{ ins_s }}
                     </span>
+                    <div class="health-progress-container">
+                        <div class="health-progress-bar {% if ins_s == 'Active' %}health-high{% elif ins_s == 'Expiring Soon' %}health-medium{% else %}health-low{% endif %}" style="width: {% if ins_s == 'Active' %}100%{% elif ins_s == 'Expiring Soon' %}40%{% else %}10%{% endif %};"></div>
+                    </div>
                 </div>
                 <div class="mb-3 border-top pt-3">
                     <div class="stat-label">Plate Number</div>
@@ -189,9 +192,12 @@
                 <div>
                     <div class="stat-label">Registration Status</div>
                     {% set reg_s = vehicle.registration_status or 'N/A' %}
-                    <span class="badge {% if reg_s == 'Active' %}bg-success{% elif reg_s == 'Expiring Soon' %}bg-warning text-dark{% elif reg_s == 'Expired' %}bg-danger{% else %}bg-secondary{% endif %}">
+                    <span class="badge {% if reg_s == 'Active' %}badge-soft-success{% elif reg_s == 'Expiring Soon' %}badge-soft-warning{% elif reg_s == 'Expired' %}badge-soft-danger{% else %}badge-soft-info{% endif %}">
                         {{ reg_s }}
                     </span>
+                    <div class="health-progress-container">
+                        <div class="health-progress-bar {% if reg_s == 'Active' %}health-high{% elif reg_s == 'Expiring Soon' %}health-medium{% else %}health-low{% endif %}" style="width: {% if reg_s == 'Active' %}100%{% elif reg_s == 'Expiring Soon' %}40%{% else %}10%{% endif %};"></div>
+                    </div>
                 </div>
             </div>
         </div>

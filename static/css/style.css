@@ -1290,3 +1290,168 @@ h6 {
     text-align: center;
     margin-right: 8px;
 }
+
+/* ========================================================================== */
+/* ENTERPRISE UI/UX REFINEMENTS & COMPONENT STYLING ACCENTS                  */
+/* ========================================================================== */
+
+:root {
+    --primary-gradient: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+    --shadow-premium: 0 10px 30px rgba(0, 0, 0, 0.04), 0 1px 3px rgba(0, 0, 0, 0.02);
+    --border-premium: 1px solid rgba(226, 232, 240, 0.8);
+    --radius-premium: 16px;
+}
+
+/* Premium Card Polish */
+.card-premium {
+    background: #ffffff;
+    border: var(--border-premium) !important;
+    border-radius: var(--radius-premium) !important;
+    box-shadow: var(--shadow-premium) !important;
+    transition: transform 0.22s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.22s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    overflow: hidden;
+}
+
+.card-premium:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 35px rgba(0, 0, 0, 0.06), 0 2px 4px rgba(0, 0, 0, 0.02) !important;
+}
+
+/* Outlined Material Inputs */
+.outlined-group {
+    position: relative;
+    margin-bottom: 1.25rem;
+}
+
+.outlined-group > label {
+    position: absolute;
+    top: -9px;
+    left: 12px;
+    background: #ffffff;
+    padding: 0 6px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: var(--secondary);
+    z-index: 2;
+    pointer-events: none;
+    transition: color 0.2s ease;
+    border-radius: 4px;
+}
+
+/* Premium Soft Badges */
+.badge-soft-success {
+    background-color: rgba(16, 185, 129, 0.1) !important;
+    color: var(--success) !important;
+    border: 1px solid rgba(16, 185, 129, 0.15) !important;
+    font-weight: 600;
+}
+
+.badge-soft-warning {
+    background-color: rgba(245, 158, 11, 0.1) !important;
+    color: var(--warning) !important;
+    border: 1px solid rgba(245, 158, 11, 0.15) !important;
+    font-weight: 600;
+}
+
+.badge-soft-danger {
+    background-color: rgba(239, 68, 68, 0.1) !important;
+    color: var(--danger) !important;
+    border: 1px solid rgba(239, 68, 68, 0.15) !important;
+    font-weight: 600;
+}
+
+.badge-soft-info {
+    background-color: rgba(6, 182, 212, 0.1) !important;
+    color: var(--info) !important;
+    border: 1px solid rgba(6, 182, 212, 0.15) !important;
+    font-weight: 600;
+}
+
+/* Document Expiry Health Indicator Progress Bar */
+.health-progress-container {
+    width: 100%;
+    height: 8px;
+    background-color: #f1f5f9;
+    border-radius: 10px;
+    overflow: hidden;
+    margin-top: 6px;
+}
+
+.health-progress-bar {
+    height: 100%;
+    border-radius: 10px;
+    transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.health-high { background: var(--success); }
+.health-medium { background: var(--warning); }
+.health-low { background: var(--danger); }
+
+/* Sidebar Collapsed Micro-animations */
+.sidebar {
+    transition: width 0.24s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.24s !important;
+}
+
+.sidebar.collapsed a {
+    justify-content: center !important;
+    padding: 0.75rem !important;
+    transition: background-color 0.2s;
+}
+
+.sidebar a {
+    transition: background-color 0.2s, color 0.2s, transform 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+.sidebar a:hover {
+    transform: translateX(4px);
+}
+
+.sidebar.collapsed a:hover {
+    transform: none !important;
+}
+
+/* Loader Overlay Beautification */
+.dashboard-loading-overlay {
+    backdrop-filter: blur(8px);
+    background: rgba(255, 255, 255, 0.82) !important;
+}
+
+[data-theme="dark"] .dashboard-loading-overlay {
+    background: rgba(15, 23, 42, 0.85) !important;
+}
+
+/* Mobile & Tablet Specific Layout polish */
+@media (max-width: 768px) {
+    /* Responsive Fluid Cards instead of dense tables */
+    .mobile-table-card {
+        background: #ffffff;
+        border-radius: 12px;
+        padding: 1.25rem;
+        margin-bottom: 1rem;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.02);
+        border: 1px solid var(--border-color);
+    }
+    
+    .mobile-table-card-row {
+        display: flex;
+        justify-content: space-between;
+        padding: 0.4rem 0;
+        border-bottom: 1px dotted var(--border-color);
+        font-size: 0.85rem;
+    }
+    
+    .mobile-table-card-row:last-child {
+        border-bottom: none;
+    }
+    
+    .mobile-table-card-label {
+        font-weight: 600;
+        color: var(--secondary);
+    }
+    
+    .mobile-table-card-value {
+        color: var(--text-main);
+        font-weight: 500;
+    }
+}
+

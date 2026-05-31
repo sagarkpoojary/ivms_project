@@ -17,7 +17,7 @@
     </button>
 </div>
 
-<div class="card p-4 mb-4 custom-shadow border-0 position-relative" style="z-index: 1010; overflow: visible !important;">
+<div class="card card-premium p-4 mb-4 custom-shadow border-0 position-relative" style="z-index: 1010; overflow: visible !important;">
     <h5 class="card-title text-dark mb-4"><i class="fas fa-tachometer-alt me-2 text-primary"></i>Fleet Health & Key
         Metrics</h5>
 
@@ -181,7 +181,7 @@
 
     <div class="col-lg-8 col-12">
         {% if role == 'super_admin' or 'dashboard_map' in enabled_modules %}
-        <div class="card p-4 mb-4 custom-shadow border-0">
+        <div class="card card-premium p-4 mb-4 custom-shadow border-0">
             <h5 class="card-title text-dark mb-3"><i class="fas fa-map-marked-alt me-2 text-primary"></i>Live Fleet
                 Location</h5>
             <div id="vehicleMap" style="height:450px; border-radius: 8px; border: 1px solid var(--border-color);"></div>
@@ -189,7 +189,7 @@
         {% endif %}
 
         {% if role == 'super_admin' or 'dashboard_big_chart' in enabled_modules %}
-        <div class="card p-4 mb-4 custom-shadow border-0" style="min-height: 500px;">
+        <div class="card card-premium p-4 mb-4 custom-shadow border-0" style="min-height: 500px;">
             <h5 id="bigChartTitle" class="card-title text-dark mb-3"><i
                     class="fas fa-chart-pie me-2 text-primary"></i>Fleet Movement & Utilization (3-Level)</h5>
             <div style="height:360px; padding-top: 10px;">
@@ -204,8 +204,8 @@
 
     <div class="col-lg-4 col-12">
         <!-- Renewal & Service Alerts Card -->
-        <div class="card mb-4 custom-shadow border-0" style="min-height: 250px;">
-            <div class="card-header bg-warning text-dark fw-bold border-0 d-flex align-items-center">
+        <div class="card card-premium mb-4 custom-shadow border-0" style="min-height: 250px;">
+            <div class="card-header bg-warning text-dark fw-bold border-0 d-flex align-items-center" style="border-radius: 16px 16px 0 0;">
                 <i class="fas fa-exclamation-triangle me-2"></i>Renewal & Service Alerts
                 <span class="badge bg-danger text-white ms-auto" id="renewalAlertBadge">0</span>
             </div>
@@ -218,8 +218,8 @@
 
         <!-- Selected Vehicle Report Card Removed -->
         {% if role == 'super_admin' or 'dashboard_alerts' in enabled_modules %}
-        <div class="card mb-4 custom-shadow border-0" style="min-height: 300px;">
-            <div class="card-header bg-danger text-white fw-bold border-0 d-flex align-items-center">
+        <div class="card card-premium mb-4 custom-shadow border-0" style="min-height: 300px;">
+            <div class="card-header bg-danger text-white fw-bold border-0 d-flex align-items-center" style="border-radius: 16px 16px 0 0;">
                 <i class="fas fa-bell me-2"></i>Live Alert Feed
             </div>
             <div class="card-body p-3 alert-feed-container" id="alertAreaEvents">
