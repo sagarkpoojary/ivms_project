@@ -190,6 +190,10 @@
             vehicles.map(v => `<option value="${v.unique_id}">${v.name} (${v.unique_id})</option>`).join('');
     }
 
+    function viewTicket(ticketId) {
+        alert('View ticket details: Ticket #' + ticketId + '. Feature coming soon.');
+    }
+
     document.getElementById('newTicketForm').addEventListener('submit', async (e) => {
         e.preventDefault();
         const formData = new FormData(e.target);

@@ -31,6 +31,17 @@ def migrate():
                 archived BOOLEAN DEFAULT FALSE
             );
 
+            -- Notification Rules (for notification settings page)
+            CREATE TABLE IF NOT EXISTS notification_rules (
+                id BIGSERIAL PRIMARY KEY,
+                tenant_id VARCHAR(255),
+                type VARCHAR(100),
+                notificators VARCHAR(255),
+                description TEXT,
+                attributes JSONB,
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+            );
+
             -- Notification Delivery Logs
             CREATE TABLE IF NOT EXISTS notification_delivery (
                 id BIGSERIAL PRIMARY KEY,
@@ -54,6 +65,7 @@ def migrate():
             CREATE INDEX IF NOT EXISTS idx_notifications_user ON notification_queue(user_id);
             CREATE INDEX IF NOT EXISTS idx_notifications_tenant ON notification_queue(tenant_id);
             CREATE INDEX IF NOT EXISTS idx_notifications_read ON notification_queue(read) WHERE read = FALSE;
+            CREATE INDEX IF NOT EXISTS idx_notification_rules_tenant ON notification_rules(tenant_id);
         """)
         
         conn.commit()
