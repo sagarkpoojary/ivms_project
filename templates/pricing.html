@@ -35,39 +35,47 @@
         <!-- Determine if this plan matches current filter via JS, but we add data attributes here -->
         <div class="col plan-card-col" data-modules="{{ plan_data.enabled_modules|join(',') }}">
             <div
-                class="card mb-4 rounded-3 shadow-sm pricing-card h-100 {% if plan_name == 'Premium' %}border-primary premium-border{% endif %}">
-                <div class="card-header py-3 {% if plan_name == 'Premium' %}text-bg-primary border-primary{% endif %}">
+                class="card card-premium mb-4 rounded-3 shadow-sm pricing-card h-100 {% if plan_name == 'Premium' %}border-primary premium-border{% endif %}">
+                <div class="card-header py-3 {% if plan_name == 'Premium' %}text-bg-primary border-primary{% endif %}" style="border-radius: 16px 16px 0 0;">
                     <h4 class="my-0 fw-bold">{{ plan_name }}</h4>
                 </div>
-                <div class="card-body d-flex flex-column">
-                    <h1 class="card-title pricing-card-title">{{ plan_data.vehicle_limit }}<small
+                <div class="card-body d-flex flex-column p-4">
+                    <h1 class="card-title pricing-card-title mb-3">{{ plan_data.vehicle_limit }}<small
                             class="text-muted fw-light"> Veh</small></h1>
-                    <ul class="list-unstyled mt-3 mb-4 flex-grow-1 text-start small ps-3">
-                        <li class="mb-2"><i class="fas fa-check text-success me-2"></i> {{ plan_data.user_limit }} User
-                            Limit</li>
+                    
+                    <div class="mb-3 text-start">
+                        <span class="badge badge-soft-success d-inline-block w-100 py-2 mb-2 text-center" style="font-size: 0.85rem;">
+                            <i class="fas fa-users me-2"></i>{{ plan_data.user_limit }} User Limit
+                        </span>
+                    </div>
 
-                        {# Custom Feature Rendering Loop #}
-                        {% for module in plan_data.enabled_modules %}
-                        {% set friendly_name = module %}
-                        {% if module == 'dashboard' %}{% set friendly_name = 'Dashboard Access' %}
-                        {% elif module == 'dashboard_stats' %}{% set friendly_name = 'Key Performance Stats' %}
-                        {% elif module == 'dashboard_map' %}{% set friendly_name = 'Live Fleet Map' %}
-                        {% elif module == 'dashboard_charts' %}{% set friendly_name = 'Connectivity Charts' %}
-                        {% elif module == 'dashboard_big_chart' %}{% set friendly_name = 'Utilization Graph' %}
-                        {% elif module == 'dashboard_alerts' %}{% set friendly_name = 'Live Alert Feed' %}
-                        {% elif module == 'reports' %}{% set friendly_name = 'Car Quantity Report' %}
-                        {% elif module == 'pre_reg_report' %}{% set friendly_name = 'Pre-Registration Report' %}
-                        {% elif module == 'vehicle_add' %}{% set friendly_name = 'Vehicle Registration' %}
-                        {% elif module == 'user_manager' %}{% set friendly_name = 'User Manager' %}
-                        {% elif module == 'notifications' %}{% set friendly_name = 'Notification Rules' %}
-                        {% elif module == 'servers' %}{% set friendly_name = 'Server Settings' %}
-                        {% endif %}
+                    <div class="flex-grow-1 text-start mb-4">
+                        <small class="text-secondary fw-bold text-uppercase d-block mb-2" style="font-size: 0.72rem; letter-spacing: 0.05em;">Included Modules:</small>
+                        <div class="d-flex flex-wrap gap-1">
+                            {# Custom Feature Rendering Loop #}
+                            {% for module in plan_data.enabled_modules %}
+                            {% set friendly_name = module %}
+                            {% if module == 'dashboard' %}{% set friendly_name = 'Dashboard Access' %}
+                            {% elif module == 'dashboard_stats' %}{% set friendly_name = 'Key Performance Stats' %}
+                            {% elif module == 'dashboard_map' %}{% set friendly_name = 'Live Fleet Map' %}
+                            {% elif module == 'dashboard_charts' %}{% set friendly_name = 'Connectivity Charts' %}
+                            {% elif module == 'dashboard_big_chart' %}{% set friendly_name = 'Utilization Graph' %}
+                            {% elif module == 'dashboard_alerts' %}{% set friendly_name = 'Live Alert Feed' %}
+                            {% elif module == 'reports' %}{% set friendly_name = 'Car Quantity Report' %}
+                            {% elif module == 'pre_reg_report' %}{% set friendly_name = 'Pre-Registration Report' %}
+                            {% elif module == 'vehicle_add' %}{% set friendly_name = 'Vehicle Registration' %}
+                            {% elif module == 'user_manager' %}{% set friendly_name = 'User Manager' %}
+                            {% elif module == 'notifications' %}{% set friendly_name = 'Notification Rules' %}
+                            {% elif module == 'servers' %}{% set friendly_name = 'Server Settings' %}
+                            {% endif %}
 
-                        <li class="mb-1"><i class="fas fa-check text-success me-2"></i> {{ friendly_name }}</li>
-                        {% endfor %}
-                    </ul>
+                            <span class="badge badge-soft-info" style="font-size: 0.72rem;">{{ friendly_name }}</span>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    
                     <button type="button"
-                        class="w-100 btn btn-lg {% if plan_name == 'Premium' %}btn-primary{% else %}btn-outline-primary{% endif %} mt-auto">Get
+                        class="w-100 btn btn-lg {% if plan_name == 'Premium' %}btn-primary{% else %}btn-outline-primary{% endif %} mt-auto py-2.5 rounded-3">Get
                         Started</button>
                 </div>
             </div>
