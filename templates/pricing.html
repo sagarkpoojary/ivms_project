@@ -30,7 +30,7 @@
 </div>
 
 <div class="container py-5">
-    <div class="row row-cols-1 row-cols-md-4 mb-3 text-center g-4" id="plansContainer">
+    <div class="row row-cols-1 row-cols-md-2 row-cols-lg-4 mb-3 text-center g-4" id="plansContainer">
         {% for plan_name, plan_data in modules_config.items() %}
         <!-- Determine if this plan matches current filter via JS, but we add data attributes here -->
         <div class="col plan-card-col" data-modules="{{ plan_data.enabled_modules|join(',') }}">
@@ -206,17 +206,18 @@
         const cols = document.querySelectorAll('.plan-card-col');
 
         cols.forEach(col => {
-            const modules = col.getAttribute('data-modules').split(',');
+            const modules = col.getAttribute('data-modules').split(',').map(m => m.trim());
             if (selected === 'all') {
+                col.style.display = '';
                 col.style.opacity = '1';
                 col.style.filter = 'none';
             } else {
                 if (modules.includes(selected)) {
+                    col.style.display = '';
                     col.style.opacity = '1';
                     col.style.filter = 'none';
                 } else {
-                    col.style.opacity = '0.3';
-                    col.style.filter = 'grayscale(100%)';
+                    col.style.display = 'none';
                 }
             }
         });

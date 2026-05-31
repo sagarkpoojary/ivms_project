@@ -282,29 +282,71 @@
     // 4. Notifications
     async function fetchNotifications() {
       try {
-        const res = await fetch('/api/alerts');
-        const alerts = await res.json();
+        const res = await fetch('/api/notifications/latest');
+        const data = await res.json();
+        const alerts = data.notifications || [];
+        const unreadCount = data.unread_count || 0;
         const list = document.getElementById('notifList');
         const badge = document.getElementById('notifBadge');
-        if (alerts.length > 0) {
-          badge.textContent = alerts.length;
+        
+        if (unreadCount > 0) {
+          badge.textContent = unreadCount;
           badge.classList.remove('d-none');
-          list.innerHTML = alerts.map(a => `
-            <a href="/event-center" class="dropdown-item p-3 border-bottom">
-              <div class="d-flex align-items-center">
-                <div class="bg-soft-danger text-danger rounded-circle p-2 me-3">
-                  <i class="fas fa-exclamation-triangle"></i>
+        } else {
+          badge.classList.add('d-none');
+        }
+        
+        if (alerts.length > 0) {
+          list.innerHTML = alerts.map(a => {
+            const isRead = a.read;
+            const severityColor = a.severity === 'CRITICAL' ? 'danger' : (a.severity === 'WARNING' ? 'warning' : 'info');
+            return `
+              <a href="#" class="dropdown-item p-3 border-bottom ${isRead ? 'opacity-75' : 'fw-bold'}" onclick="markNotifRead(${a.id}, event)" style="white-space: normal;">
+                <div class="d-flex align-items-center">
+                  <div class="bg-soft-${severityColor} text-${severityColor} rounded-circle p-2 me-3" style="min-width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;">
+                    <i class="fas fa-${a.severity === 'CRITICAL' ? 'exclamation-circle' : 'exclamation-triangle'}"></i>
+                  </div>
+                  <div class="flex-grow-1">
+                    <div class="small text-dark">${a.title}</div>
+                    <div class="x-small text-muted mt-1" style="font-size: 0.75rem; line-height: 1.2;">${a.message}</div>
+                  </div>
                 </div>
-                <div>
-                  <div class="small fw-bold">${a.event_type.toUpperCase()}</div>
-                  <div class="x-small text-muted">${a.imei} - ${new Date(a.timestamp).toLocaleTimeString()}</div>
-                </div>
-              </div>
-            </a>
-          `).join('');
+              </a>
+            `;
+          }).join('');
+        } else {
+          list.innerHTML = `<div class="p-3 text-center text-muted small">No new notifications</div>`;
         }
       } catch (err) {}
     }
+
+    async function markNotifRead(id, event) {
+      if (event) event.preventDefault();
+      try {
+        await fetch(`/api/notifications/read/${id}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+          }
+        });
+        fetchNotifications();
+      } catch (err) {}
+    }
+
+    async function markAllRead() {
+      try {
+        await fetch('/api/notifications/read-all', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+          }
+        });
+        fetchNotifications();
+      } catch (err) {}
+    }
+
     setInterval(fetchNotifications, 30000);
     fetchNotifications();
   </script>

@@ -128,7 +128,7 @@
             </div>
 
             <!-- Maintenance Status -->
-            <div class="profile-card p-4">
+            <div class="profile-card p-4 mb-4">
                 <div class="d-flex justify-content-between align-items-center mb-4">
                     <h5 class="fw-bold mb-0">Maintenance</h5>
                     <a href="/maintenance" class="small text-decoration-none">Details</a>
@@ -150,7 +150,51 @@
                         No scheduled maintenance
                     </div>
                 {% endif %}
-                
+            </div>
+
+            <!-- Insurance & Registration -->
+            <div class="profile-card p-4">
+                <h5 class="fw-bold mb-4">Insurance & Registration</h5>
+                <div class="mb-3">
+                    <div class="stat-label">Insurance Company</div>
+                    <div class="fw-bold text-dark">{{ vehicle.insurance_company or 'N/A' }}</div>
+                </div>
+                <div class="mb-3">
+                    <div class="stat-label">Policy Number</div>
+                    <div class="fw-bold text-dark">{{ vehicle.insurance_policy_number or 'N/A' }}</div>
+                </div>
+                <div class="mb-3">
+                    <div class="stat-label">Insurance Period</div>
+                    <div class="small text-muted">
+                        {{ vehicle.insurance_start_date or 'N/A' }} to {{ vehicle.insurance_expiry_date or 'N/A' }}
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <div class="stat-label">Insurance Status</div>
+                    {% set ins_s = vehicle.insurance_status or 'N/A' %}
+                    <span class="badge {% if ins_s == 'Active' %}bg-success{% elif ins_s == 'Expiring Soon' %}bg-warning text-dark{% elif ins_s == 'Expired' %}bg-danger{% else %}bg-secondary{% endif %}">
+                        {{ ins_s }}
+                    </span>
+                </div>
+                <div class="mb-3 border-top pt-3">
+                    <div class="stat-label">Plate Number</div>
+                    <div class="fw-bold text-dark">{{ vehicle.plate_number or 'N/A' }}</div>
+                </div>
+                <div class="mb-3">
+                    <div class="stat-label">Registration Period</div>
+                    <div class="small text-muted">
+                        {{ vehicle.registration_start_date or 'N/A' }} to {{ vehicle.registration_expiry_date or 'N/A' }}
+                    </div>
+                </div>
+                <div>
+                    <div class="stat-label">Registration Status</div>
+                    {% set reg_s = vehicle.registration_status or 'N/A' %}
+                    <span class="badge {% if reg_s == 'Active' %}bg-success{% elif reg_s == 'Expiring Soon' %}bg-warning text-dark{% elif reg_s == 'Expired' %}bg-danger{% else %}bg-secondary{% endif %}">
+                        {{ reg_s }}
+                    </span>
+                </div>
+            </div>
+        </div>
     
         <!-- Recent Activity Feed -->
         <div class="col-lg-12">

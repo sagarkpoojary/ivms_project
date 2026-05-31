@@ -63,10 +63,21 @@ def plan_manager():
     return render_template('plan_manager.html', modules_config=modules_config, all_modules=ALL_SYSTEM_MODULES, success=request.args.get('success'))
 
 @dashboard_bp.route('/pricing')
-@role_required('super_admin')
+@role_required('main_admin')
 def pricing():
+    from auth.utils import get_current_user_data
+    user_info, current_data = get_current_user_data()
+    role = current_data.get('role')
+    enabled_modules = current_data.get('enabled_modules', [])
+    
+    if role != 'super_admin' and 'pricing' not in enabled_modules:
+        return render_template('login.html', error="Unauthorized access.")
+        
     modules_config = load_module_config()
-    return render_template('pricing.html', modules_config=modules_config, all_modules=ALL_SYSTEM_MODULES)
+    # Sort modules_config by vehicle_limit ascending for correct priority ordering and card placement
+    sorted_config = dict(sorted(modules_config.items(), key=lambda item: item[1].get('vehicle_limit', 0)))
+    
+    return render_template('pricing.html', modules_config=sorted_config, all_modules=ALL_SYSTEM_MODULES)
 
 @dashboard_bp.route('/download/apk')
 @role_required('super_admin')

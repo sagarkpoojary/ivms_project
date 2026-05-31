@@ -7,6 +7,31 @@ from services.limit_validator import validate_vehicle_registration_limit, valida
 
 vehicles_bp = Blueprint('vehicles', __name__)
 
+def calculate_status(expiry_date_str, start_date_str=None):
+    if not expiry_date_str:
+        return "N/A"
+    try:
+        from services.time_service import get_oman_now
+        today = get_oman_now().date()
+        expiry_date = datetime.strptime(expiry_date_str, "%Y-%m-%d").date()
+        
+        # Check start date validation
+        if start_date_str:
+            start_date = datetime.strptime(start_date_str, "%Y-%m-%d").date()
+            if expiry_date < start_date:
+                raise ValueError("Expiry date cannot be before start date.")
+                
+        days_left = (expiry_date - today).days
+        if days_left < 0:
+            return "Expired"
+        elif days_left <= 30:
+            return "Expiring Soon"
+        else:
+            return "Active"
+    except Exception as e:
+        raise ValueError(str(e))
+
+
 @vehicles_bp.route('/vehicle/add', methods=['GET'])
 @role_required('admin')
 def vehicle_form():
@@ -47,9 +72,26 @@ def register_vehicle():
     unique_id = request.form.get('unique_id', '').strip()
     device_model = request.form.get('device_model', '').strip()
     driver_name = request.form.get('driver_name', '').strip()
+    brand = request.form.get('brand', '').strip()
+    model = request.form.get('model', '').strip()
+    plate_number = request.form.get('plate_number', '').strip()
+    insurance_company = request.form.get('insurance_company', '').strip()
+    insurance_policy_number = request.form.get('insurance_policy_number', '').strip()
+    insurance_start_date = request.form.get('insurance_start_date', '').strip()
+    insurance_expiry_date = request.form.get('insurance_expiry_date', '').strip()
+    registration_start_date = request.form.get('registration_start_date', '').strip()
+    registration_expiry_date = request.form.get('registration_expiry_date', '').strip()
+
+    usage = get_usage_stats(session.get('email'))
 
     if not name or not unique_id:
-        return render_template('vehicle_form.html', error="Please enter Name and Unique ID.", vehicles=get_filtered_vehicles(), role=role)
+        return render_template('vehicle_form.html', error="Please enter Name and Unique ID.", vehicles=get_filtered_vehicles(), role=role, usage=usage)
+
+    try:
+        insurance_status = calculate_status(insurance_expiry_date, insurance_start_date)
+        registration_status = calculate_status(registration_expiry_date, registration_start_date)
+    except ValueError as val_err:
+        return render_template('vehicle_form.html', error=f"Validation Error: {str(val_err)}", vehicles=get_filtered_vehicles(include_all=True), role=role, usage=usage)
 
     current = load_vehicles()
     existing = next((v for v in current if str(v.get('unique_id')) == unique_id), None)
@@ -58,7 +100,7 @@ def register_vehicle():
              # Allow re-submission of declined vehicles
              delete_vehicle_db(unique_id)
         else:
-             return render_template('vehicle_form.html', error="Vehicle already registered or pending!", vehicles=get_filtered_vehicles(include_all=True), role=role)
+             return render_template('vehicle_form.html', error="Vehicle already registered or pending!", vehicles=get_filtered_vehicles(include_all=True), role=role, usage=usage)
 
     v_parent = session.get('parent_email') if role == 'user' else session.get('email')
 
@@ -71,7 +113,6 @@ def register_vehicle():
     )
     
     if not can_register:
-        usage = get_usage_stats(current_email)
         return render_template('vehicle_form.html', 
                                error=limit_error, 
                                vehicles=get_filtered_vehicles(include_all=True), 
@@ -86,13 +127,24 @@ def register_vehicle():
             "unique_id": unique_id, 
             "device_model": device_model,
             "driver_name": driver_name,
+            "brand": brand,
+            "model": model,
+            "plate_number": plate_number,
+            "insurance_company": insurance_company,
+            "insurance_policy_number": insurance_policy_number,
+            "insurance_start_date": insurance_start_date,
+            "insurance_expiry_date": insurance_expiry_date,
+            "insurance_status": insurance_status,
+            "registration_start_date": registration_start_date,
+            "registration_expiry_date": registration_expiry_date,
+            "registration_status": registration_status,
             "parent_email": v_parent,
             "company_name": current_data.get('company_name'),
             "status": "draft",
             "created_at": str(datetime.now())
         }
         add_vehicle_db(new_vehicle)
-        return render_template('vehicle_form.html', success="Vehicle submitted as DRAFT. Please contact Main Admin for approval and registration.", vehicles=get_filtered_vehicles(include_all=True), role=role)
+        return render_template('vehicle_form.html', success="Vehicle submitted as DRAFT. Please contact Main Admin for approval and registration.", vehicles=get_filtered_vehicles(include_all=True), role=role, usage=usage)
 
     # DIRECT REGISTRATION/SYNC for Main Admin / Super Admin (Bypasses Traccar)
     try:
@@ -101,6 +153,17 @@ def register_vehicle():
             "unique_id": unique_id, 
             "device_model": device_model,
             "driver_name": driver_name,
+            "brand": brand,
+            "model": model,
+            "plate_number": plate_number,
+            "insurance_company": insurance_company,
+            "insurance_policy_number": insurance_policy_number,
+            "insurance_start_date": insurance_start_date,
+            "insurance_expiry_date": insurance_expiry_date,
+            "insurance_status": insurance_status,
+            "registration_start_date": registration_start_date,
+            "registration_expiry_date": registration_expiry_date,
+            "registration_status": registration_status,
             "parent_email": v_parent,
             "company_name": current_data.get('company_name'),
             "status": "active",
@@ -119,9 +182,9 @@ def register_vehicle():
                     (unique_id, 'offline', datetime.now()))
         conn.commit(); cur.close(); conn.close()
         
-        return render_template('vehicle_form.html', success="Vehicle registered successfully. Tracking will start as soon as the device connects.", vehicles=get_filtered_vehicles(include_all=True), role=role)
+        return render_template('vehicle_form.html', success="Vehicle registered successfully. Tracking will start as soon as the device connects.", vehicles=get_filtered_vehicles(include_all=True), role=role, usage=usage)
     except Exception as e:
-        return render_template('vehicle_form.html', error=f"Registration error: {str(e)}", vehicles=get_filtered_vehicles(include_all=True), role=role)
+        return render_template('vehicle_form.html', error=f"Registration error: {str(e)}", vehicles=get_filtered_vehicles(include_all=True), role=role, usage=usage)
 
 @vehicles_bp.route('/manage-drafts')
 @role_required('main_admin')
@@ -228,9 +291,24 @@ def update_vehicle(unique_id):
     name = request.form.get('name', '').strip()
     device_model = request.form.get('device_model', '').strip()
     driver_name = request.form.get('driver_name', '').strip()
+    brand = request.form.get('brand', '').strip()
+    model = request.form.get('model', '').strip()
+    plate_number = request.form.get('plate_number', '').strip()
+    insurance_company = request.form.get('insurance_company', '').strip()
+    insurance_policy_number = request.form.get('insurance_policy_number', '').strip()
+    insurance_start_date = request.form.get('insurance_start_date', '').strip()
+    insurance_expiry_date = request.form.get('insurance_expiry_date', '').strip()
+    registration_start_date = request.form.get('registration_start_date', '').strip()
+    registration_expiry_date = request.form.get('registration_expiry_date', '').strip()
     
     if not name:
         return redirect(url_for('vehicles.vehicle_form', error="Name is required"))
+
+    try:
+        insurance_status = calculate_status(insurance_expiry_date, insurance_start_date)
+        registration_status = calculate_status(registration_expiry_date, registration_start_date)
+    except ValueError as val_err:
+        return redirect(url_for('vehicles.vehicle_form', error=f"Validation Error: {str(val_err)}"))
 
     current = load_vehicles()
     found_vehicle = next((v for v in current if str(v.get('unique_id')) == str(unique_id)), None)
@@ -239,6 +317,17 @@ def update_vehicle(unique_id):
         found_vehicle['name'] = name
         found_vehicle['device_model'] = device_model
         found_vehicle['driver_name'] = driver_name
+        found_vehicle['brand'] = brand
+        found_vehicle['model'] = model
+        found_vehicle['plate_number'] = plate_number
+        found_vehicle['insurance_company'] = insurance_company
+        found_vehicle['insurance_policy_number'] = insurance_policy_number
+        found_vehicle['insurance_start_date'] = insurance_start_date
+        found_vehicle['insurance_expiry_date'] = insurance_expiry_date
+        found_vehicle['insurance_status'] = insurance_status
+        found_vehicle['registration_start_date'] = registration_start_date
+        found_vehicle['registration_expiry_date'] = registration_expiry_date
+        found_vehicle['registration_status'] = registration_status
         update_vehicle_db(unique_id, found_vehicle)
         return redirect(url_for('vehicles.vehicle_form', success="Vehicle updated successfully"))
     else:

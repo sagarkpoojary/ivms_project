@@ -225,3 +225,50 @@ def user_manager():
         if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
             return jsonify({'success': False, 'error': str(e)}), 500
         return render_template('base.html', error=str(e))
+
+@users_bp.route('/settings', methods=['GET', 'POST'])
+def settings():
+    if not session.get('logged_in'):
+        return redirect(url_for('auth.login'))
+        
+    from models.database import get_user_by_email, update_user_db
+    email = session.get('email')
+    user_info = get_user_by_email(email)
+    
+    if not user_info:
+        return redirect(url_for('auth.login'))
+        
+    if request.method == 'POST':
+        # Extract inputs
+        ins_days_str = request.form.getlist('insurance_days')
+        reg_days_str = request.form.getlist('registration_days')
+        maint_days_str = request.form.getlist('maintenance_days')
+        
+        # Convert to integers
+        ins_days = [int(x) for x in ins_days_str if x.isdigit()]
+        reg_days = [int(x) for x in reg_days_str if x.isdigit()]
+        maint_days = [int(x) for x in maint_days_str if x.isdigit()]
+        
+        # Merge into reminder settings
+        data = user_info.get('data') or {}
+        if not isinstance(data, dict):
+            data = {}
+        
+        data['reminder_settings'] = {
+            'insurance_days': ins_days,
+            'registration_days': reg_days,
+            'maintenance_days': maint_days
+        }
+        
+        update_user_db(email, {'data': data})
+        return render_template('settings.html', success="Settings saved successfully.", reminder_settings=data['reminder_settings'])
+        
+    # GET: load reminder settings
+    data = user_info.get('data') or {}
+    reminder_settings = data.get('reminder_settings') or {
+        'insurance_days': [30, 15, 7],
+        'registration_days': [30, 15, 7],
+        'maintenance_days': [30, 15, 7]
+    }
+    
+    return render_template('settings.html', reminder_settings=reminder_settings)
