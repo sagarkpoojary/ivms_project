@@ -169,7 +169,7 @@
 
 <div class="card card-premium p-4">
   <h5 class="mb-4 fw-bold text-dark"><i class="fas fa-list me-2 text-primary"></i>Registered Vehicles</h5>
-  <div class="table-responsive">
+  <div class="table-responsive d-none d-md-block">
     <table class="table align-middle">
       {% if role == 'main_admin' %}
       <thead>
@@ -237,19 +237,19 @@
           <td><code class="small text-muted">{{ v.unique_id }}</code></td>
           <td><span class="small">{{ v.driver_name or '-' }}</span></td>
           <td class="text-center">
-            <span class="badge {% if v.status == 'active' %}bg-success{% elif v.status == 'draft' %}bg-warning text-dark{% elif v.status == 'declined' %}bg-danger{% else %}bg-secondary{% endif %}">
+            <span class="badge {% if v.status == 'active' %}badge-soft-success{% elif v.status == 'draft' %}badge-soft-warning{% elif v.status == 'declined' %}badge-soft-danger{% else %}bg-secondary{% endif %}">
               {% if v.status == 'active' %}Active{% elif v.status == 'draft' %}Pending{% else %}{{ v.status }}{% endif %}
             </span>
           </td>
           <td class="text-center">
             {% set ins_s = v.insurance_status or 'N/A' %}
-            <span class="badge {% if ins_s == 'Active' %}bg-success{% elif ins_s == 'Expiring Soon' %}bg-warning text-dark{% elif ins_s == 'Expired' %}bg-danger{% else %}bg-secondary{% endif %}">
+            <span class="badge {% if ins_s == 'Active' %}badge-soft-success{% elif ins_s == 'Expiring Soon' %}badge-soft-warning{% elif ins_s == 'Expired' %}badge-soft-danger{% else %}bg-secondary{% endif %}">
               {{ ins_s }}
             </span>
           </td>
           <td class="text-center">
             {% set reg_s = v.registration_status or 'N/A' %}
-            <span class="badge {% if reg_s == 'Active' %}bg-success{% elif reg_s == 'Expiring Soon' %}bg-warning text-dark{% elif reg_s == 'Expired' %}bg-danger{% else %}bg-secondary{% endif %}">
+            <span class="badge {% if reg_s == 'Active' %}badge-soft-success{% elif reg_s == 'Expiring Soon' %}badge-soft-warning{% elif reg_s == 'Expired' %}badge-soft-danger{% else %}bg-secondary{% endif %}">
               {{ reg_s }}
             </span>
           </td>
@@ -276,6 +276,65 @@
       {% endif %}
     </table>
   </div>
+
+  {% if role != 'main_admin' %}
+  <!-- Mobile Responsive Card View -->
+  <div class="d-block d-md-none">
+    {% for v in vehicles %}
+    <div class="mobile-table-card">
+      <div class="d-flex justify-content-between align-items-center mb-2 border-bottom pb-2">
+        <strong class="text-primary fs-6">{{ v.name }}</strong>
+        <span class="badge {% if v.status == 'active' %}badge-soft-success{% elif v.status == 'draft' %}badge-soft-warning{% elif v.status == 'declined' %}badge-soft-danger{% else %}bg-secondary{% endif %}">
+          {% if v.status == 'active' %}Active{% elif v.status == 'draft' %}Pending{% else %}{{ v.status }}{% endif %}
+        </span>
+      </div>
+      <div class="mobile-table-card-row">
+        <span class="mobile-table-card-label">Brand / Model</span>
+        <span class="mobile-table-card-value">{{ v.brand or '-' }} {{ v.model or '' }}</span>
+      </div>
+      <div class="mobile-table-card-row">
+        <span class="mobile-table-card-label">Plate Number</span>
+        <span class="mobile-table-card-value fw-semibold text-dark">{{ v.plate_number or '-' }}</span>
+      </div>
+      <div class="mobile-table-card-row">
+        <span class="mobile-table-card-label">IMEI</span>
+        <span class="mobile-table-card-value"><code>{{ v.unique_id }}</code></span>
+      </div>
+      <div class="mobile-table-card-row">
+        <span class="mobile-table-card-label">Driver</span>
+        <span class="mobile-table-card-value">{{ v.driver_name or '-' }}</span>
+      </div>
+      <div class="mobile-table-card-row">
+        <span class="mobile-table-card-label">Insurance</span>
+        {% set ins_s = v.insurance_status or 'N/A' %}
+        <span class="badge {% if ins_s == 'Active' %}badge-soft-success{% elif ins_s == 'Expiring Soon' %}badge-soft-warning{% elif ins_s == 'Expired' %}badge-soft-danger{% else %}bg-secondary{% endif %}">
+          {{ ins_s }}
+        </span>
+      </div>
+      <div class="mobile-table-card-row">
+        <span class="mobile-table-card-label">Registration</span>
+        {% set reg_s = v.registration_status or 'N/A' %}
+        <span class="badge {% if reg_s == 'Active' %}badge-soft-success{% elif reg_s == 'Expiring Soon' %}badge-soft-warning{% elif reg_s == 'Expired' %}badge-soft-danger{% else %}bg-secondary{% endif %}">
+          {{ reg_s }}
+        </span>
+      </div>
+      <div class="d-flex justify-content-end gap-2 mt-3 pt-2 border-top">
+        {% if v.status == 'active' %}
+        <button class="btn btn-sm btn-outline-info"
+          onclick="openEditModal('{{ v.unique_id|escape }}', '{{ (v.name or \"\")|escape }}', '{{ (v.device_model or \"\")|escape }}', '{{ (v.driver_name or \"\")|escape }}', '{{ (v.brand or \"\")|escape }}', '{{ (v.model or \"\")|escape }}', '{{ (v.plate_number or \"\")|escape }}', '{{ (v.insurance_company or \"\")|escape }}', '{{ (v.insurance_policy_number or \"\")|escape }}', '{{ (v.insurance_start_date or \"\")|escape }}', '{{ (v.insurance_expiry_date or \"\")|escape }}', '{{ (v.registration_start_date or \"\")|escape }}', '{{ (v.registration_expiry_date or \"\")|escape }}')">
+          <i class="fas fa-edit me-1"></i>Edit
+        </button>
+        <a href="/vehicle/profile/{{ v.unique_id }}" class="btn btn-sm btn-outline-primary"><i class="fas fa-eye me-1"></i>View</a>
+        {% endif %}
+        <a href="/vehicle/delete/{{ v.unique_id }}" class="btn btn-sm btn-outline-danger"
+          onclick="return confirm('Are you sure?')"><i class="fas fa-trash me-1"></i>Delete</a>
+      </div>
+    </div>
+    {% else %}
+    <p class="text-muted text-center py-3">No vehicles registered.</p>
+    {% endfor %}
+  </div>
+  {% endif %}
 </div>
 
 <!-- Edit Modal -->

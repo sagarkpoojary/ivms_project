@@ -690,3 +690,26 @@
     }
 }
 
+/* Responsive alignment adjustments for smaller screens to prevent map controls overlapping */
+@media (max-width: 768px) {
+    .ai-chat-launcher {
+        bottom: 16px !important;
+        right: 16px !important;
+        width: 50px !important;
+        height: 50px !important;
+    }
+    
+    .ai-chat-launcher i {
+        font-size: 1.3rem !important;
+    }
+    
+    .ai-chat-container {
+        right: 12px !important;
+        bottom: 76px !important;
+        width: calc(100vw - 24px) !important;
+        height: 500px !important;
+        max-height: calc(100vh - 96px) !important;
+    }
+}
+
+
