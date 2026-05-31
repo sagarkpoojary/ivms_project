@@ -1,112 +1,80 @@
 {% extends "base.html" %}
 {% block content %}
 
-<style>
-  .card-settings {
-    background: #fff;
-    border-radius: 16px;
-    border: none;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.03);
-    margin-bottom: 25px;
-  }
-  .settings-title {
-    font-size: 1.15rem;
-    font-weight: 700;
-    color: #1e293b;
-    margin-bottom: 20px;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-  }
-  .checkbox-group {
-    background: #f8fafc;
-    border: 1px solid #e2e8f0;
-    border-radius: 12px;
-    padding: 15px;
-    display: flex;
-    gap: 20px;
-    flex-wrap: wrap;
-  }
-  .form-check-input:checked {
-    background-color: var(--primary-color);
-    border-color: var(--primary-color);
-  }
-  .form-check-label {
-    font-weight: 600;
-    color: #475569;
-    font-size: 0.9rem;
-  }
-</style>
-
-<div class="d-flex align-items-center justify-content-between mb-4 flex-wrap">
-  <h3 class="m-0 text-primary fw-light">User Settings</h3>
-</div>
-
-<div class="row g-4" style="max-width: 800px;">
-  <div class="col-12">
-    {% if success %}
-    <div class="alert alert-success shadow-sm mb-4"><i class="fas fa-check-circle me-2"></i>{{ success }}</div>
-    {% endif %}
-
-    <form method="post" action="/settings">
-      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-
-      <!-- Card 1: Insurance Expiry Settings -->
-      <div class="card card-settings p-4">
-        <div class="settings-title text-primary">
-          <i class="fas fa-shield-alt"></i> Insurance Expiry Reminders
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
+        <div>
+            <h3 class="fw-bold mb-0 text-dark"><i class="fas fa-cog text-primary me-2"></i> User Settings</h3>
+            <p class="text-muted small mb-0">Configure reminder thresholds and alert intervals for vehicle compliance and maintenance schedules</p>
         </div>
-        <p class="text-muted small">Configure which intervals prior to insurance policy expiration will trigger notification alerts.</p>
-        <div class="checkbox-group">
-          {% for day in [30, 15, 7] %}
-          <div class="form-check form-check-inline">
-            <input class="form-check-input" type="checkbox" name="insurance_days" value="{{ day }}" id="ins_{{ day }}"
-              {% if day in reminder_settings.insurance_days %}checked{% endif %}>
-            <label class="form-check-label" for="ins_{{ day }}">{{ day }} Days Before Expiry</label>
-          </div>
-          {% endfor %}
-        </div>
-      </div>
+    </div>
 
-      <!-- Card 2: Registration Renewal Settings -->
-      <div class="card card-settings p-4">
-        <div class="settings-title text-success">
-          <i class="fas fa-id-card"></i> Registration Renewal Reminders
-        </div>
-        <p class="text-muted small">Configure which intervals prior to vehicle registry/mulkiya expiration will trigger renewal notifications.</p>
-        <div class="checkbox-group">
-          {% for day in [30, 15, 7] %}
-          <div class="form-check form-check-inline">
-            <input class="form-check-input" type="checkbox" name="registration_days" value="{{ day }}" id="reg_{{ day }}"
-              {% if day in reminder_settings.registration_days %}checked{% endif %}>
-            <label class="form-check-label" for="reg_{{ day }}">{{ day }} Days Before Expiry</label>
-          </div>
-          {% endfor %}
-        </div>
-      </div>
+    <div class="row g-4" style="max-width: 800px;">
+        <div class="col-12">
+            {% if success %}
+            <div class="alert alert-success shadow-sm rounded-3 mb-4"><i class="fas fa-check-circle me-2"></i>{{ success }}</div>
+            {% endif %}
 
-      <!-- Card 3: Maintenance/Service Schedule Settings -->
-      <div class="card card-settings p-4">
-        <div class="settings-title text-warning">
-          <i class="fas fa-tools"></i> Scheduled Maintenance Alerts
-        </div>
-        <p class="text-muted small">Configure which thresholds for maintenance targets (dates/mileage) will trigger automatic service warnings.</p>
-        <div class="checkbox-group">
-          {% for day in [30, 15, 7] %}
-          <div class="form-check form-check-inline">
-            <input class="form-check-input" type="checkbox" name="maintenance_days" value="{{ day }}" id="maint_{{ day }}"
-              {% if day in reminder_settings.maintenance_days %}checked{% endif %}>
-            <label class="form-check-label" for="maint_{{ day }}">{{ day }} Days Before Target</label>
-          </div>
-          {% endfor %}
-        </div>
-      </div>
+            <form method="post" action="/settings">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
 
-      <button type="submit" class="btn btn-primary px-4 py-2 shadow-sm">
-        <i class="fas fa-save me-2"></i>Save Configuration
-      </button>
-    </form>
-  </div>
+                <!-- Card 1: Insurance Expiry Settings -->
+                <div class="card card-premium p-4 mb-4">
+                    <div class="h5 fw-bold text-primary mb-2">
+                        <i class="fas fa-shield-alt me-2"></i> Insurance Expiry Reminders
+                    </div>
+                    <p class="text-muted small mb-3">Configure which intervals prior to insurance policy expiration will trigger notification alerts.</p>
+                    <div class="border-0 p-3 rounded-3 bg-light d-flex gap-3 flex-wrap">
+                        {% for day in [30, 15, 7] %}
+                        <div class="form-check form-check-inline">
+                            <input class="form-check-input" type="checkbox" name="insurance_days" value="{{ day }}" id="ins_{{ day }}"
+                                {% if day in reminder_settings.insurance_days %}checked{% endif %}>
+                            <label class="form-check-label text-dark fw-semibold" for="ins_{{ day }}">{{ day }} Days Before Expiry</label>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <!-- Card 2: Registration Renewal Settings -->
+                <div class="card card-premium p-4 mb-4">
+                    <div class="h5 fw-bold text-success mb-2">
+                        <i class="fas fa-id-card me-2"></i> Registration Renewal Reminders
+                    </div>
+                    <p class="text-muted small mb-3">Configure which intervals prior to vehicle registry/mulkiya expiration will trigger renewal notifications.</p>
+                    <div class="border-0 p-3 rounded-3 bg-light d-flex gap-3 flex-wrap">
+                        {% for day in [30, 15, 7] %}
+                        <div class="form-check form-check-inline">
+                            <input class="form-check-input" type="checkbox" name="registration_days" value="{{ day }}" id="reg_{{ day }}"
+                                {% if day in reminder_settings.registration_days %}checked{% endif %}>
+                            <label class="form-check-label text-dark fw-semibold" for="reg_{{ day }}">{{ day }} Days Before Expiry</label>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <!-- Card 3: Maintenance/Service Schedule Settings -->
+                <div class="card card-premium p-4 mb-4">
+                    <div class="h5 fw-bold text-warning mb-2">
+                        <i class="fas fa-tools me-2"></i> Scheduled Maintenance Alerts
+                    </div>
+                    <p class="text-muted small mb-3">Configure which thresholds for maintenance targets (dates/mileage) will trigger automatic service warnings.</p>
+                    <div class="border-0 p-3 rounded-3 bg-light d-flex gap-3 flex-wrap">
+                        {% for day in [30, 15, 7] %}
+                        <div class="form-check form-check-inline">
+                            <input class="form-check-input" type="checkbox" name="maintenance_days" value="{{ day }}" id="maint_{{ day }}"
+                                {% if day in reminder_settings.maintenance_days %}checked{% endif %}>
+                            <label class="form-check-label text-dark fw-semibold" for="maint_{{ day }}">{{ day }} Days Before Target</label>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <button type="submit" class="btn btn-primary px-4 py-2 rounded-3 shadow-sm">
+                    <i class="fas fa-save me-2"></i>Save Configuration
+                </button>
+            </form>
+        </div>
+    </div>
 </div>
 
 {% endblock %}

@@ -1,68 +1,87 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
-    <h3 class="m-0"><i class="fas fa-chart-line text-primary me-2"></i>Enterprise Analytics</h3>
-</div>
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
+        <div>
+            <h3 class="fw-bold mb-0 text-dark"><i class="fas fa-chart-line text-primary me-2"></i> Enterprise Analytics</h3>
+            <p class="text-muted small mb-0">Monitor telemetry reports, trip metrics, and driver rule violations</p>
+        </div>
+    </div>
 
-<div class="row mb-4">
-    <div class="col-md-12">
-        <div class="card p-3 shadow-sm border-0">
-            <div class="row g-2">
-                <div class="col-md-3">
-                    <label class="form-label small fw-bold">Vehicle</label>
+    <!-- Filter Card -->
+    <div class="card card-premium border-0 shadow-sm p-4 mb-4">
+        <div class="row g-3 align-items-center">
+            <div class="col-md-3">
+                <div class="outlined-group mb-0">
                     <select id="vehicleSelect" class="form-select"></select>
+                    <label class="form-label">Select Vehicle</label>
                 </div>
-                <div class="col-md-3">
-                    <label class="form-label small fw-bold">Start Date</label>
+            </div>
+            <div class="col-md-3">
+                <div class="outlined-group mb-0">
                     <input type="date" id="startDate" class="form-control">
+                    <label class="form-label">Start Date</label>
                 </div>
-                <div class="col-md-3">
-                    <label class="form-label small fw-bold">End Date</label>
+            </div>
+            <div class="col-md-3">
+                <div class="outlined-group mb-0">
                     <input type="date" id="endDate" class="form-control">
+                    <label class="form-label">End Date</label>
                 </div>
-                <div class="col-md-3 d-flex align-items-end">
-                    <button id="fetchAnalytics" class="btn btn-primary w-100">Generate Report</button>
-                </div>
+            </div>
+            <div class="col-md-3">
+                <button id="fetchAnalytics" class="btn btn-primary w-100 py-2 rounded-3 shadow-sm"><i class="fas fa-filter me-2"></i>Generate Report</button>
             </div>
         </div>
     </div>
-</div>
 
-<div class="row">
-    <div class="col-md-8">
-        <div class="card shadow-sm border-0 mb-4">
-            <div class="card-header bg-white py-3">
-                <h6 class="m-0 fw-bold"><i class="fas fa-route text-primary me-2"></i>Trip Summary</h6>
+    <div class="row">
+        <!-- Trip Summary -->
+        <div class="col-md-8">
+            <!-- Desktop View -->
+            <div class="card card-premium border-0 shadow-sm d-none d-md-block mb-4">
+                <div class="card-header bg-white py-3 border-0">
+                    <h5 class="m-0 fw-bold text-dark"><i class="fas fa-route text-primary me-2"></i>Trip Summary</h5>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Start Time</th>
+                                    <th>End Time</th>
+                                    <th>Duration</th>
+                                    <th>Distance</th>
+                                    <th>Max Speed</th>
+                                    <th>Driver</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tripsBody">
+                                <tr><td colspan="6" class="text-center py-5 text-muted">Select filters to view trips</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
             </div>
-            <div class="table-responsive">
-                <table class="table table-hover align-middle mb-0">
-                    <thead class="table-light">
-                        <tr>
-                            <th>Start Time</th>
-                            <th>End Time</th>
-                            <th>Duration</th>
-                            <th>Distance</th>
-                            <th>Max Speed</th>
-                            <th>Driver</th>
-                        </tr>
-                    </thead>
-                    <tbody id="tripsBody">
-                        <tr><td colspan="6" class="text-center py-4 text-muted">Select filters to view trips</td></tr>
-                    </tbody>
-                </table>
+
+            <!-- Mobile View -->
+            <div class="d-block d-md-none" id="tripsMobileContainer">
+                <p class="text-muted text-center py-4">Select filters to view trips</p>
             </div>
         </div>
-    </div>
-    <div class="col-md-4">
-        <div class="card shadow-sm border-0">
-            <div class="card-header bg-white py-3">
-                <h6 class="m-0 fw-bold"><i class="fas fa-exclamation-triangle text-danger me-2"></i>Violation Alerts</h6>
-            </div>
-            <div class="p-0">
-                <ul class="list-group list-group-flush" id="eventsList">
-                    <li class="list-group-item text-center py-4 text-muted">No events to show</li>
-                </ul>
+
+        <!-- Violation Alerts -->
+        <div class="col-md-4">
+            <div class="card card-premium border-0 shadow-sm mb-4">
+                <div class="card-header bg-white py-3 border-0">
+                    <h5 class="m-0 fw-bold text-dark"><i class="fas fa-exclamation-triangle text-danger me-2"></i>Violation Alerts</h5>
+                </div>
+                <div class="p-0">
+                    <ul class="list-group list-group-flush" id="eventsList">
+                        <li class="list-group-item text-center py-5 text-muted border-0">No events to show</li>
+                    </ul>
+                </div>
             </div>
         </div>
     </div>
@@ -100,27 +119,59 @@
         const tripsRes = await fetch(`/api/v2/reports/trips/${imei}?start=${start}T00:00:00Z&end=${end}T23:59:59Z`);
         const trips = await tripsRes.json();
         const tripsBody = document.getElementById('tripsBody');
+        const tripsMobile = document.getElementById('tripsMobileContainer');
         tripsBody.innerHTML = '';
+        tripsMobile.innerHTML = '';
         
         if(trips.length === 0) {
-            tripsBody.innerHTML = '<tr><td colspan="6" class="text-center py-4 text-muted">No trips found</td></tr>';
+            tripsBody.innerHTML = '<tr><td colspan="6" class="text-center py-5 text-muted">No trips found</td></tr>';
+            tripsMobile.innerHTML = '<p class="text-muted text-center py-4">No trips found</p>';
         } else {
-            trips.forEach(t => {
+            tripsBody.innerHTML = trips.map(t => {
                 const startT = new Date(t.start_time);
                 const endT = t.end_time ? new Date(t.end_time) : null;
                 const duration = endT ? Math.round((endT - startT) / 60000) + ' min' : 'Ongoing';
-                
-                tripsBody.innerHTML += `
+                return `
                     <tr>
-                        <td>${startT.toLocaleString()}</td>
-                        <td>${endT ? endT.toLocaleString() : '-'}</td>
-                        <td>${duration}</td>
-                        <td>${t.distance_km.toFixed(2)} km</td>
-                        <td>${t.max_speed} km/h</td>
-                        <td><span class="badge bg-light text-dark">${t.driver_id || 'Unknown'}</span></td>
+                        <td class="fw-medium text-dark">${startT.toLocaleString()}</td>
+                        <td class="fw-medium text-muted">${endT ? endT.toLocaleString() : '-'}</td>
+                        <td><span class="badge badge-soft-info">${duration}</span></td>
+                        <td class="fw-semibold text-primary">${t.distance_km.toFixed(2)} km</td>
+                        <td class="fw-bold text-dark">${t.max_speed} km/h</td>
+                        <td><span class="badge badge-soft-success">${t.driver_id || 'Unknown'}</span></td>
                     </tr>
                 `;
-            });
+            }).join('');
+
+            tripsMobile.innerHTML = trips.map(t => {
+                const startT = new Date(t.start_time);
+                const endT = t.end_time ? new Date(t.end_time) : null;
+                const duration = endT ? Math.round((endT - startT) / 60000) + ' min' : 'Ongoing';
+                return `
+                    <div class="mobile-table-card card-premium mb-3">
+                        <div class="d-flex justify-content-between align-items-center mb-2 border-bottom pb-2">
+                            <span class="badge badge-soft-info">${duration}</span>
+                            <span class="badge badge-soft-success">${t.driver_id || 'Unknown'}</span>
+                        </div>
+                        <div class="mobile-table-card-row">
+                            <span class="mobile-table-card-label">Start Time</span>
+                            <span class="mobile-table-card-value text-dark fw-medium small">${startT.toLocaleString()}</span>
+                        </div>
+                        <div class="mobile-table-card-row">
+                            <span class="mobile-table-card-label">End Time</span>
+                            <span class="mobile-table-card-value text-muted small">${endT ? endT.toLocaleString() : '-'}</span>
+                        </div>
+                        <div class="mobile-table-card-row">
+                            <span class="mobile-table-card-label">Distance</span>
+                            <span class="mobile-table-card-value fw-semibold text-primary">${t.distance_km.toFixed(2)} km</span>
+                        </div>
+                        <div class="mobile-table-card-row">
+                            <span class="mobile-table-card-label">Max Speed</span>
+                            <span class="mobile-table-card-value fw-bold text-dark">${t.max_speed} km/h</span>
+                        </div>
+                    </div>
+                `;
+            }).join('');
         }
 
         // Fetch Events
@@ -130,20 +181,22 @@
         eventsList.innerHTML = '';
 
         if(events.length === 0) {
-            eventsList.innerHTML = '<li class="list-group-item text-center py-4 text-muted">No events recorded</li>';
+            eventsList.innerHTML = '<li class="list-group-item text-center py-5 text-muted border-0">No events recorded</li>';
         } else {
-            events.forEach(e => {
+            eventsList.innerHTML = events.map(e => {
                 const color = e.event_type === 'overspeed' ? 'danger' : 'primary';
-                eventsList.innerHTML += `
-                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                const badgeColor = e.event_type === 'overspeed' ? 'badge-soft-danger' : 'badge-soft-info';
+                const borderClass = e.event_type === 'overspeed' ? 'border-start border-danger border-3' : 'border-start border-primary border-3';
+                return `
+                    <li class="list-group-item d-flex justify-content-between align-items-center py-3 border-0 ${borderClass} mb-2 bg-light rounded-3">
                         <div>
-                            <div class="fw-bold text-${color}">${e.event_type.replace('_', ' ').toUpperCase()}</div>
-                            <div class="small text-muted">${new Date(e.timestamp).toLocaleString()}</div>
+                            <div class="fw-bold text-dark small">${e.event_type.replace('_', ' ').toUpperCase()}</div>
+                            <div class="small text-muted x-small">${new Date(e.timestamp).toLocaleString()}</div>
                         </div>
-                        <span class="badge bg-${color}">${e.value ? e.value + ' km/h' : '!!'}</span>
+                        <span class="badge ${badgeColor}">${e.value ? e.value + ' km/h' : 'Alert'}</span>
                     </li>
                 `;
-            });
+            }).join('');
         }
     }
 </script>

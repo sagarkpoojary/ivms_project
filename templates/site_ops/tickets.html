@@ -1,14 +1,18 @@
 {% extends "base.html" %}
 {% block content %}
 <div class="container-fluid py-4">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <h3 class="fw-bold mb-0 text-dark"><i class="fas fa-ticket-alt text-primary me-2"></i> Service Tickets</h3>
-        <button class="btn btn-primary shadow-sm" data-bs-toggle="modal" data-bs-target="#newTicketModal">
+    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
+        <div>
+            <h3 class="fw-bold mb-0 text-dark"><i class="fas fa-ticket-alt text-primary me-2"></i> Service Tickets</h3>
+            <p class="text-muted small mb-0">Track and manage hardware telemetry issues and maintenance tasks</p>
+        </div>
+        <button class="btn btn-primary shadow-sm rounded-3 px-4 py-2" data-bs-toggle="modal" data-bs-target="#newTicketModal">
             <i class="fas fa-plus me-1"></i> New Ticket
         </button>
     </div>
 
-    <div class="card border-0 shadow-sm rounded-4">
+    <!-- Desktop Table View -->
+    <div class="card card-premium border-0 shadow-sm rounded-4 d-none d-md-block mb-4">
         <div class="card-body p-0">
             <div class="table-responsive">
                 <table class="table table-hover mb-0">
@@ -20,7 +24,7 @@
                             <th>Priority</th>
                             <th>Status</th>
                             <th>Created At</th>
-                            <th>Actions</th>
+                            <th class="text-end">Actions</th>
                         </tr>
                     </thead>
                     <tbody id="ticketsTableBody">
@@ -30,50 +34,63 @@
             </div>
         </div>
     </div>
+
+    <!-- Mobile Fluid Cards View -->
+    <div class="d-block d-md-none" id="ticketsMobileContainer">
+        <!-- Loaded via API -->
+    </div>
 </div>
 
 <!-- New Ticket Modal -->
 <div class="modal fade" id="newTicketModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content border-0 shadow-lg rounded-4">
-            <div class="modal-header border-0 pb-0">
-                <h5 class="modal-title fw-bold">Create Service Ticket</h5>
+            <div class="modal-header border-0 pb-0 p-4">
+                <h5 class="modal-title fw-bold text-dark"><i class="fas fa-ticket-alt text-primary me-2"></i>Create Service Ticket</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-            <div class="modal-body">
+            <div class="modal-body p-4">
                 <form id="newTicketForm">
                     <div class="mb-3">
-                        <label class="form-label">Vehicle</label>
-                        <select class="form-select" name="imei" id="vehicleSelect" required>
-                            <option value="">Select Vehicle...</option>
-                        </select>
+                        <div class="outlined-group">
+                            <select class="form-select" name="imei" id="vehicleSelect" required>
+                                <option value="">Select Vehicle...</option>
+                            </select>
+                            <label class="form-label">Vehicle</label>
+                        </div>
                     </div>
                     <div class="mb-3">
-                        <label class="form-label">Issue Type</label>
-                        <select class="form-select" name="issue_type" required>
-                            <option value="Hardware Malfunction">Hardware Malfunction</option>
-                            <option value="Sensor Error">Sensor Error</option>
-                            <option value="GPS Drift">GPS Drift</option>
-                            <option value="SIM/Network Issue">SIM/Network Issue</option>
-                        </select>
+                        <div class="outlined-group">
+                            <select class="form-select" name="issue_type" required>
+                                <option value="Hardware Malfunction">Hardware Malfunction</option>
+                                <option value="Sensor Error">Sensor Error</option>
+                                <option value="GPS Drift">GPS Drift</option>
+                                <option value="SIM/Network Issue">SIM/Network Issue</option>
+                            </select>
+                            <label class="form-label">Issue Type</label>
+                        </div>
                     </div>
                     <div class="mb-3">
-                        <label class="form-label">Priority</label>
-                        <select class="form-select" name="priority">
-                            <option value="Low">Low</option>
-                            <option value="Medium" selected>Medium</option>
-                            <option value="High">High</option>
-                        </select>
+                        <div class="outlined-group">
+                            <select class="form-select" name="priority">
+                                <option value="Low">Low</option>
+                                <option value="Medium" selected>Medium</option>
+                                <option value="High">High</option>
+                            </select>
+                            <label class="form-label">Priority</label>
+                        </div>
                     </div>
                     <div class="mb-3">
-                        <label class="form-label">Description</label>
-                        <textarea class="form-control" name="description" rows="3" placeholder="Describe the issue..."></textarea>
+                        <div class="outlined-group">
+                            <textarea class="form-control" name="description" rows="3" placeholder="Describe the issue..." required></textarea>
+                            <label class="form-label">Description</label>
+                        </div>
                     </div>
                 </form>
             </div>
-            <div class="modal-footer border-0 pt-0">
-                <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
-                <button type="submit" form="newTicketForm" class="btn btn-primary">Create Ticket</button>
+            <div class="modal-footer border-0 pt-0 p-4">
+                <button type="button" class="btn btn-light rounded-3" data-bs-dismiss="modal">Cancel</button>
+                <button type="submit" form="newTicketForm" class="btn btn-primary rounded-3 px-4"><i class="fas fa-save me-2"></i>Create Ticket</button>
             </div>
         </div>
     </div>
@@ -86,25 +103,83 @@
         const res = await fetch('/api/v2/ops/service-tickets');
         const tickets = await res.json();
         const tbody = document.getElementById('ticketsTableBody');
+        const mobContainer = document.getElementById('ticketsMobileContainer');
         
         if (tickets.length === 0) {
             tbody.innerHTML = '<tr><td colspan="7" class="text-center py-5 text-muted">No service tickets found.</td></tr>';
+            mobContainer.innerHTML = '<p class="text-muted text-center py-4">No service tickets found.</p>';
             return;
         }
 
-        tbody.innerHTML = tickets.map(t => `
-            <tr>
-                <td class="fw-bold">#${t.id}</td>
-                <td>${t.vehicle_name || t.imei}</td>
-                <td>${t.issue_type}</td>
-                <td><span class="badge ${t.priority === 'High' ? 'bg-soft-danger' : (t.priority === 'Medium' ? 'bg-soft-warning' : 'bg-soft-info')}">${t.priority}</span></td>
-                <td><span class="badge bg-soft-primary">${t.status}</span></td>
-                <td class="small">${new Date(t.created_at).toLocaleString()}</td>
-                <td>
-                    <button class="btn btn-sm btn-light border" onclick="viewTicket(${t.id})"><i class="fas fa-eye"></i></button>
-                </td>
-            </tr>
-        `).join('');
+        // Render Desktop Rows
+        tbody.innerHTML = tickets.map(t => {
+            let priorityBadge = '';
+            if (t.priority === 'High') {
+                priorityBadge = 'badge-soft-danger';
+            } else if (t.priority === 'Medium') {
+                priorityBadge = 'badge-soft-warning';
+            } else {
+                priorityBadge = 'badge-soft-info';
+            }
+
+            let statusBadge = t.status === 'Open' ? 'badge-soft-warning' : 'badge-soft-success';
+
+            return `
+                <tr>
+                    <td class="fw-bold text-dark">#${t.id}</td>
+                    <td class="fw-semibold text-primary">${t.vehicle_name || t.imei}</td>
+                    <td><span class="text-dark fw-medium">${t.issue_type}</span></td>
+                    <td><span class="badge ${priorityBadge}">${t.priority}</span></td>
+                    <td><span class="badge ${statusBadge}">${t.status}</span></td>
+                    <td class="small text-muted">${new Date(t.created_at).toLocaleString()}</td>
+                    <td class="text-end">
+                        <button class="btn btn-sm btn-outline-primary rounded-3" onclick="viewTicket(${t.id})"><i class="fas fa-eye"></i></button>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+
+        // Render Mobile Cards View
+        mobContainer.innerHTML = tickets.map(t => {
+            let priorityBadge = '';
+            if (t.priority === 'High') {
+                priorityBadge = 'badge-soft-danger';
+            } else if (t.priority === 'Medium') {
+                priorityBadge = 'badge-soft-warning';
+            } else {
+                priorityBadge = 'badge-soft-info';
+            }
+
+            let statusBadge = t.status === 'Open' ? 'badge-soft-warning' : 'badge-soft-success';
+
+            return `
+                <div class="mobile-table-card card-premium mb-3">
+                    <div class="d-flex justify-content-between align-items-center mb-2 border-bottom pb-2">
+                        <strong class="text-dark fs-6">Ticket #${t.id}</strong>
+                        <span class="badge ${statusBadge}">${t.status}</span>
+                    </div>
+                    <div class="mobile-table-card-row">
+                        <span class="mobile-table-card-label">Vehicle</span>
+                        <span class="mobile-table-card-value fw-bold text-primary">${t.vehicle_name || t.imei}</span>
+                    </div>
+                    <div class="mobile-table-card-row">
+                        <span class="mobile-table-card-label">Issue Type</span>
+                        <span class="mobile-table-card-value fw-medium">${t.issue_type}</span>
+                    </div>
+                    <div class="mobile-table-card-row">
+                        <span class="mobile-table-card-label">Priority</span>
+                        <span class="badge ${priorityBadge}">${t.priority}</span>
+                    </div>
+                    <div class="mobile-table-card-row">
+                        <span class="mobile-table-card-label">Created At</span>
+                        <span class="mobile-table-card-value small text-muted">${new Date(t.created_at).toLocaleString()}</span>
+                    </div>
+                    <div class="d-flex justify-content-end gap-2 mt-3 pt-2 border-top">
+                        <button class="btn btn-sm btn-outline-primary rounded-3" onclick="viewTicket(${t.id})"><i class="fas fa-eye me-1"></i>View Details</button>
+                    </div>
+                </div>
+            `;
+        }).join('');
     }
 
     async function loadVehicles() {
@@ -114,6 +189,23 @@
         select.innerHTML = '<option value="">Select Vehicle...</option>' + 
             vehicles.map(v => `<option value="${v.unique_id}">${v.name} (${v.unique_id})</option>`).join('');
     }
+
+    document.getElementById('newTicketForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const formData = new FormData(e.target);
+        const data = Object.fromEntries(formData.entries());
+        
+        const res = await fetch('/api/v2/ops/service-tickets', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+
+        if (res.ok) {
+            bootstrap.Modal.getInstance(document.getElementById('newTicketModal')).hide();
+            loadTickets();
+        }
+    });
 
     document.addEventListener('DOMContentLoaded', () => {
         loadTickets();

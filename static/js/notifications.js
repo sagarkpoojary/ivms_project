@@ -59,24 +59,54 @@ function loadRules() {
         .then(response => response.json())
         .then(rules => {
             const tbody = document.querySelector('#rules-table tbody');
+            const mobContainer = document.getElementById('rulesMobileContainer');
             tbody.innerHTML = '';
+            mobContainer.innerHTML = '';
+            
             if (rules.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">No rules found</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="4" class="text-center py-5 text-muted">No rules found</td></tr>';
+                mobContainer.innerHTML = '<p class="text-muted text-center py-4">No rules found</p>';
                 return;
             }
+            
             rules.forEach(rule => {
+                // Desktop Table Row
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
-                    <td>${rule.type}</td>
-                    <td>${rule.notificators ? rule.notificators.replace(/,/g, ', ') : ''}</td>
-                    <td>${rule.description || '-'}</td>
+                    <td class="fw-bold text-dark">${rule.type}</td>
                     <td>
-                        <button class="btn btn-sm btn-outline-danger" onclick="deleteRule(${rule.id})">
+                        ${rule.notificators ? rule.notificators.split(',').map(n => `<span class="badge badge-soft-info me-1">${n.trim()}</span>`).join('') : '<span class="text-muted">-</span>'}
+                    </td>
+                    <td class="fw-semibold text-muted">${rule.description || '-'}</td>
+                    <td class="text-end">
+                        <button class="btn btn-sm btn-outline-danger rounded-3" onclick="deleteRule(${rule.id})">
                             <i class="fas fa-trash"></i>
                         </button>
                     </td>
                 `;
                 tbody.appendChild(tr);
+
+                // Mobile Card Item
+                const channels = rule.notificators ? rule.notificators.split(',').map(n => `<span class="badge badge-soft-info me-1">${n.trim()}</span>`).join('') : '<span class="text-muted">-</span>';
+                const cardDiv = document.createElement('div');
+                cardDiv.className = 'mobile-table-card card-premium mb-3';
+                cardDiv.innerHTML = `
+                    <div class="d-flex justify-content-between align-items-center mb-2 border-bottom pb-2">
+                        <strong class="text-primary fs-6">${rule.type}</strong>
+                        <button class="btn btn-sm btn-outline-danger rounded-3" onclick="deleteRule(${rule.id})">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                    <div class="mobile-table-card-row">
+                        <span class="mobile-table-card-label">Channels</span>
+                        <span class="mobile-table-card-value">${channels}</span>
+                    </div>
+                    <div class="mobile-table-card-row">
+                        <span class="mobile-table-card-label">Description</span>
+                        <span class="mobile-table-card-value fw-semibold text-muted">${rule.description || '-'}</span>
+                    </div>
+                `;
+                mobContainer.appendChild(cardDiv);
             });
         })
         .catch(error => console.error('Error loading rules:', error));

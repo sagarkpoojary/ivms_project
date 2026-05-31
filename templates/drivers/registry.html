@@ -1,14 +1,15 @@
 {% extends "base.html" %}
 {% block content %}
 <div class="container-fluid py-4">
-    <div class="d-flex justify-content-between align-items-center mb-4">
+    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
         <h3 class="fw-bold mb-0 text-dark"><i class="fas fa-users text-primary me-2"></i> Driver Registry</h3>
-        <button class="btn btn-primary shadow-sm" data-bs-toggle="modal" data-bs-target="#addDriverModal">
-            <i class="fas fa-user-plus me-1"></i> Register Driver
+        <button class="btn btn-primary shadow-sm rounded-3 px-4 py-2" data-bs-toggle="modal" data-bs-target="#addDriverModal">
+            <i class="fas fa-user-plus me-2"></i>Register Driver
         </button>
     </div>
 
-    <div class="card border-0 shadow-sm rounded-4">
+    <!-- Desktop Table View -->
+    <div class="card card-premium border-0 shadow-sm rounded-4 d-none d-md-block mb-4">
         <div class="card-body p-0">
             <div class="table-responsive">
                 <table class="table table-hover mb-0">
@@ -19,7 +20,7 @@
                             <th>RFID Tag</th>
                             <th>License #</th>
                             <th>Dept/Team</th>
-                            <th>Actions</th>
+                            <th class="text-end">Actions</th>
                         </tr>
                     </thead>
                     <tbody id="driversTableBody">
@@ -29,57 +30,76 @@
             </div>
         </div>
     </div>
+
+    <!-- Mobile Fluid Cards View -->
+    <div class="d-block d-md-none" id="driversMobileContainer">
+        <!-- Loaded via API -->
+    </div>
 </div>
 
 <!-- Add Driver Modal -->
 <div class="modal fade" id="addDriverModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content border-0 shadow-lg rounded-4">
-            <div class="modal-header border-0 pb-0">
-                <h5 class="modal-title fw-bold">Register New Driver</h5>
+            <div class="modal-header border-0 pb-0 p-4">
+                <h5 class="modal-title fw-bold text-dark"><i class="fas fa-user-plus text-primary me-2"></i>Register New Driver</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-            <div class="modal-body">
+            <div class="modal-body p-4">
                 <form id="addDriverForm">
                     <div class="row">
                         <div class="col-6 mb-3">
-                            <label class="form-label">Driver ID</label>
-                            <input type="text" class="form-control" name="driver_id" required placeholder="D-1234">
+                            <div class="outlined-group">
+                                <input type="text" class="form-control" name="driver_id" required placeholder="D-1234">
+                                <label class="form-label">Driver ID</label>
+                            </div>
                         </div>
                         <div class="col-6 mb-3">
-                            <label class="form-label">RFID Tag</label>
-                            <input type="text" class="form-control" name="rfid_tag" placeholder="Optional">
+                            <div class="outlined-group">
+                                <input type="text" class="form-control" name="rfid_tag" placeholder="Optional">
+                                <label class="form-label">RFID Tag</label>
+                            </div>
                         </div>
                     </div>
                     <div class="mb-3">
-                        <label class="form-label">Full Name</label>
-                        <input type="text" class="form-control" name="name" required>
-                    </div>
-                    <div class="row">
-                        <div class="col-6 mb-3">
-                            <label class="form-label">Phone</label>
-                            <input type="text" class="form-control" name="phone">
-                        </div>
-                        <div class="col-6 mb-3">
-                            <label class="form-label">License #</label>
-                            <input type="text" class="form-control" name="license_number">
+                        <div class="outlined-group">
+                            <input type="text" class="form-control" name="name" required placeholder="Full Name">
+                            <label class="form-label">Full Name</label>
                         </div>
                     </div>
                     <div class="row">
                         <div class="col-6 mb-3">
-                            <label class="form-label">Department</label>
-                            <input type="text" class="form-control" name="department">
+                            <div class="outlined-group">
+                                <input type="text" class="form-control" name="phone" placeholder="Phone Number">
+                                <label class="form-label">Phone</label>
+                            </div>
                         </div>
                         <div class="col-6 mb-3">
-                            <label class="form-label">Team</label>
-                            <input type="text" class="form-control" name="team">
+                            <div class="outlined-group">
+                                <input type="text" class="form-control" name="license_number" placeholder="License Number">
+                                <label class="form-label">License #</label>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-6 mb-3">
+                            <div class="outlined-group">
+                                <input type="text" class="form-control" name="department" placeholder="Department">
+                                <label class="form-label">Department</label>
+                            </div>
+                        </div>
+                        <div class="col-6 mb-3">
+                            <div class="outlined-group">
+                                <input type="text" class="form-control" name="team" placeholder="Team Name">
+                                <label class="form-label">Team</label>
+                            </div>
                         </div>
                     </div>
                 </form>
             </div>
-            <div class="modal-footer border-0 pt-0">
-                <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
-                <button type="submit" form="addDriverForm" class="btn btn-primary">Save Driver</button>
+            <div class="modal-footer border-0 pt-0 p-4">
+                <button type="button" class="btn btn-light rounded-3" data-bs-dismiss="modal">Cancel</button>
+                <button type="submit" form="addDriverForm" class="btn btn-primary rounded-3 px-4"><i class="fas fa-save me-2"></i>Save Driver</button>
             </div>
         </div>
     </div>
@@ -92,30 +112,63 @@
         const res = await fetch('/api/v2/ops/drivers');
         const drivers = await res.json();
         const tbody = document.getElementById('driversTableBody');
+        const mobContainer = document.getElementById('driversMobileContainer');
         
         if (drivers.length === 0) {
             tbody.innerHTML = '<tr><td colspan="6" class="text-center py-5 text-muted">No drivers registered yet.</td></tr>';
+            mobContainer.innerHTML = '<p class="text-muted text-center py-4">No drivers registered yet.</p>';
             return;
         }
 
+        // Render Desktop Table Rows
         tbody.innerHTML = drivers.map(d => `
             <tr>
                 <td class="fw-bold text-primary">${d.driver_id}</td>
                 <td>
                     <div class="fw-bold">${d.name}</div>
-                    <div class="small text-muted">${d.phone || ''}</div>
+                    <div class="small text-muted">${d.phone || '-'}</div>
                 </td>
-                <td><span class="badge bg-soft-info">${d.rfid_tag || 'None'}</span></td>
-                <td>${d.license_number || 'N/A'}</td>
+                <td><span class="badge badge-soft-info">${d.rfid_tag || 'None'}</span></td>
+                <td><span class="fw-semibold text-dark">${d.license_number || 'N/A'}</span></td>
                 <td>
                     <div class="small fw-bold">${d.department || ''}</div>
                     <div class="x-small text-muted">${d.team || ''}</div>
                 </td>
-                <td>
-                    <button class="btn btn-sm btn-light border"><i class="fas fa-edit"></i></button>
-                    <button class="btn btn-sm btn-soft-danger border"><i class="fas fa-trash"></i></button>
+                <td class="text-end">
+                    <button class="btn btn-sm btn-outline-primary me-1 rounded-3"><i class="fas fa-edit"></i></button>
+                    <button class="btn btn-sm btn-outline-danger rounded-3"><i class="fas fa-trash"></i></button>
                 </td>
             </tr>
+        `).join('');
+
+        // Render Mobile Cards View
+        mobContainer.innerHTML = drivers.map(d => `
+            <div class="mobile-table-card card-premium mb-3">
+                <div class="d-flex justify-content-between align-items-center mb-2 border-bottom pb-2">
+                    <strong class="text-primary fs-6">${d.driver_id}</strong>
+                    <span class="badge badge-soft-info">${d.rfid_tag || 'None'}</span>
+                </div>
+                <div class="mobile-table-card-row">
+                    <span class="mobile-table-card-label">Full Name</span>
+                    <span class="mobile-table-card-value fw-bold">${d.name}</span>
+                </div>
+                <div class="mobile-table-card-row">
+                    <span class="mobile-table-card-label">Phone</span>
+                    <span class="mobile-table-card-value">${d.phone || '-'}</span>
+                </div>
+                <div class="mobile-table-card-row">
+                    <span class="mobile-table-card-label">License #</span>
+                    <span class="mobile-table-card-value fw-semibold text-dark">${d.license_number || 'N/A'}</span>
+                </div>
+                <div class="mobile-table-card-row">
+                    <span class="mobile-table-card-label">Dept / Team</span>
+                    <span class="mobile-table-card-value">${d.department || '-'} ${d.team ? '('+d.team+')' : ''}</span>
+                </div>
+                <div class="d-flex justify-content-end gap-2 mt-3 pt-2 border-top">
+                    <button class="btn btn-sm btn-outline-primary rounded-3"><i class="fas fa-edit me-1"></i>Edit</button>
+                    <button class="btn btn-sm btn-outline-danger rounded-3"><i class="fas fa-trash me-1"></i>Delete</button>
+                </div>
+            </div>
         `).join('');
     }
 

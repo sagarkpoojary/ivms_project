@@ -1,20 +1,21 @@
 {% extends "base.html" %}
 {% block content %}
 <div class="container-fluid py-4">
-    <div class="d-flex justify-content-between align-items-center mb-4">
+    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
         <h3 class="fw-bold mb-0 text-dark"><i class="fas fa-calendar-check text-primary me-2"></i> Driver Attendance</h3>
         <div class="d-flex gap-2">
-            <select id="periodFilter" class="form-select border-0 shadow-sm" onchange="loadAttendance()">
+            <select id="periodFilter" class="form-select border-0 shadow-sm rounded-3" style="max-width: 150px;" onchange="loadAttendance()">
                 <option value="Today" selected>Today</option>
                 <option value="Yesterday">Yesterday</option>
                 <option value="This Week">This Week</option>
                 <option value="This Month">This Month</option>
             </select>
-            <button class="btn btn-primary shadow-sm" onclick="loadAttendance()"><i class="fas fa-sync-alt"></i> Refresh</button>
+            <button class="btn btn-primary shadow-sm rounded-3 px-3" onclick="loadAttendance()"><i class="fas fa-sync-alt me-1"></i>Refresh</button>
         </div>
     </div>
 
-    <div class="card border-0 shadow-sm rounded-4">
+    <!-- Desktop Table View -->
+    <div class="card card-premium border-0 shadow-sm rounded-4 d-none d-md-block mb-4">
         <div class="card-body p-0">
             <div class="table-responsive">
                 <table class="table table-hover mb-0">
@@ -35,6 +36,11 @@
             </div>
         </div>
     </div>
+
+    <!-- Mobile Fluid Cards View -->
+    <div class="d-block d-md-none" id="attendanceMobileContainer">
+        <!-- Loaded via API -->
+    </div>
 </div>
 {% endblock %}
 
@@ -45,12 +51,15 @@
         const res = await fetch(`/api/v2/ops/driver-attendance?period=${period}`);
         const data = await res.json();
         const tbody = document.getElementById('attendanceTableBody');
+        const mobContainer = document.getElementById('attendanceMobileContainer');
         
         if (data.length === 0) {
             tbody.innerHTML = '<tr><td colspan="6" class="text-center py-5 text-muted">No attendance records found for this period.</td></tr>';
+            mobContainer.innerHTML = '<p class="text-muted text-center py-4">No attendance records found for this period.</p>';
             return;
         }
 
+        // Render Desktop Table Rows
         tbody.innerHTML = data.map(row => {
             const login = new Date(row.login_time);
             const logout = row.logout_time ? new Date(row.logout_time) : null;
@@ -62,16 +71,52 @@
                         <div class="fw-bold">${row.driver_name}</div>
                         <div class="small text-muted">ID: ${row.driver_id}</div>
                     </td>
-                    <td>${row.vehicle_name || 'N/A'}</td>
+                    <td><span class="fw-semibold text-dark">${row.vehicle_name || 'N/A'}</span></td>
                     <td>${login.toLocaleString()}</td>
-                    <td>${logout ? logout.toLocaleString() : '<span class="text-success fw-bold">Still Logged In</span>'}</td>
+                    <td>${logout ? logout.toLocaleString() : '<span class="badge badge-soft-success">Still Logged In</span>'}</td>
                     <td>${duration}</td>
                     <td>
-                        <span class="badge ${logout ? 'bg-soft-secondary' : 'bg-soft-success'}">
+                        <span class="badge ${logout ? 'badge-soft-info' : 'badge-soft-success'}">
                             ${logout ? 'Completed' : 'On-Duty'}
                         </span>
                     </td>
                 </tr>
+            `;
+        }).join('');
+
+        // Render Mobile Cards View
+        mobContainer.innerHTML = data.map(row => {
+            const login = new Date(row.login_time);
+            const logout = row.logout_time ? new Date(row.logout_time) : null;
+            const duration = logout ? Math.round((logout - login) / 3600000 * 10) / 10 + ' hrs' : 'Active';
+            
+            return `
+                <div class="mobile-table-card card-premium mb-3">
+                    <div class="d-flex justify-content-between align-items-center mb-2 border-bottom pb-2">
+                        <strong class="text-primary fs-6">${row.driver_name}</strong>
+                        <span class="badge ${logout ? 'badge-soft-info' : 'badge-soft-success'}">${logout ? 'Completed' : 'On-Duty'}</span>
+                    </div>
+                    <div class="mobile-table-card-row">
+                        <span class="mobile-table-card-label">Driver ID</span>
+                        <span class="mobile-table-card-value"><code>${row.driver_id}</code></span>
+                    </div>
+                    <div class="mobile-table-card-row">
+                        <span class="mobile-table-card-label">Vehicle</span>
+                        <span class="mobile-table-card-value fw-semibold text-dark">${row.vehicle_name || 'N/A'}</span>
+                    </div>
+                    <div class="mobile-table-card-row">
+                        <span class="mobile-table-card-label">Login Time</span>
+                        <span class="mobile-table-card-value small">${login.toLocaleString()}</span>
+                    </div>
+                    <div class="mobile-table-card-row">
+                        <span class="mobile-table-card-label">Logout Time</span>
+                        <span class="mobile-table-card-value small">${logout ? logout.toLocaleString() : '<span class="badge badge-soft-success">Still Logged In</span>'}</span>
+                    </div>
+                    <div class="mobile-table-card-row">
+                        <span class="mobile-table-card-label">Duration</span>
+                        <span class="mobile-table-card-value fw-bold text-dark">${duration}</span>
+                    </div>
+                </div>
             `;
         }).join('');
     }
